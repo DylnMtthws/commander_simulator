@@ -1,0 +1,52 @@
+# CI: configure, build, test, and check the core is sealed.
+#
+# macOS runner because that is the only platform this project targets - it runs
+# locally on an Apple Silicon Mac mini and nowhere else. Adding ubuntu here
+# would test a configuration nobody uses, and would eventually fail for reasons
+# that do not matter.
+#
+# The ci preset is asan plus -Werror. Warnings are errors in CI and NOT locally:
+# a warning should stop a merge without stopping someone mid-thought.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ninja
+        run: brew install ninja
+
+      # Catch2 is fetched at configure time, so cache it or every run pays a
+      # clone plus a full build of the framework.
+      - name: Cache FetchContent dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/ci/_deps
+          key: deps-${{ runner.os }}-${{ hashFiles('tests/CMakeLists.txt') }}
+
+      - name: Core is sealed
+        run: ./scripts/check_core_is_sealed.sh
+
+      - name: Configure
+        run: cmake --preset ci
+
+      - name: Build
+        run: cmake --build --preset ci
+
+      # noTestsAction=error in the preset: a run that discovers zero tests is a
+      # failure, not a pass. Otherwise a broken catch_discover_tests silently
+      # turns CI green while testing nothing.
+      - name: Test
+        run: ctest --preset ci

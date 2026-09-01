@@ -1,0 +1,7 @@
+# CMake writes everything into the build directory; nothing generated is tracked.
+build/
+# macOS
+.DS_Store
+# Editor / IDE
+.cache/
+compile_commands.json
