@@ -401,6 +401,52 @@ A mean is excluded outright and for a separate reason: with a third of games
 censored, the mean over the games that finished is not the mean of anything
 (§10.3), and it biases optimistically.
 
+#### THE BLIND SPOT this objective has, and it is not a trade-off
+
+An early-turn objective **cannot see a mid-game engine piece.** This is stated
+separately from the reasoning above because it is a different kind of warning: a
+trade-off is something a reader weighs, and this is something the number is
+structurally unable to represent.
+
+Measured (§16.5), the same card at three objectives:
+
+| Card | turn 3 | turn 6 | turn 12 |
+|---|---|---|---|
+| **Basalt Monolith** | **−0.61%** | +1.09% | **+5.58%** |
+| Enduring Vitality | +7.28% | +24.98% | +30.50% |
+| Force of Will (inert, a control) | −0.63% | −1.23% | −0.31% |
+
+*Basalt Monolith* is **half of the deck's primary engine** — the `kinnan_basalt`
+line that produces unbounded colourless mana, and the reason *Thrasios* is in the
+99 at all. At turn 3 it scores **indistinguishably from a card declared to do
+nothing**, and slightly worse. That is not an error. It is colourless, it does
+not untap, and casting it on turn three buys nothing on turn three. By turn 12 it
+is worth +5.6.
+
+> **A keep/mull chart built on `P(assembled by turn 3)` ranks cards by how fast
+> they get you there, and a card whose entire contribution arrives on turn six
+> registers as a blank. The chart is not wrong. It is answering a question in
+> which that card does not appear.**
+
+Three consequences that a reader of such a chart has to be told, not left to
+infer:
+
+1. **Do not read a low score as "this card is bad."** Read it as "this card does
+   not act by turn N." Those coincide for a genuinely weak card and diverge
+   completely for a slow engine piece, and the chart cannot distinguish them.
+2. **Never derive a decklist change from a single-objective sweep.** Cutting the
+   cards at the bottom of a turn-3 table would cut *Basalt Monolith*, which is
+   half the engine. Run the sweep at two objectives before touching a list; the
+   §16.5 tables print the turn in the header for exactly this reason.
+3. **The blind spot is defensible for a MULLIGAN chart specifically**, which is
+   what this tool is for (§1). An opening-hand decision is a bet on the early
+   game, and a card that acts on turn six is genuinely worth less *to that
+   decision* than to the deck. The warning is against carrying the same number
+   to a different question.
+
+The honest summary is that this objective is right for the tool's stated purpose
+and wrong for the question people will reach for it to answer next.
+
 ### 4.2 The effect kinds — a closed, enumerated set
 
 **This list is closed.** It is derived from reading all 99 oracle texts, not
@@ -1520,6 +1566,54 @@ strictly worse, or a second copy of an existing effect is the point: if a
 finding survives a change of baseline it is about the card, and if it does not
 it was about the baseline.
 
+#### TECHNIQUE — declared-inert elements are a free control group
+
+**The bias above is inherent in choosing any replacement. It is not
+unmeasurable, and the thing that measures it was already in the model for a
+different reason.**
+
+This deck declares 31 cards `inert` (§4.4), each with a category and a
+human-readable reason, so that the run report can say what the model cannot see.
+That declaration has a second use nobody designed it for:
+
+> **Ablating an element declared to do nothing measures the replacement and
+> nothing else. A set of such elements is a control group, and its mean is the
+> baseline bias in the units of the result table.**
+
+Measured for this deck at turn 3: **−0.411%**, spread −0.627% to −0.287%. That
+number *is* what a *Forest* is worth over a blank card, and subtracting it turns
+"value against a Forest" into "value against nothing" — which is the quantity a
+reader thinks they are looking at.
+
+Without it the §16.5 table is close to unreadable. At turn 3 a land beats most of
+this deck, so nearly every nonland reads negative, and there is no way to tell
+*worse than a land* from *worse than nothing*. With it, seven of the deck's eight
+clones resolve to zero.
+
+**Three conditions, because this does not always work:**
+
+1. **The inert set must be declared, not inferred.** A card someone *believes* is
+   weak is not a control; a card the model is *architecturally unable to
+   represent* is. §4.4's forced declaration — every card `modeled` or `inert`
+   with a reason and a category, or the build fails — is what makes the set
+   trustworthy, and it was built to make the model's limits auditable rather
+   than for this.
+2. **Report the SPREAD, not just the mean.** The 31 nulls span 0.34 points,
+   wider than any single paired interval, because a cheap blank still gets cast
+   and wastes mana where an expensive one never does. "A blank card" is not one
+   number. Anything within about half that spread of zero is not distinguished
+   from doing nothing, and a re-centred column printed without its spread claims
+   a precision it does not have.
+3. **It needs enough of them.** Five is the floor the CLI enforces; fewer is a
+   coincidence rather than a control group, and the report says so and omits the
+   column instead of computing a null from one card.
+
+**The generalisation, which is the reason this is written as a technique rather
+than as a note about one sweep:** any model that forces its unrepresentable
+inputs to be *declared* — rather than dropping them, defaulting them, or letting
+them fail quietly — has a calibration set sitting inside it for free. The
+declaration was made for honesty. It pays a second time as measurement.
+
 Requirements:
 
 - `replacement` must resolve in the export and be legal in the deck's colour
@@ -2292,10 +2386,11 @@ measured, which is what makes a third of a point resolvable at all.
 
 #### The inert cards are a measured null, and that is what makes the table readable
 
-§9.4 says the replacement bias is "inherent in choosing any replacement" and
-"not removable". True — and **not unmeasurable**, because this deck declares 31
-cards that do nothing (§4.4). Ablating an inert card swaps a blank for a Forest,
-so its delta is *exactly* the value of that swap and nothing else.
+The technique is written up as a technique in §9.4, because it generalises past
+this sweep: **any model that forces its unrepresentable inputs to be declared has
+a control group sitting inside it for free.** Ablating an inert card swaps a
+blank for a Forest, so its delta is *exactly* the value of that swap and nothing
+else.
 
 | | value |
 |---|---|
