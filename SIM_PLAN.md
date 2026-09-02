@@ -2443,7 +2443,7 @@ is. And **`pay` uses declared pattern membership, not authored rank**: a feature
 built from `[policy.rank]` would make the grid a picture of the scorer rather
 than of the deck.
 
-**THE PRIMER'S EIGHT WORKED HANDS ARE HELD OUT.** They come with stated
+**THE PRIMER'S WORKED HANDS ARE HELD OUT.** They come with stated
 reasoning and they are the only external validation set this project will ever
 get. Fitting a grid with them in view and then scoring them answers nothing.
 They are also from version C (§15A), so each needs checking against A's 99 first.
@@ -3974,3 +3974,75 @@ under-measures — it is a mechanic the model does not have.
 - **The 29-card diff is not a to-do list.** A is the modelled list and stays that
   way; re-authoring to B would discard every measurement in §16 and produce a
   document whose numbers describe neither list.
+
+---
+
+## 18. The primer's hands: why they were not scored
+
+§13.1 held the primer's worked hands out as the only external validation set this
+project would get. **They were then checked for evaluability, and the check
+failed at a step before evaluability.** No agreement count is reported, and the
+reason is worth more than the count would have been.
+
+### 18.1 The hands cannot be read
+
+The primer's mulligan guide presents each hand as an **image of seven cards**.
+What is available in text is the prose around it — *"I would recommend starting
+turn 1 by playing Rejuvenating Springs → Mox Diamond discarding the Mana
+Confluence → casting Armored Scrapgorger"* — which names the cards the *line*
+uses, not the cards the *hand* holds.
+
+Every transcription below is therefore a **reconstruction from prose**, and
+several are visibly incomplete: six named cards where a hand has seven. That is
+not a transcription that can support a validation claim, and no amount of care in
+the scoring afterwards repairs it.
+
+### 18.2 And even taken at face value, 2 of 20 are evaluable on A
+
+| | |
+|---|---|
+| worked hands in the primer | 20 |
+| transcribed complete (7 non-commander cards) | 13 |
+| complete **and** every card present in A | **2** |
+| of those two, mulligans | **0** |
+
+The two are *Good Hand 1* and *Good Hand 7*. **Both are keeps.** A validation set
+with no negative examples validates nothing: a rule that says "keep" would score
+2 for 2 on it.
+
+**What blocks the other eighteen is §15A's three-versions problem, exactly:**
+
+| Blocking card | in A | in B |
+|---|---|---|
+| Seedborn Muse, Gaea's Cradle, Cyclonic Rift, Mana Drain, Void Winnower, Pongify | no | **yes** |
+| Mana Crypt, Bloom Tender, Armored Scrapgorger, Perplexing Chimera, Homeward Path, Force of Vigor | no | no |
+
+The first row is cards **B added and A never had**. The second is cards **only
+version C had** — *Mana Crypt* moved to the maybeboard, and the rest were cut
+before B. The primer's hands are drawn from a 99 that is neither the one modelled
+nor the one currently played, which is what §15A said and this is the cost of it.
+
+### 18.3 What this is worth, which is not nothing
+
+> **The hands stay held out, unscored, and that is the honest end state rather
+> than a deferral.** Producing an agreement count from two same-class hands
+> reconstructed out of prose would have been the most impressive-looking and
+> least defensible number in this document.
+
+Three things follow:
+
+1. **The primer's value to this project was never its hands.** It found three
+   real errors — a `TUTOR`/`SELECT` miscategorisation, `max_mana_value` compared
+   as `≤`, and *Hullbreaker Horror* filed inert (§16.12, §17.3) — and it
+   supplied the grid's features and the heuristic whose failure justified R3.
+   That is a great deal of external check, and none of it came from the hands.
+2. **A usable hand-level validation set is obtainable**, and cheaply: the hands
+   are readable by a person, and thirteen of the twenty are already transcribed
+   here for someone to correct against the images. What it needs is the reading,
+   not more machinery.
+3. **It would still be scored against A, and A is not what the primer describes.**
+   Even perfectly transcribed, a hand containing *Seedborn Muse* is not a hand
+   this deck can be dealt. **The validation set and the modelled list have to be
+   the same version**, and today they are three versions apart — which makes
+   this, in the end, another argument for §15A's provenance stamp rather than a
+   result.
