@@ -2045,3 +2045,107 @@ Each task ends somewhere runnable.
 
 Step 18 is where the project's real quality is decided. Everything before it is
 mechanism; that step is where you find out whether the numbers mean anything.
+
+---
+
+## 16. Findings — what the model has said that reading the deck did not
+
+Every other section of this document is about *how* to get a number. This one
+records the numbers that came back and said something, and it is deliberately
+short: most of what a simulator produces confirms what its author already
+believed, and the entries worth writing down are the ones that did not.
+
+**All figures: 20,000 games, seed 1, `P(assembled by turn N)`, measured by
+declaring the cards in question `inert` and re-running.** The intervals are not
+here yet — Phase 6 — and the smallest two findings below are the reason that
+matters rather than a formality.
+
+### 16.1 Clones matter less than their count suggests
+
+| | turn 3 | turn 6 | turn 12 |
+|---|---|---|---|
+| all eight clones inert | 8.38% | 36.30% | 66.36% |
+| baseline | 8.71% | 37.01% | 66.65% |
+| **the eight clones are worth** | **+0.33** | **+0.71** | **+0.29** |
+
+`CLONE` is the second-largest kind in the deck at 8 cards, and §4.2 makes a
+point of the fact that a taxonomy derived from the format rather than from these
+99 texts would have missed it. That was right about the *modelling* and it turns
+out to be a poor guide to the *deck*: eight cards move the curve by about a
+third of a point.
+
+**The reason is specific and is the finding, not the number.** In a Kinnan shell
+a clone's job is copying a mana source. Copying a mana source only pays when
+mana is the binding constraint — and for this deck it usually is not. What binds
+is *finding Thrasios*, which is a tutor's job and not a clone's. A clone of a
+Sol Ring is more mana on a board that already had enough.
+
+This is the first result in the project that is about the DECK rather than about
+the model. Everything before it — the seeding, the pattern proxies, the mana
+payment — was the simulator being wrong and then being less wrong.
+
+### 16.2 One tutor is worth twenty-five clones
+
+| | turn 3 | turn 6 | turn 12 |
+|---|---|---|---|
+| Chord of Calling inert | 6.51% | 30.98% | 58.99% |
+| baseline | 8.71% | 37.01% | 66.65% |
+| **Chord of Calling is worth** | **+2.20** | **+6.03** | **+7.66** |
+
+The same measurement on *Finale of Devastation*, which is the same card and was
+already authored, costs 7.25 points — so the magnitude is a property of the
+effect and not of the newer code. §16.1's explanation predicts this: an X-cost
+creature tutor straight to the battlefield finds Thrasios, and finding Thrasios
+is what the deck is short of.
+
+### 16.3 Convoke — the elaborate half of the card — is worth nothing
+
+| | turn 3 | turn 6 | turn 12 |
+|---|---|---|---|
+| Chord without convoke | 8.47% | 36.63% | 66.67% |
+| baseline | 8.71% | 37.01% | 66.65% |
+| **convoke is worth** | **+0.24** | **+0.38** | **−0.02** |
+
+Convoke is the only cost in the deck that reads the battlefield, it is why Chord
+was authored last and separately, and it is the single most intricate piece of
+the effect model. It is worth a fraction of a point early and, at turn 12, a
+number whose sign is not established.
+
+The reason is that this deck's creatures are almost all mana dorks, and a mana
+dork under Kinnan taps for two where convoking it pays one — so the creatures
+convoke is *allowed* to use are the few that do nothing else, and those are
+rarely on the battlefield when Chord is castable. **Effort spent on a mechanism
+is not evidence about its importance**, and the ratio here is roughly 300:1
+against the intuition that put convoke last in the authoring order.
+
+### 16.4 The metric is sensitive at turn 3 and numb at turn 12
+
+Not a deck finding — a finding about reading the other three. Fixing the mana
+payment bug (see the commit; free mana from Enduring Vitality, from clones and
+from Elvish Spirit Guide) moved the curve like this:
+
+| | turn 3 | turn 4 | turn 6 | turn 12 |
+|---|---|---|---|---|
+| before | 18.27% | 26.87% | 39.72% | 67.25% |
+| after | 8.71% | 19.59% | 37.01% | 66.65% |
+
+**Turn 3 halved and turn 12 moved by six-tenths of a point.** The tail is
+insensitive because by turn 12 the deck has enough real mana anyway, so a bug
+that hands it free mana changes only *when*. Anything reported as a single
+summary number should therefore be an early-turn one; §10.1's insistence on the
+whole CDF over a mean is doing more work than it looked like.
+
+### 16.5 What is not yet established
+
+§16.1 and §16.3 are differences of a few tenths of a point at 20,000 games.
+Unpaired, that is inside the noise: at p ≈ 0.67 the standard error is 0.33
+points and a 95% interval is about ±0.65 either side. They are *paired* — every
+ablation reuses seed 1 and the same game indices, so the two runs draw the same
+cards until the decks diverge — and common random numbers is exactly the reason
+§10.4 asks for it. But the pairing has not been exploited in the reporting, and
+**until §10.2's intervals exist, "+0.29" and "0" are not distinguished here.**
+
+The finding in §16.1 does not rest on the interval — 8 cards at a third of a
+point versus 1 card at seven and a half points is not a close call at any
+plausible width — but its *precise* value is not yet a claim this document
+makes.
