@@ -1,0 +1,103 @@
+# State
+
+Where the work is. Design decisions and findings live in
+[SIM_PLAN.md](SIM_PLAN.md), how to build it in [README.md](README.md). Updated
+when an item completes.
+
+## Position
+
+**Phases 0–7 complete, including R3.** The model executes Kinnan's dig rather
+than detecting it, which was the last known missing verb on the deck's main line.
+
+The current headline, 60,000 games, `data/kinnan.deck.toml` (list A, snapshot
+2026-09-01, 99 sha256 `f3919eaf`):
+
+| | |
+|---|---|
+| P(assembled by turn 3) | **1.41%** |
+| P(assembled by turn 6) | **20.86%** |
+| P(assembled by turn 12) | **76.82%** |
+| censored | 23.18% |
+
+Read §9.5's honesty header before any of those. **A faster number is not a better
+deck**, and the model cannot see 31 of the 99 cards.
+
+## Completed
+
+- **Phases 0–5** — exporter, card DB, mana matching, state and turn loop,
+  patterns, the authored policy and `--trace`.
+- **Phase 6** — `simulate_batch`, Wilson intervals, censored percentiles, the
+  honesty header. (§10.6)
+- **Phase 7** — effects authored (96 of 100), the parallel driver, the
+  leave-one-out sweep with common random numbers (**28× variance reduction,
+  measured**), and **R3**: `SELECT` implemented and Kinnan's dig executed.
+- **Two consumer-facing outputs** — `--hands` (raw sampled hands, §13.1 option
+  B) and `--grid` (the keep/mull feature grid, option A).
+- **Two mechanical checks in CI** — `check_core_is_sealed.sh` and
+  `check_effects_are_read.sh`. The second caught a field added in the same
+  session that added the check.
+
+## In flight
+
+Nothing uncommitted.
+
+## Where the chart stands
+
+`cs --grid 3000 --games 300`, four features taken from the deck's published
+primer, ~8 seconds on 8 cores.
+
+- **It works and it separates**: a 97-point spread across cells against a
+  0.8-point interval per hand.
+- **All four of the primer's stated keep heuristics now confirm.** The fourth
+  contradicted the model until R3; building the missing verb closed it (§17.4).
+- **10% of cell pairs are ordered differently by turn 3 and turn 12.** That is
+  printed on the chart, computed each run, in those words — "which hand is better
+  has no answer here without naming the turn".
+- **It is not a keep/mull recommendation.** A mulligan decision compares a hand
+  against the *expectation over mulliganing*, which is the recursion §13.1
+  describes and which is **not built**. The chart is one half of that.
+
+## What the hands need
+
+The primer's 20 worked hands are held out and **unscored** (§18). Two things
+have to happen before they are worth anything, in this order:
+
+1. **Correction against the images.** The primer presents each hand as a picture
+   of seven cards; what exists in text is the prose around it, which names the
+   cards the *line* uses and not the cards the *hand* holds. Thirteen
+   reconstructions are recorded in §18 for someone to check against the images.
+   This needs a person reading, not more machinery.
+2. **Scoring against the version each was written for.** Even perfectly
+   transcribed, only 2 of 20 are playable from list A — and both are keeps, so
+   the set has no negative class and a rule saying "keep" scores 2 for 2. The
+   blockers are cards A never had and cards only version C had (§15A). **The
+   validation set and the modelled list must be the same version.**
+
+Until both are done there is no agreement count, and producing one anyway would
+be the least defensible number in the document.
+
+## Known wrong, deliberately
+
+- **`Hullbreaker Horror` is filed `inert` and the classification is wrong.**
+  Only its *first* mode says "you don't control"; the second is an unrestricted
+  bounce and the primer builds an infinite-mana line on it. Left in place because
+  authoring it needs a bounce-and-replay verb the loop lacks; **printed in the
+  run report** under the inert table so no reader meets a number without it
+  (§17.3).
+- **Four cards unauthored** — *Sylvan Library*, *The One Ring*, *Thrasios*'s
+  activated ability, *Valley Floodcaller*. Each needs a verb the loop does not
+  have. Thrasios still appears in the sweep because he is a *pattern term*.
+- **`infinite_C_outlet_in_hand` fires zero times, provably** — its entry cost is
+  Thrasios's own cast cost, so "in hand" and "castable" cannot both hold under a
+  policy that casts what it can afford (§5.3's fifth cause).
+
+## On resuming
+
+- **`source_url` in `[provenance]` is empty and required to be present.** The
+  Moxfield URL was never recorded for this snapshot; the run report prints the
+  gap every run. Fill it when it is to hand — do not reconstruct one.
+- **The deck file is list A and stays list A.** List B (exported 2026-09-02)
+  differs by 29 cards. Re-authoring would discard every measurement in §16 and
+  produce a document describing neither list.
+- **Not in v1, deliberately**: the mulligan recursion, opposition profiles, a
+  second deck, pairwise ablation, Thrasios's scry.

@@ -3131,6 +3131,20 @@ Two things generalise:
    second one tells you whether the simplification mattered. Every "known
    simplification, stated with its direction" comment in `effects.toml` is
    currently an unmeasured one.
+
+   **And an UNDECLARED one cannot even be looked up.** §16.12's audit found
+   three: *Talisman of Curiosity* and *Yavimaya Coast* were modelled with only
+   their coloured mode, so below the life floor **the source does not get worse —
+   it disappears**, when the card would still tap for `{C}`. *Tarnished Citadel*
+   documents the identical omission and those two did not. The difference between
+   the two states is not the size of the error, which is a hundredth of a point
+   in all three cases. It is that one is a line someone can find, disagree with,
+   and measure, and the other is invisible until someone re-reads the card.
+
+   > **A declared simplification is unbounded. An undeclared one is also
+   > unfindable.** The declaration is worth writing even when — especially when —
+   > the approximation looks obviously small, because "obviously small" is a
+   > judgement the next reader cannot audit if it was never written down.
 2. **Measure a simplification by perturbing it, not by reasoning about it.**
    Swapping one arbitrary rule for another costs ten minutes. Note that here it
    would have *under*-reported: the two crude rules differ by only 0.31 points
@@ -3961,7 +3975,51 @@ has no representation of untapping outside its own turn, and B adds it along wit
 largest single gap between A and B**, and it is not a card the model
 under-measures — it is a mechanic the model does not have.
 
-### 17.4 What this exercise is worth, stated with its limits
+### 17.4 The methodological result: a comparison target, never a tuning target
+
+**The most transferable thing this project produced, and it is not a number.**
+
+The primer disagreed with the model on one thing — the pilot's most-stated keep
+criterion, *"we are able and happy to keep the all-mana hand"* — and the model
+rated that hand below a two-source hand with a payoff. The loop that followed:
+
+| | |
+|---|---|
+| 1. Disagreement | on the criterion the primer says matters most |
+| 2. Diagnosis | the claim rests on Kinnan converting mana into cards, and the model **detected** that ability rather than **resolving** it |
+| 3. Fix | R3 — build the missing verb (§16.7b) |
+| 4. Result | the all-mana hand moves 52.3% → **81.8%** at turn 12; four of four heuristics confirm; the chart's internal inversion rate halves, 20% → 10% |
+
+> **Tuning to the heuristic would have fixed the number and never found R3.**
+>
+> A feature weight, a rank adjustment, a term in the scorer rewarding mana
+> density — any of those closes the gap between the chart and the primer on that
+> cell. All of them leave `SELECT` unimplemented, Kinnan's dig detected rather
+> than resolved, and the model unable to convert mana into cards anywhere else.
+> The chart would have agreed with the primer and been wrong about the same
+> thing, silently, everywhere the primer had nothing to say.
+
+That the fix generalised is the evidence it was the right one. R3 was justified
+by *one cell of one chart*, and it moved the headline eleven points, retired a
+win pattern, made a hard-won parameter unnecessary (§16.11), and halved a
+disagreement the primer never mentioned. **A tuning fix cannot do that, because
+it changes an output and not a mechanism.**
+
+Hence the rule, which is the reason to have an external source at all:
+
+> **Treat an external expert as a COMPARISON target and never as a TUNING
+> target.** Where it disagrees, ask what mechanism the disagreement implies —
+> and if the answer is "none, the model is just weighted wrong", that is worth
+> knowing too. What must not happen is closing the gap directly, because a model
+> fitted to an expert's conclusions has learned the conclusions and not the
+> reasons, and it will be confidently wrong exactly where the expert was silent.
+
+**The same discipline is why the hands stayed held out** (§18): a validation set
+used during design is a tuning target by definition, whatever it is called. In
+the end they could not be scored at all — but they were held out for the right
+reason, and the reason survives the fact that they were unusable.
+
+### 17.5 What this exercise is worth, stated with its limits
 
 - **It is one pilot and one list.** Revealed preference is evidence, not ground
   truth, and a cut can be a metagame call, a slot squeeze, or taste.

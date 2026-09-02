@@ -1,7 +1,98 @@
 # commander_simulator
 
-A Monte Carlo goldfishing simulator for one cEDH Commander deck. Design and
-reasoning live in [SIM_PLAN.md](SIM_PLAN.md); this file is how to build it.
+A Monte Carlo goldfishing simulator for one cEDH Commander deck — Kinnan, Bonder
+Prodigy. Design and findings live in [SIM_PLAN.md](SIM_PLAN.md), current status
+in [STATE.md](STATE.md); this file is how to build it and what it means.
+
+## What this measures, and what it does not
+
+**It measures one thing: the turn this deck reaches a declared board state,
+playing alone.** That is a *goldfish* number.
+
+> **A faster number is not a better deck.** This model has no opponents, no
+> stack, no combat and no interaction. It cannot tell you whether a card is
+> good; it can tell you how fast a declared line assembles with nobody
+> interfering, and those are different questions that a single number is very
+> good at blurring.
+
+The output says so first, on every run, before any figure — and the label travels
+in the column names too. An ablation column is called
+`goldfish_turn_to_assembly_delta`, never `score`, because a sorted table headed
+`score` *is* a card-quality ranking whatever a banner said further up.
+
+### "Win" here means "assembled", and that is a real distinction
+
+This deck contains **no card that reads "you win the game."** Every actual kill
+in it is opponent-facing — *Emrakul* takes an opponent's turn, *Hullbreaker
+Horror* bounces permanents you don't control, *Finale of Devastation* wants a
+combat step. So the terminal state is outside the model and is replaced by a
+**declared proxy**: a state from which a competent pilot wins.
+
+Patterns are therefore named for states and never outcomes —
+`infinite_C_into_thrasios`, not `win_thrasios` — and the loader rejects a pattern
+named like an outcome.
+
+### 31 of the 99 cards do nothing here, and the run tells you which
+
+Every card is `modeled` or explicitly `inert` with a required reason and a
+category from a closed set. The run prints the inert set **grouped**, because a
+count says how much the model cannot see and the categories say *what*:
+
+```
+WHAT THE MODEL CANNOT SEE  (31 inert cards, by reason)
+  interaction           16   counters or removal with nothing to answer
+  no_object_in_model     4   needs combat, the stack, or a meaningful graveyard
+  opponent_permanent     4   targets, copies or steals an opponent's permanent
+  opponent_trigger       6   fires only when an opponent acts
+  timing_only            1   alters timing; no stack and no priority here
+```
+
+`interaction` dominating is the model being narrow in the direction it claims to
+be. If `no_object_in_model` dominated instead, the fix would be a bigger card
+model — a different project.
+
+**The size of that gap has been measured once.** The deck's primer calls
+*Consecrated Sphinx* "our greatest form of card advantage"; this model rates it
+at **−0.01%**, indistinguishable from a blank card, because a card that triggers
+on an opponent drawing draws nothing when there are no opponents. Both are
+correct. The distance between them is what the no-opponent assumption costs.
+
+### One inert entry is classified WRONG, on purpose, and it says so
+
+**`Hullbreaker Horror` is filed inert and the classification is a misread.** Only
+its *first* mode is restricted to permanents you don't control; the second is an
+unrestricted bounce, and the deck's own primer builds an infinite-mana line on
+bouncing and replaying *your own* artifacts.
+
+It is left in place because modelling it needs a verb the turn loop does not
+have — and it is **printed in the run report**, under the inert table, so nobody
+meets a number from this model without meeting its largest known error first:
+
+```
+  OF THOSE 31, 1 IS CLASSIFIED WRONG - by the author, and left in place:
+    Hullbreaker Horror
+```
+
+A wrong category that is documented is auditable. A silently corrected one is
+not, and every number in SIM_PLAN.md §16 was measured with it inert.
+
+### Four more cards are unauthored, and the header counts them
+
+*Sylvan Library*, *The One Ring*, *Thrasios*'s activated ability and *Valley
+Floodcaller* each need a verb the loop does not have. They are drawn, they dilute
+every draw, and they do nothing when cast — which **understates** the deck, and
+is reported as such.
+
+### The decklist is a snapshot, and it is stamped
+
+`data/kinnan.deck.toml` carries a `[provenance]` block — source, snapshot date,
+and a sha256 of the 99 — because it is a snapshot of a living Moxfield list and
+**that list has since changed by 29 cards**. Three versions are known to exist
+and SIM_PLAN.md §15A tells them apart. The URL for this snapshot was never
+recorded; the run prints that gap rather than inventing one.
+
+---
+
 
 **Status:** Phases 0-7 landed except the ablation sweep. The card model is
 authored (94 of 100 cards; the four that remain each need an effect kind the
