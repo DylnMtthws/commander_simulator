@@ -412,16 +412,28 @@ Measured (§16.5), the same card at three objectives:
 
 | Card | turn 3 | turn 6 | turn 12 |
 |---|---|---|---|
-| **Basalt Monolith** | **−0.61%** | +1.09% | **+5.58%** |
-| Enduring Vitality | +7.28% | +24.98% | +30.50% |
-| Force of Will (inert, a control) | −0.63% | −1.23% | −0.31% |
+| **Enduring Vitality** | **+0.45%** | +15.90% | **+29.39%** |
+| Basalt Monolith | +1.00% | +3.37% | +5.81% |
+| Thrasios, Triton Hero | +1.17% | +4.89% | +5.21% |
 
-*Basalt Monolith* is **half of the deck's primary engine** — the `kinnan_basalt`
-line that produces unbounded colourless mana, and the reason *Thrasios* is in the
-99 at all. At turn 3 it scores **indistinguishably from a card declared to do
-nothing**, and slightly worse. That is not an error. It is colourless, it does
-not untap, and casting it on turn three buys nothing on turn three. By turn 12 it
-is worth +5.6.
+*Enduring Vitality* is **half of one of the deck's two engines** — it is what
+turns every creature into a mana source and sets `WIDE_COLOUR`. At turn 3 it
+scores **+0.45, barely outside the ±0.05 band where cards are indistinguishable
+from doing nothing**. By turn 12 it is worth **+29.4**, the largest number in the
+deck by a factor of five. Sixty-five times its turn-3 value.
+
+That is not an error. It costs `{1}{G}{G}` and does nothing by itself; the board
+it wants takes turns to build. **An objective at turn 3 cannot see it.**
+
+**A note on this example, because it replaced one that evaporated.** This section
+previously used *Basalt Monolith*, measured at **−0.61% at turn 3 and +5.58% at
+turn 12**. Both figures were taken against `wide_colour_into_thrasios` and
+`infinite_C_outlet_in_hand` as they stood before §16.8's cost-model audit, and
+when those patterns gained the costs they were missing, Basalt moved to **+1.00%
+at turn 3 — the second most valuable card in the deck at the recommended
+objective.** Its blind-spot instance did not survive its own evidence being
+corrected. The general claim did, and now rests on a card that demonstrates it
+about ten times more sharply.
 
 > **A keep/mull chart built on `P(assembled by turn 3)` ranks cards by how fast
 > they get you there, and a card whose entire contribution arrives on turn six
@@ -1005,7 +1017,7 @@ how you get a pattern that silently succeeds due to a modelling gap.
   every declared pattern with its count, including zeroes, under a heading that
   names them as either dead lines or modelling bugs. Zero-count patterns are
   printed *first*, because they are the interesting ones.
-> **A never-fired pattern has FOUR causes, not two.** §5.3 originally named
+> **A never-fired pattern has FIVE causes, not two.** §5.3 originally named
 > two; the report has since found the others by itself:
 >
 > | Cause | Signal | The fix is |
@@ -1014,6 +1026,37 @@ how you get a pattern that silently succeeds due to a modelling gap.
 > | Modelling bug | fired 0, also-satisfied 0 | code |
 > | **Shadowed** | fired 0, also-satisfied **> 0** | reorder or narrow the patterns |
 > | **Resolved intra-turn** | fired 0, also-satisfied 0 | evaluate more often, or accept it |
+> | **Contradicts the policy's stopping condition** | fired 0, also-satisfied 0, and **provably so** | the pattern, not the code |
+
+> **THE FIFTH, and it is the only one that is a proof rather than an
+> observation.** `infinite_C_outlet_in_hand` requires *Thrasios* **in hand** and,
+> since §16.8's audit, that `{G}{U}` be payable — because he must be cast before
+> he is an outlet. `{G}{U}` **is his cast cost.** The policy's rule is *cast
+> everything affordable until nothing is*. So at the moment patterns are checked,
+> "Thrasios is still in hand" means exactly "`{G}{U}` was not payable", and the
+> conjunction is empty by construction.
+>
+> It was diagnosed by varying the requirement rather than by reasoning:
+>
+> | `entry_pips` | fires (60,000 games) |
+> |---|---|
+> | `["G"]` | 115 |
+> | `["U"]` | 72 |
+> | **`["G","U"]`** | **0** |
+> | `[]` | 769 |
+>
+> Either pip alone fires; both together never do, and both together is the cast
+> cost. **A requirement that a card be uncast AND that its exact cost be payable
+> is self-contradictory under any "cast what you can afford" policy** — and
+> nothing in the output distinguishes that from a dead line.
+>
+> The general shape, worth checking whenever a pattern names a card *in hand*:
+> **does this requirement describe a state the policy is defined to leave?** Two
+> earlier attempts to explain this one — "the policy casts it because it is
+> highly ranked" and "the deck taps out" — were both tested and both wrong. Rank
+> is irrelevant (the policy casts anything affordable at any rank) and `{G}{U}`
+> is in fact payable on 41% of turns. Only the exact-cost coincidence explains a
+> hard zero.
 >
 > The fourth arrived in Phase 7 and is the subtlest. Patterns are checked once
 > per turn, after the main phase, which is exact for the turn *number* but blind
@@ -2997,9 +3040,9 @@ reading each declaration against the card it claims to describe.
 | **`kinnan_basalt`** (engine) | *Basalt Monolith* `{3}: Untap this artifact` | `{3}` | `loop_entry_cost = 3`, `activations = 1` | ✅ correct — and one activation genuinely is all of them, because the loop untaps itself |
 | **`kinnan_enduring_vitality`** (engine) | *Enduring Vitality*'s granted `{T}: Add one mana of any color` | **free** — tapping is not a mana cost | none | ✅ **correctly absent.** A static grant is not an activated ability with a price |
 | **`infinite_C_into_thrasios`** | *Thrasios* `{4}: Scry 1…` | `{4}` generic | none | ✅ **correctly absent.** `INFINITE:C` pays `{4}` generic without limit, so one activation implies all of them |
-| **`infinite_C_outlet_in_hand`** | the same, but *Thrasios must first be CAST* | `{G}{U}` **to cast**, then `{4}` | none | ❌ **SHOULD HAVE ONE, and it is the subtle one.** `INFINITE:C` is **colourless**. It cannot pay `{G}{U}`. The pattern fires on unbounded colourless plus Thrasios in hand without checking the deck can produce a green and a blue to cast him |
+| **`infinite_C_outlet_in_hand`** | the same, but *Thrasios must first be CAST* | `{G}{U}` **to cast**, then `{4}` | `entry_pips = ["G","U"]`, `activations = 1` | ✅ **FIXED — with R2, and fixing it proved the pattern unsatisfiable.** See §5.3's fifth cause: `{G}{U}` is his cast cost, so "in hand" and "castable" cannot both hold under a policy that casts what it can afford. It fires **zero** times, provably, where it fired 769 before |
 | **`wide_colour_into_kinnan_dig`** | *Kinnan* `{5}{G}{U}: Look at the top five…` | 7 | `loop_entry_cost = 7`, `activations = 2` | ✅ fixed in §16.7 |
-| **`wide_colour_into_thrasios`** | *Thrasios* `{4}: Scry 1…` | `{4}` per activation, and `WIDE_COLOUR` is **finite** | none | ❌ **SHOULD HAVE ONE.** Measured below |
+| **`wide_colour_into_thrasios`** | *Thrasios* `{4}: Scry 1…` | `{4}` per activation, and `WIDE_COLOUR` is **finite** | `loop_entry_cost = 4`, `activations = 3` | ✅ **FIXED.** One activation is a cantrip, two is a good turn, three is where a finite-mana board has seen enough library that "assembled" is honest |
 
 **`infinite_C_outlet_in_hand` is the find.** It is §2.6's typed-flag argument
 applied one level further than §2.6 applied it. §2.6 established that a boolean
@@ -3079,7 +3122,64 @@ Thrasios's activation is worth *nothing* in the model beyond being a pattern
 term, which **understates** it. That is the conservative direction, and it is the
 one place in this section where the missing machinery does not flatter the deck.
 
-### 16.10 What is still not established
+### 16.10 Both cost models landed, and the deck re-ranked
+
+The largest single correction in the project, at the recommended objective.
+
+| `P(assembled by turn N)`, 60,000 games | turn 3 | turn 6 | turn 12 |
+|---|---|---|---|
+| before either cost model | 5.09% | 31.37% | 66.63% |
+| `{G}{U}` cast cost only | 4.83% | 31.18% | 66.58% |
+| Thrasios ×3 activations only | 2.18% | 29.29% | 66.14% |
+| **both** | **1.92%** | **29.09%** | **66.09%** |
+
+Nearly additive (−0.26 and −2.91 against −3.17 together). **Turn 3 falls by 62%
+relative; turn 12 by half a point.** §16.4 for the third time, and the pattern is
+now so consistent it should be treated as a property of the metric rather than a
+recurring surprise: **a defect in what "assembled" means is nearly invisible at
+the tail and dominant at the front.**
+
+#### The sweep re-ranked, and the top of it changed hands
+
+| Card, `vs blank` at turn 3 | before | after |
+|---|---|---|
+| Enduring Vitality | **+6.79%** | +0.58% |
+| Thrasios, Triton Hero | +3.57% | **+1.30%** |
+| **Basalt Monolith** | **+0.02%** | **+1.13%** |
+| Chord of Calling | +2.25% | +0.43% |
+| Chrome Mox | +1.49% | +0.53% |
+
+**The measured null shrank from −0.424% to −0.126%** and the not-distinguished
+band with it, from ±0.155 to ±0.052 — because the whole distribution compressed
+toward zero once assembly by turn 3 became rare.
+
+Two reversals worth stating plainly:
+
+- ***Enduring Vitality* fell from first by a factor of two to third**, and from
+  +6.79 to +0.58. Both `WIDE_COLOUR` patterns now demand real mana (12 and 14),
+  and a turn-3 board does not have it. Its value moved to the tail: +15.9 at turn
+  6, **+29.4 at turn 12**.
+- ***Basalt Monolith* went from indistinguishable-from-a-blank to second**, and
+  it is the same card §4.1 used as its blind-spot example. Its entire previous
+  reading was an artifact of the two patterns that had no cost model, which
+  systematically favoured the `WIDE_COLOUR` lines it is not part of. §4.1's blind
+  spot is now grounded on *Enduring Vitality* instead, which demonstrates it
+  about ten times more sharply.
+
+#### And option B's hands compressed with it
+
+| | before | after |
+|---|---|---|
+| best hand | 97.2% | **52.6%** |
+| spread | 97.2 points | **52.6 points** |
+| one hand's interval | 1.4 points | 0.8 points |
+
+Still 65× the noise, so §13.1's conclusion holds: **hands separate and option A
+has something to fit.** The two 97% hands were the ones assembling
+`wide_colour_into_thrasios` with no cost check — the defect option B surfaced,
+now priced.
+
+### 16.11 What is still not established
 
 - **Summoning sickness is not modelled, and it is worth about a point.** A
   creature that enters can tap for mana the same turn — from a tutor, a clone, or

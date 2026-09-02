@@ -57,6 +57,11 @@ bool requirement_holds(const Requirement& requirement, const PatternSet& set,
         Cost entry;
         entry.generic = static_cast<std::uint8_t>(requirement.loop_entry_cost *
                                                   requirement.activations);
+        // Coloured pips scale with activations too: N casts need N of each.
+        for (std::size_t c = 0; c < kColourCount; ++c) {
+            entry.pips[c] = static_cast<std::uint8_t>(requirement.entry_pips[c] *
+                                                      requirement.activations);
+        }
         if (!can_pay(entry, sources, 0)) {
             return false;
         }

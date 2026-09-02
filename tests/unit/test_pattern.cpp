@@ -100,3 +100,52 @@ TEST_CASE("both pieces are still required", "[pattern][loop]") {
     state.battlefield.set(kKinnan);  // no Basalt
     REQUIRE_FALSE(loop_detected(set, state, {land(), land(), land(), land()}));
 }
+
+TEST_CASE("a coloured entry cost is a colour check, not a quantity one", "[pattern][entry_pips]") {
+    // R2 (SIM_PLAN.md section 16.7), and the case that needed it: Thrasios in
+    // HAND must be CAST for {G}{U}, while INFINITE:C supplies only {C}. No
+    // amount of colourless mana pays for it, so a generic entry cost cannot
+    // express the requirement however large it is made.
+    //
+    // This exists because the pattern went to ZERO fires once the cost was
+    // added, and a test that only sees zero cannot tell "correctly dead under
+    // this policy" from "the check never passes".
+    cs::PatternSet set;
+    cs::WinPattern pattern;
+    pattern.name = "outlet_in_hand";
+    pattern.requires_.in_hand.set(0);
+    pattern.requires_.loop_entry_cost = 0;
+    pattern.requires_.activations = 1;
+    pattern.requires_.entry_pips[static_cast<std::size_t>(cs::Colour::Green)] = 1;
+    pattern.requires_.entry_pips[static_cast<std::size_t>(cs::Colour::Blue)] = 1;
+    set.patterns.push_back(pattern);
+
+    cs::GameState state;
+    state.hand.set(0);
+
+    SECTION("unbounded COLOURLESS mana does not satisfy it") {
+        const std::vector<cs::Source> colourless(40, cs::Source{.produces = 0, .amount = 3});
+        REQUIRE(cs::first_satisfied(set, state, colourless) < 0);
+    }
+    SECTION("one green and one blue do") {
+        const std::vector<cs::Source> coloured{
+            cs::Source{.produces = 0x10, .amount = 1},  // {G}
+            cs::Source{.produces = 0x02, .amount = 1},  // {U}
+        };
+        REQUIRE(cs::first_satisfied(set, set.patterns.empty() ? state : state, coloured) == 0);
+    }
+    SECTION("one dual producing either, alone, does NOT - a source makes one colour") {
+        // The section 2.6 property, reaching the pattern layer: a source produces
+        // `amount` mana all of ONE colour, so a single {G/U} land is not {G}{U}.
+        const std::vector<cs::Source> one_dual{cs::Source{.produces = 0x12, .amount = 2}};
+        REQUIRE(cs::first_satisfied(set, state, one_dual) < 0);
+    }
+    SECTION("activations scale the pips too") {
+        set.patterns[0].requires_.activations = 2;
+        const std::vector<cs::Source> just_enough_once{
+            cs::Source{.produces = 0x10, .amount = 1},
+            cs::Source{.produces = 0x02, .amount = 1},
+        };
+        REQUIRE(cs::first_satisfied(set, state, just_enough_once) < 0);
+    }
+}

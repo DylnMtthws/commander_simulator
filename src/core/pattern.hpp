@@ -13,6 +13,7 @@
 // quantity reported is TURNS TO ASSEMBLY. `validate` rejects a pattern named
 // like an outcome, because the one place a caveat survives is the name.
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -77,6 +78,19 @@ struct Requirement {
     // count is someone deciding when a line has been assembled, and it belongs
     // in the honesty header beside opponents and on_the_play.
     int activations = 1;
+
+    // COLOURED pips of the entry cost - R2 in §16.7's option set.
+    //
+    // §16.7 rejected a coloured entry cost for Kinnan's dig, because that
+    // constraint genuinely is a QUANTITY: under WIDE_COLOUR every creature taps
+    // for any colour, so a board that can pay 7N can find the pips among it.
+    //
+    // `infinite_C_outlet_in_hand` is the opposite case and needs exactly this.
+    // Its requirement is that Thrasios be CAST for {G}{U} while the engine
+    // supplies only {C} - a colour question with no quantity in it at all, and
+    // one a generic entry cost cannot express however large you make it. Same
+    // machinery, and it fits here because the constraint has a different shape.
+    std::array<std::uint8_t, kColourCount> entry_pips{};
 
     // Set when a card this requirement names has been ABLATED out of the deck
     // (core/ablation.hpp). Requirements compile to SLOT MASKS at load, and a

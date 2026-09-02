@@ -24,7 +24,7 @@ constexpr std::string_view kZoneTerms[] = {"in_play", "in_hand", "in_play_or_han
 constexpr std::string_view kScalarTerms[] = {"turn_gte", "creature_count_gte",
                                             "library_size_lte", "loop_entry_cost",
                                             "activations"};
-constexpr std::string_view kOtherTerms[] = {"flag", "flags"};
+constexpr std::string_view kOtherTerms[] = {"flag", "flags", "entry_pips"};
 
 // Declared in section 5.2 but not implemented yet. Named separately so the
 // error says "not implemented" rather than "unknown", which is the difference
@@ -83,6 +83,7 @@ Requirement parse_requirement(const toml::table& table, const CardDb& db, Patter
                               const std::string& context, bool allow_flags) {
     Requirement requirement;
     bool saw_activations = false;
+    bool saw_pips = false;
     for (const auto& [key, value] : table) {
         const std::string_view name{key.str()};
         if (contains(kNotYetImplemented, name)) {
@@ -113,6 +114,26 @@ Requirement parse_requirement(const toml::table& table, const CardDb& db, Patter
                 saw_activations = true;
             }
             else requirement.library_size_lte = static_cast<int>(*number);
+        } else if (name == "entry_pips") {
+            // The coloured half of an entry cost (R2, section 16.7). Written as
+            // colour letters rather than a mana string, because the pattern
+            // vocabulary has no cost parser and adding one to express two pips
+            // would be more machinery than the thing it expresses.
+            const auto* array = value.as_array();
+            if (array == nullptr) {
+                fail(context + ": entry_pips must be an array of colour letters, e.g. "
+                               "[\"G\", \"U\"]");
+            }
+            for (const toml::node& entry : *array) {
+                const auto letter = entry.value<std::string>();
+                static constexpr std::string_view kOrder = "WUBRG";
+                const auto at = letter ? kOrder.find(*letter) : std::string_view::npos;
+                if (!letter || letter->size() != 1 || at == std::string_view::npos) {
+                    fail(context + ": unknown colour in entry_pips; expected letters from WUBRG");
+                }
+                ++requirement.entry_pips[at];
+            }
+            saw_pips = true;
         } else if (contains(kOtherTerms, name)) {
             if (!allow_flags) {
                 fail(context +
@@ -141,7 +162,7 @@ Requirement parse_requirement(const toml::table& table, const CardDb& db, Patter
     // section 16.7 measured it at 2.97 points of P(assembled by turn 3) between
     // one and two - more than every card in the deck except three. A silently
     // defaulted 1 would be the largest unstated assumption in the model.
-    if (requirement.loop_entry_cost >= 0 && !saw_activations) {
+    if ((requirement.loop_entry_cost >= 0 || saw_pips) && !saw_activations) {
         fail(context +
              ": a requirement with `loop_entry_cost` must also declare `activations` - how "
              "many times the ability has to be used before this counts as assembled. It has "
@@ -151,6 +172,12 @@ Requirement parse_requirement(const toml::table& table, const CardDb& db, Patter
     }
     if (requirement.activations < 1) {
         fail(context + ": `activations` must be at least 1");
+    }
+    // entry_pips without a generic part still needs the check to RUN, and the
+    // gate is `loop_entry_cost >= 0`. Declaring pips implies an entry cost of
+    // zero generic rather than no entry cost at all.
+    if (saw_pips && requirement.loop_entry_cost < 0) {
+        requirement.loop_entry_cost = 0;
     }
     return requirement;
 }
