@@ -1,0 +1,192 @@
+// INVARIANT S1: the outcome of game i is a pure function of
+// (deck, config, base_seed, i).
+//
+// Tested DIRECTLY, not as a side effect of other tests, and tested now while
+// the turn loop is trivial. Once a policy exists, a failure here would be
+// ambiguous between the RNG and the decisions; today it can only be the RNG.
+//
+// This test gates common random numbers (SIM_PLAN.md section 10.4), and CRN
+// fails silently: if S1 breaks, nothing errors, variance reduction quietly
+// stops, and every ablation interval needs ~10x the games with no symptom.
+
+#include <algorithm>
+#include <atomic>
+#include <thread>
+#include <vector>
+
+#include <catch2/catch_test_macros.hpp>
+
+#include "core/rng.hpp"
+#include "core/sim.hpp"
+#include "io/card_db_load.hpp"
+
+namespace {
+
+const std::filesystem::path kFixture = std::filesystem::path(CS_FIXTURE_DIR) / "cards.fixture.json";
+constexpr std::uint64_t kBaseSeed = 0xC0FFEE;
+
+const cs::CardDb& fixture() {
+    static const cs::CardDb db = cs::io::load_card_db(kFixture);
+    return db;
+}
+
+cs::GameResult play(std::uint64_t index) {
+    const cs::StubPolicyDoNotUseForResults policy;
+    return cs::run_game(fixture(), cs::GameConfig{}, policy, cs::seed_for_game(kBaseSeed, index));
+}
+
+// Enough to compare two games without needing operator== on the whole result.
+struct Signature {
+    std::uint32_t can_pay_calls, turns, drawn, lands, spells;
+    std::uint8_t simulated;
+    // Without this the signature is blind to the draw order: on a small fixture
+    // the stub plays the same COUNT of things whatever it draws, so two
+    // genuinely different games compare equal. Found by this file's own
+    // "different indices give different games" section failing.
+    std::uint64_t digest;
+    friend bool operator==(const Signature&, const Signature&) = default;
+};
+
+Signature sign(const cs::GameResult& r) {
+    return {r.stats.can_pay_calls, r.stats.turns,        r.stats.cards_drawn,
+            r.stats.lands_played,  r.stats.spells_cast,  r.turns_simulated,
+            r.state_digest};
+}
+
+constexpr int kGames = 64;
+
+}  // namespace
+
+TEST_CASE("S1: a game is a pure function of its index", "[seeding][S1]") {
+    SECTION("the same index twice gives the same game") {
+        for (std::uint64_t i = 0; i < 8; ++i) {
+            REQUIRE(sign(play(i)) == sign(play(i)));
+        }
+    }
+    SECTION("different indices give different games") {
+        // Guards against the degenerate pass: a run_game that ignored its seed
+        // entirely would satisfy every other assertion in this file.
+        std::vector<Signature> seen;
+        for (std::uint64_t i = 0; i < 16; ++i) {
+            seen.push_back(sign(play(i)));
+        }
+        const bool all_identical =
+            std::all_of(seen.begin(), seen.end(), [&](const Signature& s) { return s == seen[0]; });
+        REQUIRE_FALSE(all_identical);
+    }
+}
+
+TEST_CASE("S1: batch position does not change a result", "[seeding][S1]") {
+    // Game 7 run seventh in a batch must equal game 7 run alone. This is what
+    // makes the ablation sweep parallelisable by handing threads disjoint index
+    // ranges, and what makes CRN couple two decks run on the same seeds.
+    std::vector<Signature> batch;
+    batch.reserve(kGames);
+    for (std::uint64_t i = 0; i < kGames; ++i) {
+        batch.push_back(sign(play(i)));
+    }
+    for (std::uint64_t i = 0; i < kGames; ++i) {
+        REQUIRE(sign(play(i)) == batch[static_cast<std::size_t>(i)]);
+    }
+}
+
+TEST_CASE("S1: reversed iteration order does not change a result", "[seeding][S1]") {
+    // The case most likely to catch an accidental dependence on execution
+    // order - a generator advanced once per game rather than seeded per index
+    // would pass "same index twice" and fail here.
+    std::vector<Signature> forward;
+    for (std::uint64_t i = 0; i < kGames; ++i) {
+        forward.push_back(sign(play(i)));
+    }
+    std::vector<Signature> backward(kGames);
+    for (int i = kGames - 1; i >= 0; --i) {
+        backward[static_cast<std::size_t>(i)] = sign(play(static_cast<std::uint64_t>(i)));
+    }
+    REQUIRE(forward == backward);
+}
+
+TEST_CASE("S1: thread count does not change a result", "[seeding][S1]") {
+    std::vector<Signature> single;
+    for (std::uint64_t i = 0; i < kGames; ++i) {
+        single.push_back(sign(play(i)));
+    }
+
+    for (const int threads : {1, 4, 8}) {
+        std::vector<Signature> shared(kGames);
+        std::atomic<int> next{0};
+        std::vector<std::thread> workers;
+        workers.reserve(static_cast<std::size_t>(threads));
+        for (int t = 0; t < threads; ++t) {
+            workers.emplace_back([&] {
+                for (int i = next.fetch_add(1); i < kGames; i = next.fetch_add(1)) {
+                    // Deliberately NOT a contiguous split: work-stealing means a
+                    // given game lands on a different thread each run, so a
+                    // hidden per-thread dependency would show up as flakiness.
+                    shared[static_cast<std::size_t>(i)] = sign(play(static_cast<std::uint64_t>(i)));
+                }
+            });
+        }
+        for (std::thread& worker : workers) {
+            worker.join();
+        }
+        REQUIRE(shared == single);
+    }
+}
+
+TEST_CASE("seed derivation is counter-based, not sequential", "[seeding][S1]") {
+    SECTION("adjacent indices give uncorrelated streams") {
+        // Xoring a small index straight into a base seed gives neighbouring
+        // games states differing in a couple of bits. splitmix64 on the index
+        // first is what prevents that, so this checks the mixing rather than
+        // just the plumbing.
+        cs::Rng a(cs::seed_for_game(kBaseSeed, 0));
+        cs::Rng b(cs::seed_for_game(kBaseSeed, 1));
+        int differing_bits = 0;
+        for (int i = 0; i < 8; ++i) {
+            differing_bits += std::popcount(a.next() ^ b.next());
+        }
+        // 512 bits compared; independent streams differ in ~256. Anything under
+        // 150 means the streams are related.
+        REQUIRE(differing_bits > 150);
+    }
+    SECTION("a different base seed gives a different game") {
+        const cs::StubPolicyDoNotUseForResults policy;
+        const auto one = cs::run_game(fixture(), cs::GameConfig{}, policy,
+                                      cs::seed_for_game(1, 0));
+        const auto two = cs::run_game(fixture(), cs::GameConfig{}, policy,
+                                      cs::seed_for_game(2, 0));
+        REQUIRE_FALSE(sign(one) == sign(two));
+    }
+}
+
+TEST_CASE("below() terminates on power-of-two bounds", "[seeding]") {
+    // The bound where the rejection limit is 2^64, which does not fit in 64
+    // bits and wraps to zero. An unguarded rejection loop hangs here forever.
+    // Every power of two up to the deck size, because a library drawn down to
+    // 2, 4, 8 or 16 remaining is an ordinary thing for a long game to do.
+    cs::Rng rng(999);
+    for (const std::uint64_t bound : {1U, 2U, 4U, 8U, 16U, 32U, 64U, 128U}) {
+        for (int i = 0; i < 1000; ++i) {
+            REQUIRE(rng.below(bound) < bound);
+        }
+    }
+}
+
+TEST_CASE("below() is unbiased", "[seeding]") {
+    // `next() % bound` skews towards small values whenever bound does not
+    // divide 2^64. With a 99-card library that would make low-indexed cards
+    // measurably likelier to be drawn early - a bias with no symptom.
+    cs::Rng rng(12345);
+    constexpr std::uint64_t kBound = 99;
+    constexpr int kDraws = 200000;
+    std::vector<int> counts(kBound, 0);
+    for (int i = 0; i < kDraws; ++i) {
+        counts[static_cast<std::size_t>(rng.below(kBound))]++;
+    }
+    const auto [low, high] = std::minmax_element(counts.begin(), counts.end());
+    const double expected = static_cast<double>(kDraws) / static_cast<double>(kBound);
+    // Loose bounds: this catches gross skew, not a subtle failure. A chi-square
+    // would be sharper; the modulo bias this exists to exclude is not subtle.
+    REQUIRE(static_cast<double>(*low) > expected * 0.85);
+    REQUIRE(static_cast<double>(*high) < expected * 1.15);
+}

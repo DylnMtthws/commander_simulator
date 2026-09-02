@@ -8,7 +8,12 @@
 #include <filesystem>
 #include <string>
 
+#include <cstdlib>
+#include <cstring>
+
 #include "core/card.hpp"
+#include "core/rng.hpp"
+#include "core/sim.hpp"
 #include "core/version.hpp"
 #include "io/card_db_load.hpp"
 
@@ -73,6 +78,61 @@ int summarise(const std::filesystem::path& path) {
 
 }  // namespace
 
+// Runs `games` games and reports aggregate counters.
+//
+// The number this exists for is CALLS PER GAME. Section 11.1 measured can_pay
+// at ~65 ns and noted that per-game cost is calls x 65 ns, with the call count
+// a property of the policy. This is the first time that number can be observed
+// at all - against the stub, so it is a floor rather than an estimate.
+int simulate(const std::filesystem::path& path, int games, std::uint64_t base_seed) {
+    cs::CardDb db;
+    try {
+        db = cs::io::load_card_db(path);
+    } catch (const cs::io::LoadError& error) {
+        std::fflush(stdout);
+        std::fprintf(stderr, "error: %s\n", error.what());
+        return 1;
+    }
+
+    const cs::StubPolicyDoNotUseForResults policy;
+    const cs::GameConfig config;
+
+    std::uint64_t can_pay_calls = 0;
+    std::uint64_t turns = 0;
+    std::uint64_t drawn = 0;
+    std::uint64_t lands = 0;
+    std::uint64_t spells = 0;
+    std::uint64_t digest_mix = 0;
+
+    for (int i = 0; i < games; ++i) {
+        const cs::GameResult result = cs::run_game(
+            db, config, policy, cs::seed_for_game(base_seed, static_cast<std::uint64_t>(i)));
+        can_pay_calls += result.stats.can_pay_calls;
+        turns += result.stats.turns;
+        drawn += result.stats.cards_drawn;
+        lands += result.stats.lands_played;
+        spells += result.stats.spells_cast;
+        digest_mix ^= result.state_digest;
+    }
+
+    const auto per_game = [games](std::uint64_t total) {
+        return static_cast<double>(total) / games;
+    };
+    std::printf("\n%d games, seed %llu, policy: %s\n", games,
+                static_cast<unsigned long long>(base_seed), policy.name());
+    std::printf("  can_pay calls/game %8.1f   <- the number that decides section 11.1\n",
+                per_game(can_pay_calls));
+    std::printf("  turns/game         %8.1f\n", per_game(turns));
+    std::printf("  cards drawn/game   %8.1f\n", per_game(drawn));
+    std::printf("  lands played/game  %8.1f\n", per_game(lands));
+    std::printf("  spells cast/game   %8.1f\n", per_game(spells));
+    std::printf("  digest xor         %016llx  (identical runs agree here)\n",
+                static_cast<unsigned long long>(digest_mix));
+    std::printf("\n  NOTE: the stub policy is not the real one. These counts are a\n");
+    std::printf("        floor on can_pay traffic, not a prediction of it.\n");
+    return 0;
+}
+
 int main(int argc, char** argv) {
     const auto v = cs::version();
     const auto flavour = cs::build_flavour();
@@ -82,7 +142,22 @@ int main(int argc, char** argv) {
     print_view("%.*s", flavour);
     std::printf(" build)\n\n");
 
-    const std::filesystem::path path =
-        argc > 1 ? std::filesystem::path(argv[1]) : std::filesystem::path("data/cards.json");
-    return summarise(path);
+    std::filesystem::path path{"data/cards.json"};
+    int games = 0;
+    std::uint64_t seed = 1;
+    for (int i = 1; i < argc; ++i) {
+        if (std::strcmp(argv[i], "--games") == 0 && i + 1 < argc) {
+            games = std::atoi(argv[++i]);
+        } else if (std::strcmp(argv[i], "--seed") == 0 && i + 1 < argc) {
+            seed = std::strtoull(argv[++i], nullptr, 10);
+        } else {
+            path = argv[i];
+        }
+    }
+
+    const int status = summarise(path);
+    if (status != 0 || games <= 0) {
+        return status;
+    }
+    return simulate(path, games, seed);
 }

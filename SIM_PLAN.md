@@ -1599,6 +1599,34 @@ not need them, and they would obstruct §6.6's trace output.
 > until Phase 5.** Optimising ns-per-call now would be tuning the half already
 > known to be fine.
 
+### 11.2 Measured, Phase 3 — calls-per-game, first observation
+
+Instrumented from the first turn loop rather than reconstructed later.
+**Stub policy, real 100-card deck, 200,000 games, `-O3`:**
+
+| | |
+|---|---|
+| `can_pay` calls per game | **62.5** |
+| Wall clock | **~4.1 µs/game** |
+| Turns / cards drawn / spells cast | 12.0 / 18.0 / 11.0 |
+
+My §11.1 guess was ~200 calls per game. The observed floor is **62**, about a
+third of it — which is the reason to instrument rather than estimate, and a
+small instance of the rule about deferring rather than guessing.
+
+At 62 calls × 65 ns, mana accounts for ~4 µs, essentially the whole 4.1 µs.
+`can_pay` is confirmed as the hot path, and the full pairwise sweep extrapolates
+to **~4 minutes across 4 P-cores** rather than §2.4's pessimistic 21.
+
+> **Read this as a floor, not a forecast.** The stub casts the first affordable
+> card in slot order and stops. §6.2's authored policy will evaluate every
+> candidate, score them, and ask `max_affordable_x` for X spells — each of which
+> multiplies the call count. A real policy at 5-10x the traffic is entirely
+> plausible and would still land inside §2.4's budget.
+>
+> Re-measure at Phase 5 with the same command. The counter is already there:
+> `cs data/cards.json --games N --seed S`.
+
 ---
 
 ## 12. The C++ project
