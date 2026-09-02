@@ -205,6 +205,17 @@ struct CardEffects {
     bool convoke = false;
 
     std::string reason_category;
+
+    // Set when the author believes this card's `inert` classification is WRONG
+    // but has not re-authored it.
+    //
+    // The inert table is the model's statement of its own limits (section 4.4),
+    // and a reader is entitled to know that one entry in it is disputed by the
+    // person who wrote it. Printing it is the difference between a documented
+    // error and a hidden one: a wrong category noted in a comment is auditable
+    // only by someone reading the effects file, and this belongs in front of
+    // anyone reading a number.
+    std::string disputed;
 };
 
 struct EffectDb {
@@ -212,6 +223,10 @@ struct EffectDb {
     int modeled = 0;
     int inert = 0;
     int unauthored = 0;
+    // Inert entries the author believes are misclassified. Counted separately
+    // because "31 cards the model cannot see" and "1 of those 31 is filed wrong"
+    // are different claims and a reader needs both.
+    int disputed = 0;
     std::vector<std::string> inert_categories;   // parallel arrays, sorted
     std::vector<int> inert_counts;
 };
@@ -257,8 +272,16 @@ void collect_sources(const CardDb& db, const EffectDb& effects, const GameState&
                                        int slot) noexcept;
 
 // Is this dynamic source's condition met right now?
+// `self` is the slot being evaluated, and it is EXCLUDED from the count.
+//
+// Gene Pollinator's cost is "{T}, Tap an untapped permanent you control" - the
+// {T} taps Gene Pollinator, so the permanent tapped as the additional cost is
+// necessarily a DIFFERENT one. Counting itself made `untapped_permanent_gte = 1`
+// true whenever Gene Pollinator was untapped, which is exactly when the
+// condition is asked. The gate was always open.
 [[nodiscard]] bool condition_met(const ManaSourceEffect& effect, const CardDb& db,
-                                 const EffectDb& effects, const GameState& state) noexcept;
+                                 const EffectDb& effects, const GameState& state,
+                                 int self) noexcept;
 
 // Library slots this fetch could find. Empty means the fetch does nothing,
 // which is a real outcome worth seeing rather than an error.
@@ -336,8 +359,14 @@ void enter_battlefield(const CardDb& db, const EffectDb& effects, GameState& sta
                        const TableContext& table, int slot);
 
 // Does this land enter tapped, given the board and the declared table context?
+// `self` is the land entering, and it is EXCLUDED from the land count.
+//
+// Botanical Sanctum "enters tapped unless you control two or fewer OTHER lands",
+// and enter_battlefield puts it on the battlefield before asking - so it counted
+// itself and entered tapped one land earlier than the card says. The word in the
+// comment beside this enum was already "other"; the code never implemented it.
 [[nodiscard]] bool enters_tapped(const ManaSourceEffect& effect, const CardDb& db,
                                  const EffectDb& effects, const GameState& state,
-                                 const TableContext& table) noexcept;
+                                 const TableContext& table, int self) noexcept;
 
 }  // namespace cs

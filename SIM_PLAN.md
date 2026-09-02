@@ -3163,6 +3163,48 @@ Thrasios's activation is worth *nothing* in the model beyond being a pattern
 term, which **understates** it. That is the conservative direction, and it is the
 one place in this section where the missing machinery does not flatter the deck.
 
+### 16.9b The interaction gap, measured for the first time
+
+§2.5 has always *asserted* that this model is blind to opposition: no opponents,
+so a card that triggers on an opponent acting does nothing. §9.5's header
+reports it as a count — *31 inert cards, 17 of them interaction*. Both are
+statements about the model's shape, and neither is a size.
+
+The deck's primer supplies the other half. On *Consecrated Sphinx*:
+
+> *"This is our greatest form of card advantage. When Sphinx hits the table, you
+> will regularly see the entire game revolve around its presence."*
+
+The model measures it at **−0.015 — the null.**
+
+| Card | primer's assessment | model, `vs blank` at turn 3 |
+|---|---|---|
+| Consecrated Sphinx | *"our greatest form of card advantage"* | −0.015 |
+| Rhystic Study | *"extremely powerful … will almost always draw more than it should"* | −0.035 |
+| Mystic Remora | *"people can almost never pay the {4}"* | +0.012 |
+
+**Both sides are right, and that is the point.** The card genuinely is one of the
+deck's best; a card that triggers on an opponent drawing genuinely draws zero
+when there are no opponents. Nothing here is an error to fix.
+
+> **This is the first number that puts a SIZE on the interaction gap rather than
+> asserting it exists.** The distance between "greatest form of card advantage"
+> and "indistinguishable from a blank card" is the whole of what §2.5 gives up,
+> expressed in the same units as every other result in this section.
+
+Three consequences worth stating:
+
+1. **It is a lower bound on the cost of the no-opponent assumption, not an
+   estimate of it.** Three cards is not the 17 `interaction` entries, and the
+   assumption also removes every card the *opponents* would have played.
+2. **It bounds how far this model's card rankings can travel.** A sweep that
+   rates the deck's best card-advantage engine at zero is not a card-quality
+   ranking and cannot be read as one — which §9.5's column naming already
+   insists on, now with a measured example behind it.
+3. **It is the argument for §2.5's opposition profiles being a different
+   project rather than a refinement.** They would not adjust these numbers;
+   they would replace the question.
+
 ### 16.10 Both cost models landed, and the deck re-ranked
 
 The largest single correction in the project, at the recommended objective.
@@ -3392,6 +3434,25 @@ The comment and the code disagreed and the code won, silently, for eight phases.
 Now `mana_value_exactly`, compared with `!=`, and the loader **rejects the old
 key by name** rather than ignoring it. Worth −0.07 points at turn 3 and −0.25 at
 turn 6 — small, and it is the primer that found it.
+
+**The audit it prompted found two more of the same shape**, and they are written
+up as §11.0's fourteenth rule upstream — *a name and a comment can agree with
+each other and disagree with the code*. Every field in the effect model whose
+name or comment asserts a comparison was checked against printed card text:
+
+| Field | The claim | The code | Verdict |
+|---|---|---|---|
+| `max_from_x` | "X or less" | `> mana_available` → ≤ | ✅ correct |
+| `condition_param` / `ArtifactCountGte` | Mox Opal: "three or more artifacts" | `>=`, counting itself | ✅ correct — the card counts itself too |
+| `condition_param` / `UntappedCreatureGte` | Springleaf Drum: "tap an untapped creature" | `>=`, and the Drum is not a creature | ✅ correct |
+| **`enters_tapped_param` / `LandCount`** | comment: "≤ N **other** lands" | counted the land itself | ❌ **off by one** |
+| **`condition_param` / `UntappedPermanentGte`** | Gene Pollinator: "tap an untapped permanent" — necessarily another | counted itself, so always true | ❌ **gate always open** |
+| `turn_gte`, `library_size_lte`, `creature_count_gte` | as named | as named | ✅ correct |
+
+Both errors are worth **about a hundredth of a point** — *Botanical Sanctum*
++0.144 and *Gene Pollinator* +0.130 in the sweep, essentially unchanged. That is
+worth recording rather than hiding: **the rule is not justified by the magnitude
+of what it finds, but by the fact that nothing internal can find it at all.**
 
 #### 3. Mirage Mirror — kept by the pilot, rated at zero by the model
 

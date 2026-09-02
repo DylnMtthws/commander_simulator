@@ -442,6 +442,7 @@ status = "inert"
 reason_category = "opponent_permanent"
 authored_from = "82b5c7398d0096cdb53842d5904f1283d3e9389b475ec3341891dd2745b31aa3"
 reason = "bounces spells and permanents you do not control - MISREAD, see the note"
+disputed = "Only the FIRST mode says 'you don't control'. The second is 'return target nonland permanent', unrestricted - and the deck's own primer builds an infinite-mana line on bouncing and replaying YOUR OWN artifacts. Measured at the null by construction. Not re-authored: it needs a bounce-and-replay verb the loop lacks, and would be a fifth engine."
 # The actual text has TWO modes and only the first carries the restriction:
 #
 #   Whenever you cast a spell, choose up to one -

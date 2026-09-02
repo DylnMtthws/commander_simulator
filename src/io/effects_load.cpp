@@ -123,8 +123,12 @@ EffectDb load_effects(const std::filesystem::path& path, const CardDb& db) {
                 fail(name + ": an inert card requires a free-text 'reason' a human can "
                             "disagree with.");
             }
+            target.disputed = (*entry)["disputed"].value_or<std::string>("");
             ++categories[target.reason_category];
             ++effects.inert;
+            if (!target.disputed.empty()) {
+                ++effects.disputed;
+            }
             continue;
         }
         if (status != "modeled") {

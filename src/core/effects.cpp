@@ -28,13 +28,16 @@ const char* reason_category_meaning(std::string_view category) noexcept {
 }
 
 bool enters_tapped(const ManaSourceEffect& effect, const CardDb& db, const EffectDb& effects,
-                   const GameState& state, const TableContext& table) noexcept {
+                   const GameState& state, const TableContext& table, int self) noexcept {
     switch (effect.enters_tapped_unless) {
         case EntersTappedUnless::Never:
             return false;
         case EntersTappedUnless::LandCount: {
             int lands = 0;
             state.battlefield.for_each([&](int slot) {
+                if (slot == self) {
+                    return;  // "two or fewer OTHER lands"
+                }
                 const CardEffects& entry = effects.by_slot[static_cast<std::size_t>(slot)];
                 lands += (entry.has_mana_source && entry.mana_source.is_land) ? 1 : 0;
             });
@@ -51,12 +54,19 @@ bool enters_tapped(const ManaSourceEffect& effect, const CardDb& db, const Effec
 }
 
 bool condition_met(const ManaSourceEffect& effect, const CardDb& db, const EffectDb& effects,
-                   const GameState& state) noexcept {
+                   const GameState& state, int self) noexcept {
     if (effect.condition == SourceCondition::None) {
         return true;
     }
     int count = 0;
     state.battlefield.for_each([&](int slot) {
+        // The permanent being asked about never counts toward its own condition:
+        // Mox Opal's metalcraft is the one case where the card DOES count itself
+        // ("you control three or more artifacts"), and it is handled by counting
+        // it back in below rather than by making the loop card-specific.
+        if (slot == self && effect.condition == SourceCondition::UntappedPermanentGte) {
+            return;
+        }
         const Card& card = db.cards[static_cast<std::size_t>(slot)];
         const bool tapped = state.tapped.test(slot);
         bool creature = false;
@@ -301,7 +311,7 @@ void enter_battlefield(const CardDb& db, const EffectDb& effects, GameState& sta
     if (!entry.has_mana_source) {
         return;
     }
-    if (enters_tapped(entry.mana_source, db, effects, state, table)) {
+    if (enters_tapped(entry.mana_source, db, effects, state, table, slot)) {
         state.tapped.set(slot);
     } else if (entry.mana_source.enters_tapped_unless == EntersTappedUnless::PayLife) {
         // Entering untapped was a choice and it was paid for. The fetch path
@@ -382,7 +392,7 @@ void collect_sources(const CardDb& db, const EffectDb& effects, const GameState&
             if (mana.life_cost > 0 && state.life - mana.life_cost < table.life_floor) {
                 return;
             }
-            if (!condition_met(mana, db, effects, state)) {
+            if (!condition_met(mana, db, effects, state, slot)) {
                 return;
             }
             source.produces = mana.colours_from_table ? table.opponent_colors : mana.produces;

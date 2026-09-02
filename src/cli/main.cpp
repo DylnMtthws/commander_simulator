@@ -208,6 +208,38 @@ void print_header(const cs::CardDb& db, const cs::io::DeckFile& deck, const cs::
                     cs::reason_category_meaning(category));
     }
 
+    // A DISPUTED INERT ENTRY IS PRINTED WITH THE TABLE IT SITS IN, not left to a
+    // document. The inert table is the model's statement of its own limits, so a
+    // reader is entitled to know that the author believes one of its entries is
+    // wrong - and to know it here rather than by reading the effects file.
+    if (effects.disputed > 0) {
+        std::printf("\n  OF THOSE %d, %d %s CLASSIFIED WRONG - by the author, and left in place:\n",
+                    effects.inert, effects.disputed, effects.disputed == 1 ? "IS" : "ARE");
+        for (const cs::Card& card : db.cards) {
+            const cs::CardEffects& entry =
+                effects.by_slot[static_cast<std::size_t>(card.export_index)];
+            if (entry.disputed.empty()) {
+                continue;
+            }
+            std::printf("    %s\n", card.listed_name.c_str());
+            // Wrapped at a width a terminal keeps, because an unwrapped
+            // paragraph here is a caveat nobody finishes reading.
+            std::string line = "      ";
+            for (std::size_t i = 0; i <= entry.disputed.size(); ++i) {
+                if (i == entry.disputed.size() ||
+                    (entry.disputed[i] == ' ' && line.size() > 68)) {
+                    std::printf("%s\n", line.c_str());
+                    line = "      ";
+                    continue;
+                }
+                line += entry.disputed[i];
+            }
+        }
+        std::printf("    This is the LARGEST KNOWN GAP: a card the model has, in the pattern\n");
+        std::printf("    layer's own subject matter, filed wrong. Distinct from a missing\n");
+        std::printf("    MECHANIC, which the model could not express at all.\n");
+    }
+
     std::printf("\nASSUMPTIONS THIS RESULT DEPENDS ON\n");
     int interaction = 0;
     for (std::size_t i = 0; i < effects.inert_categories.size(); ++i) {

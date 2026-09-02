@@ -294,3 +294,80 @@ TEST_CASE("the card given up is the least valuable one", "[card_cost][policy]") 
     const cs::Context context{db(), patterns, state, none, nullptr, &effects};
     REQUIRE(policy.choose_card_cost(context, candidates, stats) == slot_of("Mental Misstep"));
 }
+
+TEST_CASE("a permanent does not count toward its own condition", "[effects][off-by-one]") {
+    // Two instances of one shape, both found by auditing fields whose NAME or
+    // COMMENT asserts a comparison (PLAN.md 11.0, the fourteenth rule).
+    //
+    // Botanical Sanctum "enters tapped unless you control two or fewer OTHER
+    // lands". enter_battlefield puts it on the battlefield before asking, so it
+    // counted itself and entered tapped one land early. The enum's own comment
+    // said "other"; the code never implemented the word.
+    //
+    // Gene Pollinator's cost is "{T}, Tap an untapped permanent you control".
+    // The {T} taps Gene Pollinator, so the additional cost is necessarily a
+    // DIFFERENT permanent - and counting itself made the gate true whenever it
+    // was untapped, which is exactly when the gate is asked about.
+    cs::EffectDb effects = blank();
+    const cs::TableContext table;
+    const int sanctum = slot_of("Tropical Island");   // stands in
+    const int drum = slot_of("Sol Ring");             // stands in for Gene Pollinator
+    const int other = slot_of("Forest");
+    const int third = slot_of("Sink into Stupor");
+
+    cs::CardEffects& land = effects.by_slot[static_cast<std::size_t>(sanctum)];
+    land.status = cs::AuthorStatus::Modeled;
+    land.has_mana_source = true;
+    land.mana_source.is_land = true;
+    land.mana_source.produces = 0x12;
+    land.mana_source.enters_tapped_unless = cs::EntersTappedUnless::LandCount;
+    land.mana_source.enters_tapped_param = 1;  // "one or fewer OTHER lands"
+
+    for (const int slot : {other, third}) {
+        cs::CardEffects& e = effects.by_slot[static_cast<std::size_t>(slot)];
+        e.status = cs::AuthorStatus::Modeled;
+        e.has_mana_source = true;
+        e.mana_source.is_land = true;
+        e.mana_source.produces = 0x10;
+    }
+
+    SECTION("with exactly the allowed number of OTHER lands it enters untapped") {
+        cs::GameState state;
+        state.battlefield.set(other);
+        state.battlefield.set(sanctum);  // itself, already on the battlefield
+        REQUIRE_FALSE(cs::enters_tapped(land.mana_source, db(), effects, state, table, sanctum));
+    }
+    SECTION("one more OTHER land and it enters tapped") {
+        cs::GameState state;
+        state.battlefield.set(other);
+        state.battlefield.set(third);
+        state.battlefield.set(sanctum);
+        REQUIRE(cs::enters_tapped(land.mana_source, db(), effects, state, table, sanctum));
+    }
+
+    cs::CardEffects& pollinator = effects.by_slot[static_cast<std::size_t>(drum)];
+    pollinator.status = cs::AuthorStatus::Modeled;
+    pollinator.has_mana_source = true;
+    pollinator.mana_source.produces = 0x1F;
+    pollinator.mana_source.condition = cs::SourceCondition::UntappedPermanentGte;
+    pollinator.mana_source.condition_param = 1;
+
+    SECTION("alone on the battlefield it has nothing to tap and is off") {
+        cs::GameState state;
+        state.battlefield.set(drum);
+        REQUIRE_FALSE(cs::condition_met(pollinator.mana_source, db(), effects, state, drum));
+    }
+    SECTION("with one other untapped permanent it is on") {
+        cs::GameState state;
+        state.battlefield.set(drum);
+        state.battlefield.set(other);
+        REQUIRE(cs::condition_met(pollinator.mana_source, db(), effects, state, drum));
+    }
+    SECTION("and a TAPPED companion does not count") {
+        cs::GameState state;
+        state.battlefield.set(drum);
+        state.battlefield.set(other);
+        state.tapped.set(other);
+        REQUIRE_FALSE(cs::condition_met(pollinator.mana_source, db(), effects, state, drum));
+    }
+}
