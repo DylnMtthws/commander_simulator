@@ -17,6 +17,30 @@ from mtgsim_export.export import ExportError, build_export
 from mtgsim_export.mana import ManaCostError
 
 ENV_VAR = "MTGSIM_DATABASE_URL"
+DEFAULT_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+
+
+def load_env_file(path: Path) -> dict[str, str]:
+    """Read KEY=VALUE lines from a .env file.
+
+    Hand-rolled rather than a python-dotenv dependency: this needs to handle
+    KEY=VALUE and comments, and nothing else. A dependency here would be more
+    supply chain than the twenty lines are worth.
+
+    Values already in the real environment WIN. An explicit
+    `MTGSIM_DATABASE_URL=... mtgsim-export` must not be silently overridden by
+    a stale file, which is the usual way a dotenv loader surprises someone.
+    """
+    if not path.is_file():
+        return {}
+    found: dict[str, str] = {}
+    for line in path.read_text().splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, _, value = stripped.partition("=")
+        found[key.strip()] = value.strip().strip("\"'")
+    return found
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -26,12 +50,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--database-url",
         default=os.environ.get(ENV_VAR),
-        help=f"defaults to ${ENV_VAR}; connect as mtg_consumer, not the pipeline role",
+        help=f"defaults to ${ENV_VAR}, then export/.env; "
+        "connect as mtg_consumer, not the pipeline role",
     )
     args = parser.parse_args(argv)
 
     if not args.database_url:
-        parser.error(f"no database URL: pass --database-url or set {ENV_VAR}")
+        args.database_url = load_env_file(DEFAULT_ENV_FILE).get(ENV_VAR)
+
+    if not args.database_url:
+        parser.error(
+            f"no database URL: pass --database-url, set {ENV_VAR}, "
+            f"or put it in {DEFAULT_ENV_FILE} (see .env.example)"
+        )
 
     try:
         deck = load_deck(args.deck)

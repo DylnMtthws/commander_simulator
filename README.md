@@ -56,3 +56,28 @@ SIM_PLAN.md §6.5, §7.3 and §12.5 for why each is banned.
 
 Includes are written `#include "core/version.hpp"` — the include root is `src/`,
 so every include names the layer it comes from.
+
+## Exporting card data
+
+The simulator never talks to Postgres at run time. A Python exporter reads
+`mtg_v1` once and writes `data/cards.json`, so simulations need no database and
+a run is pinned to a data snapshot (SIM_PLAN.md §8).
+
+```bash
+cd export
+cp .env.example .env      # then fill in the mtg_consumer password
+uv sync --all-groups
+uv run pytest
+
+cd ..
+export/.venv/bin/mtgsim-export       # writes data/cards.json
+```
+
+`export/.env` is gitignored and holds the only credential in this repo. The
+exporter connects as `mtg_consumer`, which has no grant on `mtg_internal` at
+all — so a query that reaches past the contract fails immediately instead of
+working until a migration moves a column.
+
+`data/cards.json` **is committed**. It is ~90 KB, diffable, and carries a
+manifest recording the data snapshot it came from, which is what lets a changed
+number be attributed to either the code or the card data.
