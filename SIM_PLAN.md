@@ -2496,7 +2496,39 @@ and be wrong about every game that goes past turn six. This is §4.1's blind spo
 appearing not as a caveat but as **two adjacent rows of the chart disagreeing**,
 which is what putting the warnings on the chart was for.
 
+#### AFTER R3: four of four confirm, and the fourth is the reason R3 was built
+
+**The disagreement below is resolved.** It was the justification for §16.7b's R3,
+R3 was built, and re-running the grid closed it:
+
+| `5+ sources / t1 ramp / colour / NO payoff` — the all-mana hand | turn 3 | turn 12 |
+|---|---|---|
+| before R3 (dig detected) | 1.0% | **52.3%** |
+| after R3 (dig executed) | 0.4% | **81.8%** |
+
+And with no payoff card at all, turn 12 is now monotone in source count —
+**71.6% → 82.9% → 88.3%** from one source to three. Mana converts into results
+exactly as the primer says it does, *because Kinnan now converts it*.
+
+> **The model disagreed with the pilot's most-stated keep criterion; the
+> disagreement identified a missing mechanic; building the mechanic resolved the
+> disagreement.** That is the cleanest validation loop in the project, and it
+> ran in the direction that matters — the external source was right and the
+> model was wrong, and fixing the model moved it toward the source rather than
+> the other way.
+
+The inversion rate fell with it, from **20% of cell pairs to 10%**: much of the
+turn-3/turn-12 disagreement *was* the missing mechanic, not the objective. The
+remaining 10% is the genuine objective-dependence §4.1 describes, and the
+paragraph on the chart still applies to it.
+
+The record of the contradiction is kept below, unedited, because a finding that
+was corrected is worth more than one that was never wrong — and because the
+next disagreement of this shape should be read the same way.
+
 #### Three of four heuristics confirm — and the fourth is the one that matters
+
+*As measured BEFORE R3. Kept as the record of what prompted it.*
 
 **Stated together, because "three of four" on its own reads as agreement and the
 one that failed is the one the primer says matters most.**
@@ -3564,9 +3596,13 @@ of the model is worth more than one measured once.**
   > card-advantage engine whose value compounds over turns, so it barely touches
   > turn 3 and dominates turn 12.
 
-  §4.1's objective decision is unaffected — an early-turn objective is still what
-  separates opening hands — but its *justification* narrows. It is the sensitive
-  end for assembly-criterion errors, not for everything.
+  **§4.1's decision survived on a narrower justification, which is not the same
+  as surviving intact.** An early-turn objective is still what separates opening
+  hands — §13.1's grid shows a 97-point spread — and that argument is untouched.
+  What is gone is the *second* argument, that turn 3 is where the model's own
+  errors show up: it is the sensitive end for **assembly-criterion** errors and
+  the numb end for **missing mechanics**, and R3 was the second kind. A decision
+  resting on two arguments now rests on one, and a reader should know which.
 
 #### RE-RANKED, again
 
@@ -3610,7 +3646,92 @@ detected and there is nothing left to count.
 and its declaration there now carries the whole distinction on its own: that loop
 untaps itself, so one activation is all of them.
 
-### 16.12 What is still not established
+### 16.12 The kinds were never audited as a set — so they were, and here is the result
+
+**Three miscategorisations have now been found in `effects.toml`, and every one
+was found by something outside the authoring process.**
+
+| Card | Filed as | Actually | Found by |
+|---|---|---|---|
+| *Borne Upon a Wind* | would have been `timing_only` inert | a `DRAW` — its second line is a cantrip | reading the oracle text while authoring the card *next* to it |
+| *Hullbreaker Horror* | `inert / opponent_permanent` | an infinite-mana engine; only its **first** mode says "you don't control" | the deck's published primer |
+| Kinnan's dig | `TUTOR` (in a comment, for eight phases) | a `SELECT` — a tutor always finds, this misses 26% of the time | implementing the verb |
+
+> **The effect kinds have never been audited against the 99 as a SET.** They were
+> assigned one card at a time, during authoring, by the person reading that
+> card — and a decision made once, in isolation, with no later pass over the
+> whole, is exactly the shape that accumulates errors nothing internal reports.
+> All three were caught by an external check: two by a primer written by someone
+> who plays the deck, one by the act of building the thing the label claimed.
+
+§4.2's *taxonomy* was not the problem and is not what was audited. The closed set
+was right — `SELECT` was declared with two users from the start, and the dig was
+its third. **What had never been checked was the assignment.**
+
+#### The audit: 100 cards, oracle text against declared kind
+
+Run as a pass, not during authoring. **No fourth kind miscategorisation.** After
+three known errors that is worth stating plainly rather than burying: the
+assignments are, as far as reading every card can establish, correct.
+
+What it did find, all smaller and none of them a kind error:
+
+| Finding | Shape | Direction |
+|---|---|---|
+| **Endurance** was `interaction`; its ETB shuffles a graveyard away | a **category** error, not a kind error | none — but §4.4 says the categories decide whether the fix is opposition profiles or a bigger card model, and graveyard hate filed under `interaction` tilts that by one card. **Corrected** to `no_object_in_model` |
+| **Otawara, Soaring City**'s channel has **no** "an opponent controls" clause | the *Hullbreaker* shape — a restriction assumed that is not in the text. Boseiju's channel *does* carry it | skipped deliberately now, and **documented**, rather than skipped by assumption |
+| **Talisman of Curiosity**, **Yavimaya Coast** lose their free `{T}: Add {C}` mode | undocumented narrowing — below the life floor the source vanishes instead of degrading to `{C}`. *Tarnished Citadel* documents the identical thing | understates. **Documented** |
+| **Flash Photography** is `nonland_permanent`; the card says "target permanent" | undocumented narrowing | understates by whatever copying a land is worth — nothing, in a deck with no *Gaea's Cradle*. **Documented** |
+
+Three of the four are **undocumented approximations rather than errors**, and
+that is its own small finding: `effects.toml` is dense with stated
+simplifications, and these four slipped through the same one-card-at-a-time
+process. **A note recording an approximation is worth as much as the
+approximation being small**, because §16.6's rule is that a declared
+simplification is not a bounded one — and an *undeclared* one cannot even be
+looked up.
+
+**The clean result is the point.** Three errors were found externally and a
+systematic internal pass found no fourth. That is evidence the errors were a
+property of *how* the assignments were made rather than of the taxonomy, and it
+is the argument for doing this pass once per authoring phase rather than trusting
+a card read once.
+
+### 16.13 The clone result is the project's most robust finding
+
+Worth stating as its own claim, because **robustness across model revisions is
+evidence of a different kind from a tight interval**, and this is the first place
+the project can demonstrate it.
+
+Seven or eight clones have measured indistinguishable from a card declared to do
+nothing under **every version of the model that has existed since §16.1**:
+
+| Model revision | band | clones inside |
+|---|---|---|
+| original payment (slot order) | ±0.17 | 8 of 8 |
+| after the mana assignment | ±0.148 | 8 of 8 |
+| after the pattern-slot fix | ±0.155 | 7 of 8 |
+| after both pattern cost models | ±0.052 | 8 of 8 |
+| **after R3, the dig executed** | **±0.037** | **8 of 8**, largest +0.033 |
+
+Across that span the mana system was rewritten three times, two win patterns
+gained cost models they never had, a win pattern retired, `CARD_COST` started
+being charged, and Kinnan's dig went from detected to executed. **The headline
+moved from 59% to 77% and the band tightened by a factor of four. The clones did
+not move off zero.**
+
+> **A number measured once with a tight interval is precise about one model. A
+> number that survives five rewrites of that model is telling you something about
+> the DECK.** The interval says how well the measurement was taken; the
+> robustness says the thing measured was not an artifact of how it was taken —
+> which is exactly what §16.0 says a single ablation cannot establish.
+
+The external check agrees (§17): the pilot cut five of the eight, and the three
+kept — *Mirage Mirror*, *Clever Impersonator*, *Flash Photography* — are the ones
+whose primer justification is a **loop the model has no verb for**, not a
+disagreement about the copy.
+
+### 16.14 What is still not established
 
 - **Summoning sickness is not modelled, and it is worth about a point.** A
   creature that enters can tap for mana the same turn — from a tutor, a clone, or

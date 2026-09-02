@@ -68,6 +68,14 @@ effects = [ { kind = "MANA_SOURCE", colors = ["G"], amount = 1, is_land = true }
 [cards."Island"]
 status = "modeled"
 authored_from = "3a5acfe61c4cd27823a5df7b73c4c0e6606f683bae09a9eee27f9bc5c258db04"
+# UNMODELLED, and unlike Boseiju's the omission is not for the usual reason:
+# "Channel - {3}{U}, Discard this card: Return target artifact, creature,
+# enchantment, or planeswalker to its owner's hand" has NO "an opponent
+# controls" clause. Boseiju's channel does; Otawara's does not, so it can bounce
+# your own permanent. Skipped because re-using an ETB is not worth {3}{U} and a
+# card in this model, but skipped DELIBERATELY now rather than by assuming a
+# restriction that is not in the text - which is exactly how Hullbreaker Horror
+# came to be filed inert (section 17.3).
 effects = [ { kind = "MANA_SOURCE", colors = ["U"], amount = 1, is_land = true } ]
 
 [cards."Tropical Island"]
@@ -98,6 +106,9 @@ effects = [ { kind = "MANA_SOURCE", colors = ["G","U"], amount = 1, is_land = tr
 [cards."Yavimaya Coast"]
 status = "modeled"
 authored_from = "b467a264f4dcbd77280a2d8f12a6d3add6e2bd362376a60b009abcf517670d1c"
+# Same as Talisman of Curiosity: the free "{T}: Add {C}" mode is not modelled,
+# so this source vanishes below the life floor instead of degrading to {C}.
+# UNDERSTATES.
 effects = [ { kind = "MANA_SOURCE", colors = ["G","U"], amount = 1, is_land = true, life_cost = 1 } ]
 
 [cards."Waterlogged Grove"]
@@ -204,6 +215,9 @@ effects = [ { kind = "MANA_SOURCE", colors = ["G","U"], amount = 1 } ]
 [cards."Talisman of Curiosity"]
 status = "modeled"
 authored_from = "ac0dc138b7de9104ecf8f22f3ac9e384455dfcd5f157acf9c31019b7a579c65e"
+# The FREE "{T}: Add {C}" mode is not modelled - only the coloured mode with its
+# 1 life. Below the life floor this source disappears entirely when it should
+# still make {C}. UNDERSTATES, and the same omission Tarnished Citadel documents.
 effects = [ { kind = "MANA_SOURCE", colors = ["G","U"], amount = 1, life_cost = 1 } ]
 
 [cards."Fellwar Stone"]
@@ -294,6 +308,12 @@ status = "modeled"
 authored_from = "b8b23c10fee3c37709024f0a6b909cb02be9690a09232769aef1aeb8d3f466ea"
 # Creates a TOKEN copy rather than entering as one; identical for this model,
 # since nothing here distinguishes a token from a permanent.
+#
+# NARROWER THAN THE CARD, deliberately: the text is "target permanent", which
+# includes LANDS, and no other clone in the deck can copy one. Modelled as
+# nonland_permanent because the clone machinery keys off copy_of and a land copy
+# would need the land-drop path. UNDERSTATES by whatever copying Gaea's Cradle
+# would be worth, which in THIS deck is nothing - there is no such land in it.
 effects = [ { kind = "CLONE", filter = "nonland_permanent" } ]
 
 [cards."Mirage Mirror"]
@@ -412,10 +432,19 @@ authored_from = "0ed18109d0734ad1be0bd8d9bcbc29c0e8d44d11dfddbb165af10da3f0a9d8c
 reason = "bounce a creature"
 
 [cards."Endurance"]
+# CATEGORY CORRECTED by the section 4.2 audit - it was `interaction`.
+#
+# The ETB is "up to one target player puts all the cards from their graveyard on
+# the bottom of their library". That needs a MEANINGFUL GRAVEYARD, which is a
+# game object this model lacks, not an opposing spell it has nothing to answer.
+# The categories decide a real question (section 4.4): if `interaction`
+# dominates the fix is opposition profiles, and if `no_object_in_model`
+# dominated it would be a bigger card model. Filing graveyard hate under
+# interaction tilts that reading by one card.
 status = "inert"
-reason_category = "interaction"
+reason_category = "no_object_in_model"
 authored_from = "53963610267cc7d981a55a0d6b8cb37749c1fade2ff903ddaa1ce01c2d76263c"
-reason = "graveyard hate and a flash blocker; nothing to answer and nothing to block"
+reason = "graveyard hate: shuffles a graveyard away, and no graveyard here is meaningful"
 
 [cards."Rhystic Study"]
 status = "inert"
