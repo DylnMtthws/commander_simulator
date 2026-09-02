@@ -437,10 +437,33 @@ authored_from = "f2ff090196994e0fe8adeb05b2c3eac66565e2851e40a78a129d16547f89c81
 reason = "the opponent-search trigger is dead; its ETB draw is an X-dependent DRAW, unauthored"
 
 [cards."Hullbreaker Horror"]
+# THIS CATEGORISATION IS WRONG AND IS LEFT IN PLACE DELIBERATELY. See below.
 status = "inert"
 reason_category = "opponent_permanent"
 authored_from = "82b5c7398d0096cdb53842d5904f1283d3e9389b475ec3341891dd2745b31aa3"
-reason = "bounces spells and permanents you do not control"
+reason = "bounces spells and permanents you do not control - MISREAD, see the note"
+# The actual text has TWO modes and only the first carries the restriction:
+#
+#   Whenever you cast a spell, choose up to one -
+#   * Return target spell YOU DON'T CONTROL to its owner's hand.
+#   * Return target NONLAND PERMANENT to its owner's hand.
+#
+# The second mode has no restriction at all. The reason above took the qualifier
+# from the first bullet and applied it to both, which reads plausibly and is the
+# second miscategorisation in this table after Borne Upon a Wind.
+#
+# It is much worse than that one. Borne Upon a Wind was UNAUTHORED and its missed
+# clause was a cantrip worth about a tenth of a point. This card is FILED INERT,
+# measured at the null by construction, and the deck's own primer describes the
+# missed clause as one of four ways the deck generates infinite mana - bounce and
+# replay your own artifacts until they are mana-positive.
+#
+# NOT RE-AUTHORED, and the reason is a scope one rather than a doubt: modelling
+# it needs a bounce-and-replay verb the loop does not have, and it would be a
+# fifth engine with its own entry cost and activation count to decide
+# (SIM_PLAN.md sections 16.8 and 17.3). Left inert with the error stated, because
+# a wrong category that is documented is auditable and a silently corrected one
+# is not - and because section 16's numbers were all measured with it inert.
 
 [cards."Imposter Mech"]
 status = "inert"
@@ -536,7 +559,7 @@ status = "modeled"
 authored_from = "dc585d233c1a0a487fc2555bd0f766a8f0668753ff74d09d5bc068b29b1929ba"
 # Exactly mana value 3, and to HAND. A different card from the ones above and
 # the scorer now sees that.
-effects = [ { kind = "TUTOR", filter = "artifact", destination = "hand", max_mana_value = 3 } ]
+effects = [ { kind = "TUTOR", filter = "artifact", destination = "hand", mana_value_exactly = 3 } ]
 
 [cards."Drift of Phantasms"]
 status = "modeled"
@@ -544,13 +567,13 @@ authored_from = "3c2093535a27a6e3ab4e224af87e5c38b9482f3c5288ed1a9f406f2e4c83242
 # Transmute {1}{U}{U}: discard this, search for a card of the SAME mana value,
 # which is 3. Modelled as the transmute only - the 0/5 flying defender is
 # irrelevant with no combat.
-effects = [ { kind = "TUTOR", filter = "any", destination = "hand", max_mana_value = 3 } ]
+effects = [ { kind = "TUTOR", filter = "any", destination = "hand", mana_value_exactly = 3 } ]
 
 [cards."Dizzy Spell"]
 status = "modeled"
 authored_from = "db4a959eeafe152a037fc6dfa2ed2af2ef719d3b724026eee9053d26114710df"
 # Transmute {1}{U}{U} for a mana value 1 card. Sol Ring, Mana Vault, the dorks.
-effects = [ { kind = "TUTOR", filter = "any", destination = "hand", max_mana_value = 1 } ]
+effects = [ { kind = "TUTOR", filter = "any", destination = "hand", mana_value_exactly = 1 } ]
 
 [cards."Chord of Calling"]
 status = "modeled"

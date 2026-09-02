@@ -30,9 +30,23 @@ struct DeckTable {
     bool on_the_play = true;
 };
 
+// Where the decklist came from, and when.
+//
+// A snapshot of a living list is a claim about a moment. Without a date it is a
+// claim about nothing checkable - see the block at the top of
+// data/kinnan.deck.toml.
+struct Provenance {
+    std::string source;
+    std::string source_url;   // may be empty; the header says so loudly
+    std::string snapshot_date;
+    std::string snapshot_note;
+    std::string cards_sha256;
+};
+
 struct DeckFile {
     std::string name;
     std::string commander;
+    Provenance provenance;
     DeckTable table;
     std::string ablation_replacement;
     PatternSet patterns;

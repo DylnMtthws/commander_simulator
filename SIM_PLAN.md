@@ -2550,6 +2550,47 @@ mechanism; that step is where you find out whether the numbers mean anything.
 
 ---
 
+## 15A. Provenance: three versions of this deck exist
+
+**The deck file is a snapshot of a living Moxfield list, and the list has since
+changed.** `data/kinnan.deck.toml` now carries a `[provenance]` block —
+required, no defaults — with the source, the snapshot date and a sha256 of the
+sorted 99. It is `authored_from` applied one level up: that pins the oracle text
+an author read, this pins the 99 they read it for.
+
+| | what it is | how it differs |
+|---|---|---|
+| **A** | `data/kinnan.deck.toml`, sha256 `f3919eaf`, snapshot 2026-09-01 | what the model authors and measures |
+| **B** | the list exported 2026-09-02 | **29 of 99 cards differ from A** (§17) |
+| **C** | the version the published primer was written against | **older than both** |
+
+**C is datable from its own contents, which is worth doing because nothing
+labels it.** Its sample hands play *Mana Crypt* and *Gemstone Caverns*; Mana
+Crypt is in the maybeboard of both A and B. Its "noteworthy exclusions" argue at
+length against *Delighted Halfling* and *Faerie Mastermind*, and **B plays
+both**. So the primer's card evaluations describe a list that is neither the one
+modelled nor the one currently played.
+
+> **Only hands whose cards all exist in A are evaluable as-is.** The primer's
+> mulligan guide is the most directly useful thing in it for this project — eight
+> worked keeps and eight worked mulligans, with reasoning — and it cannot be fed
+> to the model without checking each hand against A's 99 first. A hand containing
+> *Mana Crypt* is not a hand this deck can be dealt.
+
+**`source_url` is deferred, not omitted.** The URL was never recorded for this
+snapshot. It is a required field that may be empty, because a reconstructed URL
+would be *worse* than a missing one — it resolves, to something that may not be
+the list. The run report prints the gap on every run:
+
+```
+list: Moxfield snapshot 2026-09-01, 99 sha256 f3919eaf
+      SOURCE URL NOT RECORDED. This is a snapshot of a living list and
+      the list has since changed; without the URL the snapshot cannot be
+      re-derived or diffed against its origin.
+```
+
+---
+
 ## 16. Findings — what the model has said that reading the deck did not
 
 Every other section of this document is about *how* to get a number. This one
@@ -3221,3 +3262,185 @@ now priced.
   because it is a *pattern term*, not because its ability is modelled; the +3.08
   is the value of the outlet being on the battlefield, which is what the pattern
   detects.
+
+---
+
+## 17. The pilot's revealed preferences, against the model's measurements
+
+**An external check the sweep cannot provide for itself.** A is a snapshot; B is
+what the same pilot plays now; 29 of 99 cards differ. Every cut is a judgement
+the pilot made about a card, arrived at without reference to this model, and the
+sweep has a number for each of them. Where they agree the sweep gains
+credibility it could not manufacture internally. Where they disagree, the
+disagreement is the finding.
+
+Measured at turn 3, `vs blank`, band ±0.050.
+
+### 17.1 The headline: the unresolved set is cut at twice the base rate
+
+29 of 99 cards were cut, a base rate of **29%**. Of the model's ten
+**UNRESOLVED** cards — the ones §16.0 says are ambiguous between *does little*
+and *built badly* — the pilot cut **six, or 60%**.
+
+| Model's unresolved set | vs blank | pilot |
+|---|---|---|
+| Dizzy Spell | +0.045 | **cut** |
+| Flesh Duplicate | +0.038 | **cut** |
+| Dramatic Reversal | +0.032 | **cut** |
+| Fellwar Stone | +0.028 | kept |
+| Mirrormade | +0.022 | **cut** |
+| Copy Enchantment | +0.018 | **cut** |
+| Borne Upon a Wind | +0.012 | **cut** |
+| Flash Photography | +0.005 | kept |
+| Clever Impersonator | −0.012 | kept |
+| Mirage Mirror | −0.025 | kept |
+
+**That is the strongest external corroboration this project has.** The model
+said "I cannot distinguish these from a card that does nothing", and a pilot who
+has never seen the model removed twice as many of them as chance would predict.
+
+*Dramatic Reversal* is the cleanest case, and the reasons match rather than
+merely the verdicts. The model measures +0.032 against a ±0.050 band. The
+primer's exclusion note says: *"we are a deck absolutely filled with nonland
+permanents that produce mana … Dramatic Reversal represents the potential of
+being a huge ritual for us. We are midrange Kinnan though, and DR is much more of
+a turbo Kinnan card … We are much more willing to build that mana as we go."*
+**A one-shot untap does not move turns-to-assembly** is the same claim, arrived
+at from the other direction.
+
+### 17.2 The disagreements, and seven of nine are the same disagreement
+
+Nine cards the model rated **above** the band were cut. **Seven of them are
+lands:**
+
+| Cut, rated trusted | vs blank |
+|---|---|
+| Botanical Sanctum | +0.138 |
+| **Gene Pollinator** | +0.135 |
+| Exotic Orchard | +0.135 |
+| Wooded Foothills | +0.132 |
+| Tarnished Citadel | +0.132 |
+| Windswept Heath | +0.105 |
+| **Mockingbird** | +0.085 |
+| Island | +0.078 |
+| Gemstone Caverns | +0.062 |
+
+And B adds eight lands: *Cephalid Coliseum, Emergence Zone, Gaea's Cradle,
+Glittering Caves of Aglarond, Minamo, Snow-Covered Forest, Snow-Covered Island,
+Treasure Vault*.
+
+> **This is a land-for-land swap, and the model has nothing to say about it.**
+> Every land in the sweep sits at ≈ +0.13 — which is the measured null plus "it
+> is a land". The model's land *ranking* is authored per-deck (§9.4) and its land
+> *valuation* is one number. It cannot tell *Island* from *Gaea's Cradle*, and
+> the eight lands B adds do things the model cannot represent **at all**: Crop
+> Rotation targets, flash from *Emergence Zone*, scaling with board width from
+> *Gaea's Cradle*, an instant-speed win from *Cephalid Coliseum*.
+
+So the honest count of real disagreement is **two, not nine**: *Gene Pollinator*
+and *Mockingbird*. Both are cards the model rates barely above a blank and the
+pilot removed — a difference of degree inside the noisiest part of the table.
+
+### 17.3 Where the primer contradicts the model — the list worth reading
+
+Every card text below was verified against `mtg_v1`, not taken from the primer's
+description.
+
+#### 1. Hullbreaker Horror — the model is WRONG, and it is a primary combo
+
+| | |
+|---|---|
+| A models it as | `inert`, category `opponent_permanent` |
+| A's stated reason | *"bounces spells and permanents you do not control"* |
+| Measured | +0.002 — the null, by construction |
+| The primer | **§6c, an infinite-mana engine**, one of four named ways the deck combos |
+
+The oracle text:
+
+> Whenever you cast a spell, choose up to one —
+> • Return target spell **you don't control** to its owner's hand.
+> • Return target **nonland permanent** to its owner's hand.
+
+**The restriction is on the first mode only.** The second has none, and the
+primer's line is built on exactly that: bounce and replay *your own* artifacts
+until they are mana-positive. The inert reason took the qualifier from one bullet
+and applied it to both.
+
+This is the **second miscategorisation in the inert table**, and it is far worse
+than the first. *Borne Upon a Wind* (§16) was an unauthored card whose missed
+clause was a cantrip worth ~0.1 points. This one is **filed inert**, with a
+reason that reads plausibly, and the missed clause is **one of the deck's engines**.
+Same failure direction, same shape — right about the clause it described, wrong
+that it was the only clause — and the reason_category audit is what exists to
+catch it.
+
+Not fixed here. Authoring it needs a bounce-and-replay verb the loop does not
+have, and it would be a fifth engine.
+
+#### 2. Trophy Mage, Drift of Phantasms, Dizzy Spell — the model was wrong, now fixed
+
+The primer, §14a: *"It has exactly three targets — Basalt Monolith, Mirage
+Mirror, and now Trinisphere!"* That sentence does not fit a model that had
+*Trophy Mage* finding **any** artifact of mana value ≤ 3.
+
+Verified: *Trophy Mage* searches for *"an artifact card with mana value 3"*;
+transmute searches for *"a card with the **same** mana value as this card"*.
+**None of the three says "or less."** The field was named `max_mana_value` and
+compared with `>`; the authoring comment beside it read *"Exactly mana value 3"*.
+The comment and the code disagreed and the code won, silently, for eight phases.
+
+Now `mana_value_exactly`, compared with `!=`, and the loader **rejects the old
+key by name** rather than ignoring it. Worth −0.07 points at turn 3 and −0.25 at
+turn 6 — small, and it is the primer that found it.
+
+#### 3. Mirage Mirror — kept by the pilot, rated at zero by the model
+
+Model: `CLONE`, −0.025, in the unresolved set. Primer: *"the current choice of
+non-land outlet"* — a **combo piece**, with its own worked infinite-mana line
+(§6b) that alternates the Mirror between *Basalt Monolith* and a land to convert
+colourless into coloured.
+
+The model authors the half of the card it can express (a copy) and rates it
+correctly at zero, because in this model copying something is worth nothing much.
+The half the pilot plays it for is a loop the model has no verb for. **This is
+the clearest case of a near-zero measurement being about the implementation
+rather than the card** — §16.0's ambiguity, resolved in the direction the model
+cannot see, by an external source.
+
+#### 4. Consecrated Sphinx, Rhystic Study, Mystic Remora — contradiction, and the model is right
+
+Primer on *Consecrated Sphinx*: *"This is our greatest form of card advantage …
+you will regularly see the entire game revolve around its presence."* The model
+rates it **−0.015**, at the null, as `inert / opponent_trigger`.
+
+Both are correct. The model has no opponents, so a card that triggers on an
+opponent drawing draws **zero**. This is §2.5's declared limit meeting the
+pilot's evaluation head-on, and it is the sharpest available illustration of what
+the honesty header means by *"no opponents; 31 inert cards."* **The disagreement
+is the size of the model's declared blindness, measured.**
+
+#### 5. Seedborn Muse — not in A at all, and the primer calls it the deck's centre
+
+*"Seedborn is the most important non-Kinnan creature in the deck. We play a
+package of cards with their primary purpose being access to Seedborn Muse."*
+
+*Untap all permanents you control during each other player's untap step* — with
+`opponents = 3` that is **four untaps per turn cycle instead of one**. The model
+has no representation of untapping outside its own turn, and B adds it along with
+*Green Sun's Zenith* and *Chord of Calling* as ways to find it. **This is the
+largest single gap between A and B**, and it is not a card the model
+under-measures — it is a mechanic the model does not have.
+
+### 17.4 What this exercise is worth, stated with its limits
+
+- **It is one pilot and one list.** Revealed preference is evidence, not ground
+  truth, and a cut can be a metagame call, a slot squeeze, or taste.
+- **It is not independent of the model's blind spots.** The pilot cut cards the
+  model cannot see (12 of 29 cuts are `inert`), which tells us nothing — the
+  model rates those at the null *by construction*.
+- **The signal is in the 10-card unresolved set**, where the model made a
+  falsifiable claim ("indistinguishable from a blank") and an outside party acted
+  on 6 of 10. That is the part worth carrying.
+- **The 29-card diff is not a to-do list.** A is the modelled list and stays that
+  way; re-authoring to B would discard every measurement in §16 and produce a
+  document whose numbers describe neither list.

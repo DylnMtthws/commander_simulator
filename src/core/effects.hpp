@@ -93,9 +93,25 @@ enum class TutorFilter : std::uint8_t {
 struct TutorEffect {
     TutorFilter filter = TutorFilter::Any;
     TutorDestination destination = TutorDestination::Battlefield;
-    // -1 == no limit. Trophy Mage is exactly 3; Finale is "X or less", which
-    // makes the cap a function of the mana spent rather than a constant.
-    int max_mana_value = -1;
+    // EXACTLY this mana value, not "this or less". -1 == no restriction.
+    //
+    // The name was `max_mana_value` and the comparison was `>`, which made all
+    // three constant-cap tutors in this deck able to find anything CHEAPER than
+    // their real restriction. Verified against the printed text of each:
+    //
+    //   Trophy Mage        "an artifact card with mana value 3"
+    //   Drift of Phantasms transmute: "a card with the SAME mana value as this"
+    //   Dizzy Spell        transmute: the same, and this card is 1
+    //
+    // None of them says "or less". The authoring knew - Trophy Mage's comment in
+    // data/effects.toml read "Exactly mana value 3" while the field it set was
+    // named for a maximum and compared as one. The comment and the code
+    // disagreed and the code won, silently, for eight phases.
+    int mana_value_exactly = -1;
+
+    // "X or less", which is a genuine maximum and a function of the mana spent
+    // rather than a constant. Finale of Devastation, Chord of Calling,
+    // Nature's Rhythm, Invasion of Ikoria.
     bool max_from_x = false;
 };
 

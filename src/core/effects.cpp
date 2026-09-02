@@ -153,12 +153,21 @@ void tutor_candidates(const TutorEffect& tutor, const CardDb& db, const GameStat
         if (!matches) {
             continue;
         }
-        // The mana-value cap. For an X tutor the cap is what the mana can pay
-        // for, which is why this takes mana_available rather than reading a
-        // constant - Finale of Devastation for X=0 finds a creature with mana
-        // value 0, and there are none (SIM_PLAN.md section 2.2).
-        const int cap = tutor.max_from_x ? mana_available : tutor.max_mana_value;
-        if (cap >= 0 && card.mana_value > cap) {
+        // TWO DIFFERENT RESTRICTIONS, and conflating them was a real bug.
+        //
+        // An X tutor is a genuine MAXIMUM, and the cap is what the mana can pay
+        // for rather than a constant - Finale of Devastation at X=0 finds a
+        // creature of mana value 0, and there are none (section 2.2).
+        //
+        // A constant-cap tutor in this deck is EXACT. Trophy Mage searches for
+        // "an artifact card with mana value 3", and transmute searches for "the
+        // same mana value as this card". Neither says "or less".
+        if (tutor.max_from_x) {
+            if (card.mana_value > mana_available) {
+                continue;
+            }
+        } else if (tutor.mana_value_exactly >= 0 &&
+                   card.mana_value != tutor.mana_value_exactly) {
             continue;
         }
         out.push_back(slot);

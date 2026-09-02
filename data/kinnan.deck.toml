@@ -8,6 +8,40 @@
 name      = "Kinnan cEDH"
 commander = "Kinnan, Bonder Prodigy"
 
+# PROVENANCE. A DECK FILE WITHOUT A DATE IS A CLAIM ABOUT A LIST THAT MAY NOT
+# EXIST ANYMORE.
+#
+# This is `authored_from` applied one level up. effects.toml pins the ORACLE
+# TEXT an author read, because the nightly ingest moves card text and an effect
+# authored against text that has since changed rots silently. The same is true
+# of the decklist: this is a snapshot of a living Moxfield list, the list has
+# since changed, and without a stamp nothing distinguishes "the deck" from "the
+# deck as it was on some unrecorded day".
+#
+# THREE VERSIONS ARE KNOWN TO EXIST and the distinction matters when reading
+# anything written about this deck:
+#
+#   A  this file. What the model authors and measures.
+#   B  the list as exported 2026-09-02. 29 cards differ from A (SIM_PLAN 17).
+#   C  the version the published primer was written against, OLDER THAN BOTH.
+#      Its sample hands use Mana Crypt and Gemstone Caverns; Mana Crypt is in
+#      the maybeboard of both A and B. Its "noteworthy exclusions" list
+#      Delighted Halfling and Faerie Mastermind, and B plays both.
+#
+# `source_url` IS DEFERRED, NOT OMITTED. The URL was not recorded when this
+# snapshot was taken and is not something to reconstruct from a guess - a wrong
+# URL is worse than a missing one, because it resolves. The run report prints
+# the gap on every run rather than letting an absent field be invisible.
+[provenance]
+source          = "Moxfield"
+source_url      = ""                    # UNRECORDED - see above
+snapshot_date   = "2026-09-01"          # first commit of this file
+snapshot_note   = "Grind Them Into Dust - Kinnan Midrange Control, WoundedSatellite"
+# sha256 of the 99 mainboard names, sorted, newline-joined. Two runs agreeing
+# here used the same list; a changed list changes this before it changes any
+# number downstream.
+cards_sha256    = "f3919eaf185bfb73305eb1d58ea652f083aec789ffc0844487fbf2b68b24114c"
+
 # Every field below is REQUIRED and none has a default. An unstated assumption
 # is the failure SIM_PLAN.md sections 2.8 and 9.4 exist to prevent, so omitting
 # one fails the build rather than silently picking a value.

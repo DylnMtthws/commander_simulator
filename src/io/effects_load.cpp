@@ -242,8 +242,15 @@ EffectDb load_effects(const std::filesystem::path& path, const CardDb& db) {
                 else fail(context + ": a TUTOR must state its destination explicitly - "
                                     "'battlefield' or 'hand'. They are different cards.");
 
-                tutor.max_mana_value =
-                    static_cast<int>((*effect)["max_mana_value"].value_or<int64_t>(-1));
+                if ((*effect)["max_mana_value"]) {
+                    fail(context + ": `max_mana_value` no longer exists. Every constant-cap "
+                                   "tutor in this deck searches for an EXACT mana value - "
+                                   "Trophy Mage says \"mana value 3\", transmute says \"the "
+                                   "same mana value as this card\" - so the key is "
+                                   "`mana_value_exactly`. \"X or less\" is max_from_x.");
+                }
+                tutor.mana_value_exactly =
+                    static_cast<int>((*effect)["mana_value_exactly"].value_or<int64_t>(-1));
                 tutor.max_from_x = (*effect)["max_from_x"].value_or<bool>(false);
                 target.has_tutor = true;
                 target.tutor = tutor;

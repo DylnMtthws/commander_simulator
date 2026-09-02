@@ -58,6 +58,11 @@ opponent_colors = ["G","U"]
 on_the_play = true
 [ablation]
 replacement = "Forest"
+[provenance]
+source = "test"
+source_url = ""
+snapshot_date = "1970-01-01"
+cards_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
 )";
 
 cs::io::DeckFile load(const std::string& body) {
@@ -239,4 +244,71 @@ in_play = ["Sol Ring"]
 )");
     REQUIRE_THROWS_MATCHES(cs::io::load_deck(file.path(), fixture_db()), cs::io::DeckError,
                            MessageMatches(ContainsSubstring("on_the_play")));
+}
+
+TEST_CASE("a deck without provenance is refused", "[deck][provenance]") {
+    // A decklist is a snapshot of something that CHANGES. This list is a
+    // snapshot of a living Moxfield list and the list has since changed by 29
+    // cards; without a date and a hash, a number cannot be attributed to a list.
+    //
+    // Same discipline as `authored_from` on an effect, one level up: that pins
+    // the oracle text an author read, this pins the 99 they read it for.
+    const std::string no_block = R"(
+[deck]
+commander = "Kinnan, Bonder Prodigy"
+[table]
+opponents = 3
+opponent_colors = ["G","U"]
+on_the_play = true
+[ablation]
+replacement = "Forest"
+[cards]
+mainboard = ["Sol Ring"]
+[[win]]
+name = "has_sol_ring"
+[win.requires]
+in_play = ["Sol Ring"]
+)";
+    const TempToml file(no_block);
+    REQUIRE_THROWS_AS(cs::io::load_deck(file.path(), fixture_db()), cs::io::DeckError);
+}
+
+TEST_CASE("an unrecorded source_url must be written down, not left off",
+          "[deck][provenance]") {
+    // The asymmetry is deliberate. source_url MAY be empty, because the URL for
+    // this snapshot was never recorded and a reconstructed one would be worse
+    // than none - it would resolve, to the wrong thing. It may not be ABSENT,
+    // so "we did not record it" is a statement in the file rather than a gap.
+    const std::string body = R"(
+[cards]
+mainboard = ["Sol Ring"]
+[[win]]
+name = "has_sol_ring"
+[win.requires]
+in_play = ["Sol Ring"]
+)";
+    SECTION("empty is accepted and preserved") {
+        const cs::io::DeckFile deck = load(body);
+        REQUIRE(deck.provenance.source_url.empty());
+        REQUIRE(deck.provenance.source == "test");
+        REQUIRE(deck.provenance.snapshot_date == "1970-01-01");
+    }
+    SECTION("absent is refused") {
+        const std::string header = R"(
+[deck]
+commander = "Kinnan, Bonder Prodigy"
+[table]
+opponents = 3
+opponent_colors = ["G","U"]
+on_the_play = true
+[ablation]
+replacement = "Forest"
+[provenance]
+source = "test"
+snapshot_date = "1970-01-01"
+cards_sha256 = "abc"
+)";
+        const TempToml file(header + body);
+        REQUIRE_THROWS_AS(cs::io::load_deck(file.path(), fixture_db()), cs::io::DeckError);
+    }
 }

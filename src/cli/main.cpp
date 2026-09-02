@@ -170,6 +170,19 @@ void print_header(const cs::CardDb& db, const cs::io::DeckFile& deck, const cs::
                 deck.patterns.patterns.size());
     std::printf("data: manifest %s (%s)\n", db.manifest.cards_sha256.substr(0, 8).c_str(),
                 db.manifest.max_content_updated_at.substr(0, 10).c_str());
+    // The DECKLIST's provenance, separately from the card data's. They answer
+    // different questions: the manifest says which card texts were used, this
+    // says which list. A number is attributable to neither without both.
+    std::printf("list: %s snapshot %s, 99 sha256 %s\n", deck.provenance.source.c_str(),
+                deck.provenance.snapshot_date.c_str(),
+                deck.provenance.cards_sha256.substr(0, 8).c_str());
+    if (deck.provenance.source_url.empty()) {
+        std::printf("      SOURCE URL NOT RECORDED. This is a snapshot of a living list and\n");
+        std::printf("      the list has since changed; without the URL the snapshot cannot be\n");
+        std::printf("      re-derived or diffed against its origin.\n");
+    } else {
+        std::printf("      %s\n", deck.provenance.source_url.c_str());
+    }
 
     std::string colours;
     static constexpr char kOrder[] = "WUBRG";

@@ -266,6 +266,37 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db) {
     deck.ablation_replacement =
         require_field(ablation, "ablation", "replacement").value_or<std::string>("");
 
+    // PROVENANCE, required as a block. A deck file without a date is a claim
+    // about a list that may not exist any more, and this list is a snapshot of a
+    // living one that has since changed.
+    //
+    // `source_url` may be EMPTY and the others may not. That asymmetry is
+    // deliberate: the URL for this snapshot was never recorded, and a
+    // reconstructed one would be worse than none because it resolves. An empty
+    // string is a stated gap; the honesty header prints it on every run.
+    {
+        const auto* provenance = root["provenance"].as_table();
+        if (provenance == nullptr) {
+            fail(path.string() +
+                 ": missing [provenance]. A decklist is a snapshot of something that "
+                 "changes, so it needs source, snapshot_date and cards_sha256 the same way "
+                 "an authored effect needs `authored_from`. Without them a number cannot be "
+                 "attributed to a list.");
+        }
+        deck.provenance.source =
+            require_field(*provenance, "provenance", "source").value_or<std::string>("");
+        deck.provenance.snapshot_date =
+            require_field(*provenance, "provenance", "snapshot_date").value_or<std::string>("");
+        deck.provenance.cards_sha256 =
+            require_field(*provenance, "provenance", "cards_sha256").value_or<std::string>("");
+        deck.provenance.snapshot_note =
+            (*provenance)["snapshot_note"].value_or<std::string>("");
+        // Present-but-empty is allowed; absent is not, so "we did not record it"
+        // has to be written down rather than left off.
+        require_field(*provenance, "provenance", "source_url");
+        deck.provenance.source_url = (*provenance)["source_url"].value_or<std::string>("");
+    }
+
     PatternSet& set = deck.patterns;
     for (const Card& card : db.cards) {
         if (card.is_creature()) {
