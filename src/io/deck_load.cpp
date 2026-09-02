@@ -272,6 +272,7 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db) {
             static_cast<int>((*policy)["land_floor"].value_or<int64_t>(3));
         deck.weights.land_ceiling =
             static_cast<int>((*policy)["land_ceiling"].value_or<int64_t>(6));
+        deck.life_floor = static_cast<int>((*policy)["life_floor"].value_or<int64_t>(10));
         const auto default_rank =
             static_cast<int>((*policy)["default_rank"].value_or<int64_t>(0));
         std::fill(deck.weights.rank.begin(), deck.weights.rank.end(), default_rank);

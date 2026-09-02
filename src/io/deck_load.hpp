@@ -37,6 +37,7 @@ struct DeckFile {
     std::string ablation_replacement;
     PatternSet patterns;
     PolicyWeights weights;
+    int life_floor = 10;
 };
 
 // Parses and validates against a loaded card database. The database is required

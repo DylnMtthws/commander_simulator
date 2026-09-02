@@ -9,8 +9,9 @@ const char* TraceWriter::name_of(int slot) const {
 }
 
 void TraceWriter::turn_begin(int turn, const GameState& state) {
-    std::fprintf(out_, "\nT%-2d  hand %d  board %d  library %d\n", turn, state.hand.count(),
-                 state.battlefield.count(), state.library_size());
+    std::fprintf(out_, "\nT%-2d  hand %d  board %d  library %d  life %d\n", turn,
+                 state.hand.count(), state.battlefield.count(), state.library_size(),
+                 state.life);
 }
 
 void TraceWriter::drew(int slot, int hand_size) {

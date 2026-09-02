@@ -38,6 +38,7 @@ std::uint64_t digest_state(const GameState& state) noexcept {
     }
     mix(state.drawn);
     mix(state.turn);
+    mix(static_cast<std::uint64_t>(state.life));
     const auto mix_zone = [&](const Zone& zone) {
         zone.for_each([&](int slot) { mix(static_cast<std::uint64_t>(slot)); });
         mix(0xFFFF);  // separator, so adjacent zones cannot alias
@@ -112,15 +113,54 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
             state.battlefield.set(land);
             state.land_played_this_turn = true;
             ++result.stats.lands_played;
+            // Announced BEFORE the fetch it triggers. The first version printed
+            // the fetch candidates first, so a trace read "considering (fetch
+            // target)" and then "PLAY LAND: Windswept Heath" - the third
+            // output-ordering bug in this project found by reading output
+            // rather than by any test.
+            if (observer != nullptr) {
+                observer->played_land(land);
+            }
+
+            // A fetch resolves immediately: sacrifice, find, shuffle. Modelled
+            // as removing the found land from the undrawn library and swapping
+            // it onto the battlefield, which is what "search, then shuffle"
+            // amounts to when the library order is already random.
+            const CardEffects& fetch_entry = effects.by_slot[static_cast<std::size_t>(land)];
+            if (fetch_entry.has_fetch) {
+                std::vector<int> candidates;
+                fetch_candidates(fetch_entry.fetch, db, state, candidates);
+                const int target = policy.choose_fetch(land_context, candidates, result.stats);
+                state.battlefield.clear(land);
+                state.graveyard.set(land);
+                state.life -= fetch_entry.fetch.life_cost;
+                ++result.stats.fetches_used;
+                if (target >= 0) {
+                    for (std::size_t i = state.drawn; i < state.library_count; ++i) {
+                        if (state.library[i] == target) {
+                            state.library[i] = state.library[state.library_count - 1];
+                            --state.library_count;
+                            break;
+                        }
+                    }
+                    state.battlefield.set(target);
+                    const CardEffects& found = effects.by_slot[static_cast<std::size_t>(target)];
+                    if (found.has_mana_source &&
+                        enters_tapped(found.mana_source, db, effects, state, config.table)) {
+                        state.tapped.set(target);
+                    }
+                }
+            }
             // A land that enters tapped produces nothing this turn. Getting
             // this wrong would silently give the deck a turn it did not have.
             const CardEffects& entry = effects.by_slot[static_cast<std::size_t>(land)];
-            if (entry.has_mana_source &&
-                enters_tapped(entry.mana_source, db, effects, state, config.table)) {
-                state.tapped.set(land);
-            }
-            if (observer != nullptr) {
-                observer->played_land(land);
+            if (entry.has_mana_source) {
+                if (enters_tapped(entry.mana_source, db, effects, state, config.table)) {
+                    state.tapped.set(land);
+                } else if (entry.mana_source.enters_tapped_unless == EntersTappedUnless::PayLife) {
+                    // Entering untapped was a choice and it was paid for.
+                    state.life -= entry.mana_source.enters_tapped_param;
+                }
             }
         }
 
@@ -160,8 +200,18 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
             // later one (section 6.4). Without it mana would be infinite.
             state.battlefield.for_each([&](int slot) {
                 const CardEffects& source_entry = effects.by_slot[static_cast<std::size_t>(slot)];
+                // A ritual is consumed rather than tapped: Lotus Petal
+                // sacrifices itself.
+                if (to_tap > 0 && !state.tapped.test(slot) && source_entry.has_ritual &&
+                    source_entry.ritual.from_zone == RitualZone::Battlefield) {
+                    state.battlefield.clear(slot);
+                    state.graveyard.set(slot);
+                    to_tap -= source_entry.ritual.amount;
+                    return;
+                }
                 if (to_tap > 0 && !state.tapped.test(slot) && source_entry.has_mana_source) {
                     state.tapped.set(slot);
+                    state.life -= life_cost_of_tapping(effects, state, slot);
                     to_tap -= source_entry.mana_source.amount;
                 }
             });

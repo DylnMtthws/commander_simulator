@@ -219,6 +219,7 @@ in_play = ["Thrasios, Triton Hero"]
 land_floor   = 3     # below this, a land outranks almost any spell
 land_ceiling = 6     # at or above this, lands are near-worthless
 default_rank = 10
+life_floor   = 10    # below this the deck stops paying life for mana (40 to start)
 
 [policy.rank]
 # The engine and its outlets. Kinnan is the deck.

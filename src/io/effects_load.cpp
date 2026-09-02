@@ -29,6 +29,27 @@ ColourMask colours_from(const toml::node& node, const std::string& context) {
     return mask;
 }
 
+SourceCondition condition_from(const std::string& text, const std::string& context) {
+    if (text == "artifact_count_gte") return SourceCondition::ArtifactCountGte;
+    if (text == "legendary_creature_count_gte") return SourceCondition::LegendaryCreatureCountGte;
+    if (text == "untapped_creature_gte") return SourceCondition::UntappedCreatureGte;
+    if (text == "untapped_permanent_gte") return SourceCondition::UntappedPermanentGte;
+    fail(context + ": unknown condition '" + text + "'. The set is closed.");
+}
+
+CardFilter filter_from(const std::string& text, const std::string& context) {
+    if (text.empty() || text == "any") return CardFilter::Any;
+    if (text == "land") return CardFilter::Land;
+    if (text == "nonland") return CardFilter::Nonland;
+    fail(context + ": unknown card filter '" + text + "'");
+}
+
+RitualZone zone_from(const std::string& text, const std::string& context) {
+    if (text.empty() || text == "battlefield") return RitualZone::Battlefield;
+    if (text == "hand") return RitualZone::Hand;
+    fail(context + ": unknown from_zone '" + text + "'");
+}
+
 EntersTappedUnless shape_from(const std::string& text, const std::string& context) {
     if (text == "land_count") return EntersTappedUnless::LandCount;
     if (text == "pay_life") return EntersTappedUnless::PayLife;
@@ -138,6 +159,59 @@ EffectDb load_effects(const std::filesystem::path& path, const CardDb& db) {
                 }
                 target.has_mana_source = true;
                 target.mana_source = mana;
+            } else if (kind == "DYNAMIC_MANA_SOURCE") {
+                ManaSourceEffect mana;
+                if (const auto* colours = (*effect)["colors"].as_array()) {
+                    mana.produces = colours_from(*colours, context);
+                } else {
+                    fail(context + ": needs 'colors'");
+                }
+                mana.amount = static_cast<std::uint8_t>((*effect)["amount"].value_or<int64_t>(1));
+                mana.is_land = (*effect)["is_land"].value_or<bool>(false);
+                mana.is_creature = (*effect)["is_creature"].value_or<bool>(false);
+                mana.life_cost = static_cast<int>((*effect)["life_cost"].value_or<int64_t>(0));
+                const auto condition = (*effect)["condition"].value_or<std::string>("");
+                if (condition.empty()) {
+                    fail(context + ": a DYNAMIC_MANA_SOURCE without a condition is just a "
+                                   "MANA_SOURCE - use that kind instead.");
+                }
+                mana.condition = condition_from(condition, context);
+                mana.condition_param =
+                    static_cast<int>((*effect)["condition_param"].value_or<int64_t>(1));
+                target.has_mana_source = true;
+                target.mana_source = mana;
+            } else if (kind == "FETCH") {
+                FetchEffect fetch;
+                const auto* finds = (*effect)["finds"].as_array();
+                if (finds == nullptr || finds->empty()) {
+                    fail(context + ": a FETCH needs 'finds', a non-empty list of land types");
+                }
+                for (const toml::node& entry_type : *finds) {
+                    fetch.finds.push_back(entry_type.value_or<std::string>(""));
+                }
+                fetch.life_cost = static_cast<int>((*effect)["life_cost"].value_or<int64_t>(0));
+                target.has_fetch = true;
+                target.fetch = fetch;
+            } else if (kind == "CARD_COST") {
+                CardCostEffect cost;
+                cost.cards = static_cast<int>((*effect)["cards"].value_or<int64_t>(1));
+                cost.filter =
+                    filter_from((*effect)["filter"].value_or<std::string>(""), context);
+                target.has_card_cost = true;
+                target.card_cost = cost;
+            } else if (kind == "RITUAL") {
+                RitualEffect ritual;
+                if (const auto* colours = (*effect)["colors"].as_array()) {
+                    ritual.produces = colours_from(*colours, context);
+                } else {
+                    fail(context + ": needs 'colors'");
+                }
+                ritual.amount =
+                    static_cast<std::uint8_t>((*effect)["amount"].value_or<int64_t>(1));
+                ritual.from_zone =
+                    zone_from((*effect)["from_zone"].value_or<std::string>(""), context);
+                target.has_ritual = true;
+                target.ritual = ritual;
             } else if (kind == "STATIC_MANA_MODIFIER") {
                 ModifierEffect modifier;
                 const auto mode = (*effect)["mode"].value_or<std::string>("");

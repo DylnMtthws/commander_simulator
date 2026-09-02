@@ -31,6 +31,17 @@ enum class EntersTappedUnless : std::uint8_t {
     OpponentCount,  // Rejuvenating Springs: unless you have >= N opponents
 };
 
+// A DYNAMIC_MANA_SOURCE's gate. The difference from MANA_SOURCE is that the
+// loop must EVALUATE something rather than read a constant, which is the test
+// for a kind rather than a flag (section 4.2).
+enum class SourceCondition : std::uint8_t {
+    None = 0,
+    ArtifactCountGte,           // Mox Opal's metalcraft
+    LegendaryCreatureCountGte,  // Mox Amber
+    UntappedCreatureGte,        // Springleaf Drum
+    UntappedPermanentGte,       // Gene Pollinator
+};
+
 struct ManaSourceEffect {
     ColourMask produces = 0;
     bool colours_from_table = false;  // Exotic Orchard, Fellwar Stone
@@ -40,10 +51,35 @@ struct ManaSourceEffect {
     bool untaps_normally = true;
     EntersTappedUnless enters_tapped_unless = EntersTappedUnless::Never;
     int enters_tapped_param = 0;
-    // Recorded and unused: life is not tracked, so every life cost is treated
-    // as free, which OVERSTATES the deck. Kept so the data is already here the
-    // day it matters.
+    SourceCondition condition = SourceCondition::None;
+    int condition_param = 0;
+    // What tapping this source costs in life. Ancient Tomb 2, City of Brass 1,
+    // Tarnished Citadel 3, and so on.
     int life_cost = 0;
+};
+
+// FETCH: sacrifice for a land from the library, then shuffle. `finds` matches
+// against all_types, so land subtypes make the predicate per-card.
+struct FetchEffect {
+    std::vector<std::string> finds;
+    int life_cost = 0;
+};
+
+// CARD_COST: paid in cards from hand, not mana.
+enum class CardFilter : std::uint8_t { Any = 0, Land, Nonland };
+
+struct CardCostEffect {
+    int cards = 1;
+    CardFilter filter = CardFilter::Any;
+};
+
+// RITUAL: one-shot mana from somewhere other than tapping a permanent.
+enum class RitualZone : std::uint8_t { Battlefield = 0, Hand };
+
+struct RitualEffect {
+    ColourMask produces = 0;
+    std::uint8_t amount = 1;
+    RitualZone from_zone = RitualZone::Battlefield;
 };
 
 enum class ModifierMode : std::uint8_t { Multiply, GrantCreatureMana };
@@ -62,6 +98,12 @@ struct CardEffects {
     ManaSourceEffect mana_source;
     bool has_modifier = false;
     ModifierEffect modifier;
+    bool has_fetch = false;
+    FetchEffect fetch;
+    bool has_card_cost = false;
+    CardCostEffect card_cost;
+    bool has_ritual = false;
+    RitualEffect ritual;
     std::string reason_category;
 };
 
@@ -80,11 +122,37 @@ struct TableContext {
     int opponents = 0;
     ColourMask opponent_colors = 0;
     bool on_the_play = true;
+
+    // Life below which the deck stops paying life for mana.
+    //
+    // A FLOOR, not a scored decision, and that is the whole reason life stayed
+    // small. With a floor, "pay 2 life for an untapped Breeding Pool" is a
+    // constant-time rule rather than a term the scorer has to weigh - so life
+    // gates which SOURCES EXIST and never enters can_pay or the policy at all.
+    //
+    // With no opponents nothing attacks, so the only pressure on life is the
+    // deck's own mana base. A floor keeps that from becoming absurd over twelve
+    // turns of Ancient Tomb without pretending to model a real life total.
+    int life_floor = 10;
 };
 
 // Mana available from the battlefield, with modifiers applied.
 void collect_sources(const CardDb& db, const EffectDb& effects, const GameState& state,
                      const TableContext& table, std::vector<Source>& out);
+
+// What tapping this set of sources would cost in life, given the same board.
+// The turn loop deducts it; nothing else needs to know.
+[[nodiscard]] int life_cost_of_tapping(const EffectDb& effects, const GameState& state,
+                                       int slot) noexcept;
+
+// Is this dynamic source's condition met right now?
+[[nodiscard]] bool condition_met(const ManaSourceEffect& effect, const CardDb& db,
+                                 const EffectDb& effects, const GameState& state) noexcept;
+
+// Library slots this fetch could find. Empty means the fetch does nothing,
+// which is a real outcome worth seeing rather than an error.
+void fetch_candidates(const FetchEffect& fetch, const CardDb& db, const GameState& state,
+                      std::vector<int>& out);
 
 // Does this land enter tapped, given the board and the declared table context?
 [[nodiscard]] bool enters_tapped(const ManaSourceEffect& effect, const CardDb& db,

@@ -42,6 +42,14 @@ public:
     // Which card to cast next, or -1 to stop casting this turn.
     [[nodiscard]] virtual int choose_spell(const Context& context, GameStats& stats) const = 0;
 
+    // Which land to fetch from a set of candidates, or -1 for none.
+    //
+    // A fetch IS a tutor with a small candidate set, so it goes through the
+    // same scorer rather than a list of its own (section 6.3). One function,
+    // several call sites.
+    [[nodiscard]] virtual int choose_fetch(const Context& context, std::span<const int> candidates,
+                                           GameStats& stats) const = 0;
+
     // Shown in traces and run output so a number is never separated from the
     // piloting that produced it.
     [[nodiscard]] virtual const char* name() const = 0;
@@ -68,6 +76,8 @@ class StubPolicyDoNotUseForResults final : public Policy {
 public:
     [[nodiscard]] int choose_land(const Context& context, GameStats& stats) const override;
     [[nodiscard]] int choose_spell(const Context& context, GameStats& stats) const override;
+    [[nodiscard]] int choose_fetch(const Context& context, std::span<const int> candidates,
+                                   GameStats& stats) const override;
     [[nodiscard]] const char* name() const override {
         return "StubPolicyDoNotUseForResults (plays the lowest-indexed legal thing)";
     }
@@ -124,6 +134,8 @@ public:
 
     [[nodiscard]] int choose_land(const Context& context, GameStats& stats) const override;
     [[nodiscard]] int choose_spell(const Context& context, GameStats& stats) const override;
+    [[nodiscard]] int choose_fetch(const Context& context, std::span<const int> candidates,
+                                   GameStats& stats) const override;
     [[nodiscard]] const char* name() const override {
         return "AuthoredPolicy (authored ranks plus state-dependent terms)";
     }

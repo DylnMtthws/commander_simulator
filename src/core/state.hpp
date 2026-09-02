@@ -118,6 +118,16 @@ struct GameState {
     Zone graveyard;
     Zone tapped;
 
+    // Commander starts at 40. Life is a PAYABLE COST WITH A FLOOR and nothing
+    // more: eight cards in this deck cost life to use or to enter untapped, and
+    // treating those as free made the deck faster than it can be, in the mana
+    // base - the place section 2.8 says an error is worst.
+    //
+    // Deliberately NOT a resource you draw cards off. Nothing in this deck does
+    // that, and the moment life becomes an engine input it stops being a small
+    // addition.
+    int life = 40;
+
     std::uint8_t turn = 0;
     bool land_played_this_turn = false;
     int commander_slot = -1;

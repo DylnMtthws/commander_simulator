@@ -101,6 +101,7 @@ cs::GameConfig make_config(const cs::io::DeckFile& deck) {
     config.table.opponent_colors = deck.table.opponent_colors;
     config.table.on_the_play = deck.table.on_the_play;
     config.on_the_play = deck.table.on_the_play;
+    config.table.life_floor = deck.life_floor;
     return config;
 }
 

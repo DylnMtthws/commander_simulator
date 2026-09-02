@@ -422,3 +422,124 @@ status = "inert"
 reason_category = "no_object_in_model"
 authored_from = "9e9e3daa005feb29b96587ccc700b87c83e41081eaca8aa3e39abc3efb4b1b79"
 reason = "tap/untap two targets, plus cipher, which needs combat damage"
+
+# ===========================================================================
+# FETCH - the seven fetchlands.
+#
+# Not "an effect" in the clean sense: a fetch removes a card from the library
+# and shuffles, changing the composition of every later draw (section 4.2). At
+# 7 of 25 lands, getting it wrong biases the whole distribution.
+#
+# `finds` matches against all_types, which carries LAND SUBTYPES - so the
+# predicate is per-card and real rather than "get a land". Five of the seven are
+# off-colour and can only reach a subset of the four fetchable lands in this
+# deck: Tropical Island and Breeding Pool (both Forest Island), Forest, Island.
+# ===========================================================================
+
+[cards."Misty Rainforest"]
+status = "modeled"
+authored_from = "19410d0c6ef1212a644864b4bfa02d2c15a9c073e4a76e1d860eaa4baaf25415"
+effects = [ { kind = "FETCH", finds = ["Forest", "Island"], life_cost = 1 } ]
+
+[cards."Flooded Strand"]
+status = "modeled"
+authored_from = "ed3032f2053b5cab8789c900ccc582d2141055db35144c5ba35769d9d122931a"
+# Plains or Island: reaches Island, Tropical Island, Breeding Pool - not Forest.
+effects = [ { kind = "FETCH", finds = ["Plains", "Island"], life_cost = 1 } ]
+
+[cards."Polluted Delta"]
+status = "modeled"
+authored_from = "fc527b6ce43a555f804d2beaf6b581cb398dfa927174b262fb2d808e248d5018"
+effects = [ { kind = "FETCH", finds = ["Island", "Swamp"], life_cost = 1 } ]
+
+[cards."Scalding Tarn"]
+status = "modeled"
+authored_from = "a2c65cb8e8af816b914e4075c17596d7d959d6c86be81fd8cb3dcacf242bc7be"
+effects = [ { kind = "FETCH", finds = ["Island", "Mountain"], life_cost = 1 } ]
+
+[cards."Windswept Heath"]
+status = "modeled"
+authored_from = "080cc758cb0e82ce198c6808f266234f9e412dab6588f133d886343d8327760b"
+# Forest or Plains: reaches Forest, Tropical Island, Breeding Pool - not Island.
+effects = [ { kind = "FETCH", finds = ["Forest", "Plains"], life_cost = 1 } ]
+
+[cards."Wooded Foothills"]
+status = "modeled"
+authored_from = "44c2690c7d828c8e256c879db857c123381d8ab70f782a377ff657e8db2719d3"
+effects = [ { kind = "FETCH", finds = ["Mountain", "Forest"], life_cost = 1 } ]
+
+[cards."Verdant Catacombs"]
+status = "modeled"
+authored_from = "c958edbccefc67b730d4814170c0ad4e1417158c828fe2bc39b8f0ae975f98ec"
+effects = [ { kind = "FETCH", finds = ["Swamp", "Forest"], life_cost = 1 } ]
+
+# ===========================================================================
+# DYNAMIC_MANA_SOURCE - output depends on the board, so it is a function call
+# rather than a constant. That difference is what makes it a separate kind.
+# ===========================================================================
+
+[cards."Mox Opal"]
+status = "modeled"
+authored_from = "bdb29ee397246f4255c8168a912b08b48182360efa60aa594442b0d33e74791b"
+# Metalcraft: only with three or more artifacts.
+effects = [ { kind = "DYNAMIC_MANA_SOURCE", colors = ["G","U"], amount = 1, condition = "artifact_count_gte", condition_param = 3 } ]
+
+[cards."Mox Amber"]
+status = "modeled"
+authored_from = "af4a3de9a42590a2cf05709e847ec7cda91053aeb0a629fe50a9027512f103b4"
+# "any color among legendary creatures and planeswalkers you control". The only
+# legends in this deck are Kinnan and Thrasios, both {G}{U}, so the colours are
+# approximated as GU rather than derived per board - documented because it is an
+# approximation, not a reading.
+effects = [ { kind = "DYNAMIC_MANA_SOURCE", colors = ["G","U"], amount = 1, condition = "legendary_creature_count_gte", condition_param = 1 } ]
+
+[cards."Springleaf Drum"]
+status = "modeled"
+authored_from = "75ebbec6c6e9be29a59d32e9c24201232f3de082a6b232524ee8f0033959b21a"
+# "{T}, Tap an untapped creature you control". The tapped creature is a real
+# cost, and NOT modelled - which overstates whenever that creature was itself a
+# mana source. Kinnan makes that common, so this one is worth revisiting.
+effects = [ { kind = "DYNAMIC_MANA_SOURCE", colors = ["W","U","B","R","G"], amount = 1, condition = "untapped_creature_gte", condition_param = 1 } ]
+
+[cards."Gene Pollinator"]
+status = "modeled"
+authored_from = "0cb6b02e443de6af7e6ea9633da8d34a2b4ab5feec1c3c2ac487d0a1b6369941"
+# Same shape, tapping any untapped permanent rather than a creature.
+effects = [ { kind = "DYNAMIC_MANA_SOURCE", colors = ["W","U","B","R","G"], amount = 1, is_creature = true, condition = "untapped_permanent_gte", condition_param = 1 } ]
+
+# ===========================================================================
+# CARD_COST - an entry cost paid in CARDS rather than mana.
+#
+# Two users, and RULE K2 is why it is a kind anyway: both consume a card from
+# the opening hand, which is the value function's most sensitive input. A kind's
+# justification is its position, not its population (section 4.2).
+# ===========================================================================
+
+[cards."Chrome Mox"]
+status = "modeled"
+authored_from = "b2ae0d724427351b0e14bb0bee94161ae4f2e69db7a3498e100dfa4652c615f5"
+# Imprint: exile a nonartifact, nonland card from hand. Colours are those of the
+# exiled card; approximated as GU, which is the deck's identity.
+effects = [ { kind = "MANA_SOURCE", colors = ["G","U"], amount = 1 }, { kind = "CARD_COST", cards = 1, filter = "nonland" } ]
+
+[cards."Mox Diamond"]
+status = "modeled"
+authored_from = "301afb391b47d64d23e28f128e9567da04cbf4588eb5daa025f9916cafcdd5ba"
+# Discard a LAND, which is a different and usually worse cost than Chrome Mox's.
+effects = [ { kind = "MANA_SOURCE", colors = ["W","U","B","R","G"], amount = 1 }, { kind = "CARD_COST", cards = 1, filter = "land" } ]
+
+# ===========================================================================
+# RITUAL - one-shot mana that does not come from tapping a battlefield permanent
+# ===========================================================================
+
+[cards."Lotus Petal"]
+status = "modeled"
+authored_from = "228b05dd51233bb5cf903b126f0d3c848ab81cfb9d542a146e781685621afe48"
+effects = [ { kind = "RITUAL", colors = ["W","U","B","R","G"], amount = 1, from_zone = "battlefield" } ]
+
+[cards."Elvish Spirit Guide"]
+status = "modeled"
+authored_from = "09053efe1a9af95f79ff5258813410d5baf70ba868fb9f04d1263c9f6b62973d"
+# "Exile this card from your hand: Add {G}." Mana from HAND - the verb the loop
+# would otherwise lack, and the reason RITUAL is a kind at two users.
+effects = [ { kind = "RITUAL", colors = ["G"], amount = 1, from_zone = "hand" } ]

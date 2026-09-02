@@ -31,6 +31,7 @@ struct GameStats {
     std::uint32_t cards_drawn = 0;
     std::uint32_t lands_played = 0;
     std::uint32_t spells_cast = 0;
+    std::uint32_t fetches_used = 0;
 };
 
 struct GameOutcome {

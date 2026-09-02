@@ -97,6 +97,11 @@ int StubPolicyDoNotUseForResults::choose_spell(const Context& context, GameStats
     return chosen;
 }
 
+int StubPolicyDoNotUseForResults::choose_fetch(const Context&, std::span<const int> candidates,
+                                               GameStats&) const {
+    return candidates.empty() ? -1 : candidates.front();
+}
+
 // ---------------------------------------------------------------------------
 // Authored
 // ---------------------------------------------------------------------------
@@ -164,6 +169,32 @@ int best_of(std::span<const Consideration> candidates, int floor_score) {
 }
 
 }  // namespace
+
+int AuthoredPolicy::choose_fetch(const Context& context, std::span<const int> candidates,
+                                 GameStats& stats) const {
+    // Same scorer, different candidate set. A fetch's candidates come from the
+    // library rather than the hand, and that is the only difference.
+    std::vector<Consideration> scored;
+    scored.reserve(candidates.size());
+    for (const int slot : candidates) {
+        scored.push_back(score(context, slot, /*as_land=*/true, stats));
+    }
+    if (context.observer != nullptr) {
+        context.observer->considering(scored, "fetch target");
+    }
+    // No floor: having fetched, taking SOMETHING always beats taking nothing,
+    // even above the land ceiling - the fetch is already sacrificed.
+    int best = -1;
+    int best_score = 0;
+    for (const Consideration& candidate : scored) {
+        if (best < 0 || candidate.score > best_score ||
+            (candidate.score == best_score && candidate.slot < best)) {
+            best = candidate.slot;
+            best_score = candidate.score;
+        }
+    }
+    return best;
+}
 
 int AuthoredPolicy::choose_land(const Context& context, GameStats& stats) const {
     std::vector<Consideration> candidates;
