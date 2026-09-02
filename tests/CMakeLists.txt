@@ -28,10 +28,17 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Catch2)
 
 add_executable(cs_tests
-    unit/test_smoke.cpp)
+    unit/test_smoke.cpp
+    unit/test_card_db_load.cpp)
 
 # Catch2WithMain supplies main(), so no test file writes one.
-target_link_libraries(cs_tests PRIVATE cs_core cs_warnings Catch2::Catch2WithMain)
+# cs_core arrives transitively via cs_io's PUBLIC link.
+target_link_libraries(cs_tests PRIVATE cs_io cs_warnings Catch2::Catch2WithMain)
+
+# The fixture path is compiled in rather than resolved relative to the working
+# directory, so `ctest` behaves the same wherever it is invoked from.
+target_compile_definitions(cs_tests PRIVATE
+    CS_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/fixtures")
 
 # catch_discover_tests asks the built binary for its test list and registers
 # each one with CTest individually, so `ctest` reports per-test results and can

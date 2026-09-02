@@ -56,6 +56,7 @@ endif()
 include(CTest)   # defines BUILD_TESTING (default ON) and the `test` target
 
 add_subdirectory(src/core)
+add_subdirectory(src/io)
 add_subdirectory(src/cli)
 
 if(BUILD_TESTING)

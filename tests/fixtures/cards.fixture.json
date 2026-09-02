@@ -1,0 +1,350 @@
+{
+  "manifest": {
+    "exporter_version": "0.1.0",
+    "generated_at": "2026-09-02T00:05:56.235077+00:00",
+    "source_view": "mtg_v1.card_any_medium",
+    "deck_name": "Kinnan cEDH",
+    "commander": "Kinnan, Bonder Prodigy",
+    "card_count": 8,
+    "max_content_updated_at": "2026-09-01T21:20:19.430220+00:00",
+    "corpus_row_count": 34566,
+    "table": {
+      "opponents": 3,
+      "opponent_colors": [
+        "W",
+        "U",
+        "B",
+        "R",
+        "G"
+      ],
+      "on_the_play": true
+    },
+    "ablation_replacement": "Forest",
+    "metric": "goldfish_turns_to_assembly",
+    "measures": "turns until a declared pattern is assembled, unopposed",
+    "does_not_measure": "deck strength, win rate, or card quality",
+    "cards_sha256": "ca66920dc85219f2e2b20268b930083c2bdf5db9f4450cdca586d46937fc633c",
+    "is_fixture": true,
+    "fixture_rationale": {
+      "Kinnan, Bonder Prodigy": "the commander: is_commander true, two coloured pips {G}{U}",
+      "Sol Ring": "the ordinary case: one face, generic-only cost, castable",
+      "Forest": "a basic land: no cost at all, is_land true - cost null is not cost zero",
+      "Tropical Island": "a nonbasic land, and a Reserved List card mtg_v1.card silently drops",
+      "Sink into Stupor": "modal_dfc: two faces, front-face name resolution, land back face",
+      "Invasion of Ikoria": "transform + Battle + X spell, and empty card-level mana_cost",
+      "Finale of Devastation": "an X spell: variable=1 with mana_value 2, castable at a cost that does nothing",
+      "Mental Misstep": "the only Phyrexian cost in the deck, {U/P}"
+    },
+    "derived_from_cards_sha256": "85dbcda196a6492c8ef867fe05883d993c7f8da7ed7c8d1b3b9818e391bda675"
+  },
+  "cards": [
+    {
+      "export_index": 0,
+      "listed_name": "Kinnan, Bonder Prodigy",
+      "name": "Kinnan, Bonder Prodigy",
+      "oracle_id": "8d11aa49-d4cd-48b1-aa0f-8548fa733416",
+      "layout": "normal",
+      "mana_value": 2,
+      "castable_cmcs": [
+        2
+      ],
+      "all_types": [
+        "Creature",
+        "Druid",
+        "Human",
+        "Legendary"
+      ],
+      "color_identity": [
+        "G",
+        "U"
+      ],
+      "has_land_face": false,
+      "is_commander": true,
+      "faces": [
+        {
+          "index": 0,
+          "name": "Kinnan, Bonder Prodigy",
+          "type_line": "Legendary Creature \u2014 Human Druid",
+          "is_land": false,
+          "mana_value": 2,
+          "cost": {
+            "generic": 0,
+            "pips": [
+              "G",
+              "U"
+            ],
+            "variable": 0,
+            "phyrexian": []
+          }
+        }
+      ],
+      "source_export_index": 53
+    },
+    {
+      "export_index": 1,
+      "listed_name": "Sol Ring",
+      "name": "Sol Ring",
+      "oracle_id": "6ad8011d-3471-4369-9d68-b264cc027487",
+      "layout": "normal",
+      "mana_value": 1,
+      "castable_cmcs": [
+        1
+      ],
+      "all_types": [
+        "Artifact"
+      ],
+      "color_identity": [],
+      "has_land_face": false,
+      "is_commander": false,
+      "faces": [
+        {
+          "index": 0,
+          "name": "Sol Ring",
+          "type_line": "Artifact",
+          "is_land": false,
+          "mana_value": 1,
+          "cost": {
+            "generic": 1,
+            "pips": [],
+            "variable": 0,
+            "phyrexian": []
+          }
+        }
+      ],
+      "source_export_index": 78
+    },
+    {
+      "export_index": 2,
+      "listed_name": "Forest",
+      "name": "Forest",
+      "oracle_id": "b34bb2dc-c1af-4d77-b0b3-a0fb342a5fc6",
+      "layout": "normal",
+      "mana_value": 0,
+      "castable_cmcs": [],
+      "all_types": [
+        "Basic",
+        "Forest",
+        "Land"
+      ],
+      "color_identity": [
+        "G"
+      ],
+      "has_land_face": false,
+      "is_commander": false,
+      "faces": [
+        {
+          "index": 0,
+          "name": "Forest",
+          "type_line": "Basic Land \u2014 Forest",
+          "is_land": true,
+          "mana_value": 0,
+          "cost": null
+        }
+      ],
+      "source_export_index": 42
+    },
+    {
+      "export_index": 3,
+      "listed_name": "Tropical Island",
+      "name": "Tropical Island",
+      "oracle_id": "74b7fe23-5d3a-4092-8d78-7c0eba8f6f73",
+      "layout": "normal",
+      "mana_value": 0,
+      "castable_cmcs": [],
+      "all_types": [
+        "Forest",
+        "Island",
+        "Land"
+      ],
+      "color_identity": [
+        "G",
+        "U"
+      ],
+      "has_land_face": false,
+      "is_commander": false,
+      "faces": [
+        {
+          "index": 0,
+          "name": "Tropical Island",
+          "type_line": "Land \u2014 Forest Island",
+          "is_land": true,
+          "mana_value": 0,
+          "cost": null
+        }
+      ],
+      "source_export_index": 90
+    },
+    {
+      "export_index": 4,
+      "listed_name": "Sink into Stupor",
+      "name": "Sink into Stupor // Soporific Springs",
+      "oracle_id": "bcc6eece-75ea-494c-b33a-d4477d504e0b",
+      "layout": "modal_dfc",
+      "mana_value": 3,
+      "castable_cmcs": [
+        3
+      ],
+      "all_types": [
+        "Instant",
+        "Land"
+      ],
+      "color_identity": [
+        "U"
+      ],
+      "has_land_face": true,
+      "is_commander": false,
+      "faces": [
+        {
+          "index": 0,
+          "name": "Sink into Stupor",
+          "type_line": "Instant",
+          "is_land": false,
+          "mana_value": 3,
+          "cost": {
+            "generic": 1,
+            "pips": [
+              "U",
+              "U"
+            ],
+            "variable": 0,
+            "phyrexian": []
+          }
+        },
+        {
+          "index": 1,
+          "name": "Soporific Springs",
+          "type_line": "Land",
+          "is_land": true,
+          "mana_value": null,
+          "cost": null
+        }
+      ],
+      "source_export_index": 76
+    },
+    {
+      "export_index": 5,
+      "listed_name": "Invasion of Ikoria",
+      "name": "Invasion of Ikoria // Zilortha, Apex of Ikoria",
+      "oracle_id": "21d90735-5e04-4a8c-a546-ff26d4d5998d",
+      "layout": "transform",
+      "mana_value": 2,
+      "castable_cmcs": [
+        2
+      ],
+      "all_types": [
+        "Battle",
+        "Creature",
+        "Dinosaur",
+        "Legendary",
+        "Siege"
+      ],
+      "color_identity": [
+        "G"
+      ],
+      "has_land_face": false,
+      "is_commander": false,
+      "faces": [
+        {
+          "index": 0,
+          "name": "Invasion of Ikoria",
+          "type_line": "Battle \u2014 Siege",
+          "is_land": false,
+          "mana_value": 2,
+          "cost": {
+            "generic": 0,
+            "pips": [
+              "G",
+              "G"
+            ],
+            "variable": 1,
+            "phyrexian": []
+          }
+        },
+        {
+          "index": 1,
+          "name": "Zilortha, Apex of Ikoria",
+          "type_line": "Legendary Creature \u2014 Dinosaur",
+          "is_land": false,
+          "mana_value": null,
+          "cost": null
+        }
+      ],
+      "source_export_index": 51
+    },
+    {
+      "export_index": 6,
+      "listed_name": "Finale of Devastation",
+      "name": "Finale of Devastation",
+      "oracle_id": "69872a9a-fe54-4e58-940c-89395af71acd",
+      "layout": "normal",
+      "mana_value": 2,
+      "castable_cmcs": [
+        2
+      ],
+      "all_types": [
+        "Sorcery"
+      ],
+      "color_identity": [
+        "G"
+      ],
+      "has_land_face": false,
+      "is_commander": false,
+      "faces": [
+        {
+          "index": 0,
+          "name": "Finale of Devastation",
+          "type_line": "Sorcery",
+          "is_land": false,
+          "mana_value": 2,
+          "cost": {
+            "generic": 0,
+            "pips": [
+              "G",
+              "G"
+            ],
+            "variable": 1,
+            "phyrexian": []
+          }
+        }
+      ],
+      "source_export_index": 35
+    },
+    {
+      "export_index": 7,
+      "listed_name": "Mental Misstep",
+      "name": "Mental Misstep",
+      "oracle_id": "1a0770e6-b093-4439-baff-6889a50ba12e",
+      "layout": "normal",
+      "mana_value": 1,
+      "castable_cmcs": [
+        1
+      ],
+      "all_types": [
+        "Instant"
+      ],
+      "color_identity": [
+        "U"
+      ],
+      "has_land_face": false,
+      "is_commander": false,
+      "faces": [
+        {
+          "index": 0,
+          "name": "Mental Misstep",
+          "type_line": "Instant",
+          "is_land": false,
+          "mana_value": 1,
+          "cost": {
+            "generic": 0,
+            "pips": [],
+            "variable": 0,
+            "phyrexian": [
+              "U"
+            ]
+          }
+        }
+      ],
+      "source_export_index": 58
+    }
+  ]
+}
