@@ -9,6 +9,7 @@
 #include <string>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <thread>
@@ -1085,8 +1086,8 @@ int grid(const std::filesystem::path& path, const std::filesystem::path& deck_pa
     std::printf("  TURN\", NOT \"IS BAD\". Section 4.1: an early-turn objective is what\n");
     std::printf("  separates opening hands, and it is structurally unable to see a mid-game\n");
     std::printf("  engine piece - Enduring Vitality is +0.5 at turn 3 and +29 at turn 12.\n");
-    std::printf("  The second column is printed for exactly that reason. It is CONTEXT, not\n");
-    std::printf("  an input: the ordering is by turn %d alone.\n", turn);
+    std::printf("  The ordering below is by turn %d alone; turn %d is printed beside it.\n", turn,
+                config.turn_cap);
     std::printf("\n  NOT a keep/mull recommendation. A mulligan decision compares a hand to the\n");
     std::printf("  EXPECTATION OVER MULLIGANING, which is not computed here (section 13.1).\n");
 
@@ -1126,6 +1127,72 @@ int grid(const std::filesystem::path& path, const std::filesystem::path& deck_pa
                     100.0 * cell.reached_late / cell.games,
                     cell.hands < 20 ? "   <- thin" : "");
     }
+    // THE INVERSION COUNT, computed rather than asserted, and printed with the
+    // table rather than in a document. If the two columns order the same cells
+    // differently then "which hand is better" is not a question the chart
+    // answers - it answers "better by turn N", and a reader comparing two rows
+    // has to see that before drawing a conclusion from the comparison.
+    {
+        std::size_t inversions = 0;
+        std::size_t comparable = 0;
+        std::size_t worst_a = kCells;
+        std::size_t worst_b = kCells;
+        double worst_gap = 0.0;
+        for (std::size_t a = 0; a < kCells; ++a) {
+            for (std::size_t b = a + 1; b < kCells; ++b) {
+                // Thin cells are excluded: an inversion between two cells of
+                // four hands each is noise, and counting it would inflate the
+                // very finding this is here to state honestly.
+                if (cells[a].hands < 20 || cells[b].hands < 20) {
+                    continue;
+                }
+                ++comparable;
+                const double early_a = static_cast<double>(cells[a].reached) / cells[a].games;
+                const double early_b = static_cast<double>(cells[b].reached) / cells[b].games;
+                const double late_a = static_cast<double>(cells[a].reached_late) / cells[a].games;
+                const double late_b = static_cast<double>(cells[b].reached_late) / cells[b].games;
+                if ((early_a > early_b) == (late_a > late_b)) {
+                    continue;
+                }
+                ++inversions;
+                const double gap = std::abs(late_a - late_b);
+                if (gap > worst_gap) {
+                    worst_gap = gap;
+                    worst_a = early_a > early_b ? a : b;
+                    worst_b = early_a > early_b ? b : a;
+                }
+            }
+        }
+        const auto describe = [&](std::size_t i) {
+            std::printf("%-4s t1=%-3s GU=%-3s pay=%-3s", kBuckets[i / 8], ((i / 4) % 2) ? "y" : "n",
+                        ((i / 2) % 2) ? "y" : "n", (i % 2) ? "y" : "n");
+        };
+        if (comparable > 0) {
+            std::printf("\n  THE TWO COLUMNS DISAGREE ABOUT WHICH HAND IS BETTER, in %zu of %zu\n",
+                        inversions, comparable);
+            std::printf("  cell pairs (%.0f%%). THIS IS A PROPERTY OF THE CHART, NOT A CAVEAT:\n",
+                        100.0 * static_cast<double>(inversions) / static_cast<double>(comparable));
+            std::printf("  \"which hand is better\" HAS NO ANSWER HERE without naming the turn.\n");
+            std::printf("  Before you compare two rows, check that the comparison survives both\n");
+            std::printf("  columns; where it does not, the ranking you take away is the one you\n");
+            std::printf("  chose an objective for.\n");
+        }
+        if (worst_a < kCells) {
+            std::printf("\n  The widest disagreement:\n    ");
+            describe(worst_a);
+            std::printf("   turn %-2d %5.1f%%  ->  turn %d %5.1f%%\n", turn,
+                        100.0 * cells[worst_a].reached / cells[worst_a].games, config.turn_cap,
+                        100.0 * cells[worst_a].reached_late / cells[worst_a].games);
+            std::printf("    ");
+            describe(worst_b);
+            std::printf("   turn %-2d %5.1f%%  ->  turn %d %5.1f%%\n", turn,
+                        100.0 * cells[worst_b].reached / cells[worst_b].games, config.turn_cap,
+                        100.0 * cells[worst_b].reached_late / cells[worst_b].games);
+            std::printf("    The first is ahead by turn %d and behind by %.0f points at turn %d.\n",
+                        turn, 100.0 * worst_gap, config.turn_cap);
+        }
+    }
+
     std::printf("\n  src = mana sources in hand (lands, rocks, dorks, rituals)\n");
     std::printf("  t1  = a NONLAND source castable turn one\n");
     std::printf("  GU  = the hand's own sources can pay {G}{U}, asked through can_pay\n");

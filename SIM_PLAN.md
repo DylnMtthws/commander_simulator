@@ -2413,6 +2413,33 @@ reasoning and they are the only external validation set this project will ever
 get. Fitting a grid with them in view and then scoring them answers nothing.
 They are also from version C (§15A), so each needs checking against A's 99 first.
 
+#### The two columns disagree about which hand is better, in 20% of pairs
+
+Every cell prints its turn, its hand count, a Wilson interval, and a **second
+turn beside it**. The arrangement §13.1 settled on was "decision on one
+objective, second column as a guard against misreading". **The first run showed
+that is too weak a description.**
+
+Counted over the 435 comparable cell pairs (both cells ≥ 20 hands): **89 of
+them — 20% — are ordered one way by turn 3 and the other way by turn 12.**
+
+| | turn 3 | turn 12 |
+|---|---|---|
+| `5+ / t1 / GU / no payoff` | **1.0%** | 52.3% |
+| `3 / — / — / payoff` | 0.8% | **82.0%** |
+
+Ahead by turn 3; **behind by thirty points at turn 12.**
+
+> **This is a property of the chart, not a caveat about it.** "Which hand is
+> better" has no answer here without naming the turn. A reader comparing two rows
+> has to check that the comparison survives both columns first, and where it does
+> not, the ranking they take away is the one they chose an objective for.
+
+That paragraph is printed **on the chart**, with the inversion count computed
+each run, not stated here and forgotten. Thin cells are excluded from the count,
+because an inversion between two four-hand cells is noise and counting it would
+inflate the finding this exists to state honestly.
+
 #### The chart carries §4.1's warnings, and then demonstrates why
 
 Every cell prints its turn, its hand count, a Wilson interval, and a **second
@@ -2434,14 +2461,28 @@ and be wrong about every game that goes past turn six. This is §4.1's blind spo
 appearing not as a caveat but as **two adjacent rows of the chart disagreeing**,
 which is what putting the warnings on the chart was for.
 
-#### Where the grid contradicts the primer, and the model is the one that is wrong
+#### Three of four heuristics confirm — and the fourth is the one that matters
 
-Three of the primer's four heuristics are confirmed: source count is monotone at
-turn 3, turn-one ramp helps at every source count, and the all-interaction hand
-is real — **every `pay = —` cell is at 0.0–1.0% by turn 3 and caps around 50% by
-turn 12**, against ~78% for hands with a payoff.
+**Stated together, because "three of four" on its own reads as agreement and the
+one that failed is the one the primer says matters most.**
 
-The fourth is contradicted:
+| The primer's heuristic | The grid |
+|---|---|
+| *"our number 1 priority is definitely mana production"* | ✅ source count is monotone at turn 3 |
+| *"preferably ramp we can play on turn 1"* | ✅ `t1` helps at every source count |
+| *"this is NOT a deck where you want to keep the 'all interaction hand'"* | ✅ every `pay = —` cell is 0.0–1.0% by turn 3 and caps near 50% by turn 12, against ~78% with a payoff |
+| ***"we are able and happy to keep the 'all mana hand'"*** | ❌ **contradicted — and the model is wrong** |
+
+Three confirmations are real external corroboration and are worth having: the
+features were taken from the primer and three of them separate hands in the
+direction and the shape it claims. **But the fourth is not one heuristic of four.
+It is the deck's most frequently applied keep criterion**, stated as one of the
+best things about playing the deck, and it is the one the model structurally
+cannot represent.
+
+**So the honest summary is not "three of four". It is: the grid agrees with the
+primer everywhere except the most common keep decision in the deck, where it is
+wrong in a known direction and by an amount nobody has measured.**
 
 > *"One of the BEST things about playing Kinnan is we are able and happy to keep
 > the 'all mana hand'. This is because Kinnan can properly utilize that mana to
@@ -2455,9 +2496,15 @@ creature into play, never converts mana into cards (§16.7, R3). So a hand whose
 whole plan is "make mana, then spin" registers as a hand with no plan.
 
 > **The model systematically undervalues mana-only hands, by exactly the amount
-> Kinnan's ability is worth, which it does not model.** That is a stated limit on
-> the grid rather than a finding about the deck, and it is the single largest
-> caveat on reading it.
+> Kinnan's ability is worth, which it does not model.**
+>
+> That is not a caveat on the grid. **It is the grid being wrong**, in a known
+> direction, on the deck's most common keep decision — and the size of the error
+> is unmeasured because measuring it requires the thing that is missing.
+
+The fix has a name — §16.7's **R3, execute the dig** — and it is costed in
+§16.7's "What R3 costs" below. Nothing else addresses this: R1 and R2 refine
+*when* a detection fires, and neither makes mana convert into cards.
 
 #### What B surfaced that no aggregate had
 
@@ -3141,6 +3188,94 @@ judgement, they are separate keys, `activations` is **required wherever
 header beside `opponents` and `on_the_play`. `kinnan_basalt` declares
 `activations = 1` explicitly, so the contrast — that loop untaps itself, this one
 does not — is visible in the file rather than inferable.
+
+### 16.7b What R3 costs — executing Kinnan's dig instead of detecting it
+
+Asked because §13.1's grid is wrong in a known direction on the deck's most
+common keep decision, and R3 is the only option that addresses it.
+
+#### The verb the loop needs is ONE, and everything else already exists
+
+`{5}{G}{U}: Look at the top five cards of your library. You may put a non-Human
+creature card from among them onto the battlefield. Put the rest on the bottom of
+your library in a random order.`
+
+| Step | Status |
+|---|---|
+| Pay `{5}{G}{U}` | **exists** — `plan_payment`, and it is already a coloured cost |
+| Look at the top five | **NEW** — `peek_n`, advancing the lazy Fisher–Yates without putting cards in hand. ~20 lines, reusing `draw_one`'s swap |
+| Choose among the five | **exists** — `choose_tutor`'s body, a candidate list scored by `score_arrival` |
+| Put it onto the battlefield | **exists** — `enter_battlefield` |
+| Rest to the bottom | **NEW** — a `bottomed` counter shrinking the drawable range to `[drawn, library_count − bottomed)`. ~10 lines |
+| When to activate | **NEW policy** — and see below, it is smaller than it looks |
+
+**One genuinely new verb: peek-and-bottom.** Everything else is composition.
+
+#### §6.3's lookahead wall does NOT block the scorer here
+
+The wall is against evaluating hypothetical *future* positions from a move list.
+**After the peek, the five cards are revealed** — current information, exactly
+like a tutor's candidate set, which `choose_tutor` already scores. The candidate
+set is five random cards rather than the whole library and nothing else differs.
+This is the one place the existing scorer is a *perfect* fit rather than a
+stretch.
+
+What the scorer genuinely cannot value is the decision to *activate*: "is
+spinning worth seven mana, or should I hold it?" That compares a known board
+against an unknown draw. The primer gives it an entire chapter (§8, *When Should
+I Spin Kinnan?*) and concludes there is no rule — it is spin-versus-hold-up-
+interaction, contextual every time.
+
+> **With no opponents, that question does not exist.** There is nothing to hold
+> mana *for*. "Activate whenever seven is payable after casting" is defensible,
+> needs no new scorer term, and is exact for a goldfish. §2.5's largest
+> limitation deletes the hardest policy problem in the primer.
+
+#### The 73.6% is worth far more as a TEST than as a shortcut
+
+A stochastic resolution — *"with p = 0.736, put the best non-Human creature into
+play"* — is **not simpler than the real thing**:
+
+- it still needs a "best creature" choice, over the **whole library** rather than
+  five cards, which is a strictly larger candidate set;
+- 0.736 was measured at one board state at one moment and moves with library
+  composition, so it would have to be recomputed rather than baked in;
+- and a trace would read *"dig hit"* without saying what it saw, which is §11.0's
+  ninth rule failing by construction.
+
+Implement the real peek instead and the measured 73.6% becomes a **backstop test
+with an independently measured expected value.** This project has not had one of
+those: every other test asserts against a number the same code produced. That is
+worth more than the shortcut saves.
+
+#### The cost is not the code — it is what R3 retires
+
+- **Code: ~130 lines and tests. A day, two at most.**
+- **`wide_colour_into_kinnan_dig` becomes obsolete as a win pattern.** If the dig
+  resolves, you do not detect "can activate twice", you activate and see what
+  happens. One of four patterns retires or changes meaning.
+- **§16.7's entire R1 / `activations = 2` decision evaporates.** That judgement
+  exists *only* because the dig is detected rather than resolved. The measurement
+  that fixed it, the honesty-header line that reports it, and the required
+  `activations` key all become the machinery of a question that stopped being
+  asked. `kinnan_basalt` still needs the key, so it stays — but its second user
+  goes.
+- **Every number in §16 moves again**, and the grid with them. The dig puts
+  creatures into play, which feeds `creature_count_gte`, `WIDE_COLOUR`, the clone
+  candidate set and convoke's eligible bodies. It touches more than its own line.
+
+#### Recommendation
+
+**Do it, and do it before the chart ships.** The code is days. The churn is the
+expensive part and it is the same churn that has followed every correct fix in
+this project — §16.10 moved the whole sweep, §16.0 inverted its own headline,
+and both left the model better. Shipping a chart whose known-wrong direction sits
+on the deck's most common keep decision, with the error unmeasured because
+measuring it needs the missing verb, is the worse trade.
+
+The one thing R3 does **not** fix is Thrasios's scry (§16.9): that decision is "a
+tapped land now versus an unknown card", and the unknown card is genuinely
+outside the scorer's vocabulary. R3 resolves the dig, not every activated ability.
 
 ### 16.8 The cost-model audit: all four patterns and both engines
 
