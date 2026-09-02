@@ -72,8 +72,7 @@ def load_deck(path: Path) -> Deck:
     # changes every draw probability in the simulation, silently.
     if len(mainboard) != 99:
         raise DeckError(
-            f"{path}: mainboard has {len(mainboard)} cards, expected 99 "
-            "(99 + 1 commander = 100)."
+            f"{path}: mainboard has {len(mainboard)} cards, expected 99 (99 + 1 commander = 100)."
         )
 
     duplicates = sorted({n for n in mainboard if mainboard.count(n) > 1})

@@ -100,8 +100,7 @@ def _resolve(names: Sequence[str], rows: list[dict[str, Any]]) -> list[Resolutio
     # Reserved List.
     if len(resolved) != len(names):
         raise ExportError(
-            f"resolved {len(resolved)} cards from {len(names)} names. "
-            "Counts must match exactly."
+            f"resolved {len(resolved)} cards from {len(names)} names. Counts must match exactly."
         )
     return resolved
 

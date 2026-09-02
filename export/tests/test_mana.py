@@ -47,14 +47,14 @@ def test_absent_cost_is_none_not_zero(text: str | None) -> None:
 @pytest.mark.parametrize(
     "text",
     [
-        "{G/U}",              # hybrid
-        "{2/W}",              # monocoloured hybrid
-        "{C}",                # colourless
-        "{S}",                # snow
-        "{D}",                # land drop - the symbol that broke the upstream parser
-        "{HW}",               # half mana
-        "{Q}",                # untap
-        "{}",                 # empty symbol
+        "{G/U}",  # hybrid
+        "{2/W}",  # monocoloured hybrid
+        "{C}",  # colourless
+        "{S}",  # snow
+        "{D}",  # land drop - the symbol that broke the upstream parser
+        "{HW}",  # half mana
+        "{Q}",  # untap
+        "{}",  # empty symbol
     ],
 )
 def test_rejects_unsupported_symbols_by_name(text: str) -> None:
