@@ -194,12 +194,40 @@ in_hand = ["Thrasios, Triton Hero"]
 
 [[win]]
 name = "wide_colour_into_kinnan_dig"
-# Kinnan's own {5}{G}{U} ability, which the colourless engine cannot pay for
-# but a Vitality board can.
+# "{5}{G}{U}: Look at the top five cards of your library. You may put a
+# non-Human creature card from among them onto the battlefield."
+#
+# READ THE COST SYMBOL. There is NO TAP SYMBOL. Being tapped is irrelevant to
+# this ability and it can be activated as often as the mana allows.
+#
+# This carried `untapped = ["Kinnan, Bonder Prodigy"]` for four phases, and the
+# mistake has a name: Kinnan has TWO abilities with DIFFERENT requirements. The
+# static multiplier - "whenever you tap a nonland permanent for mana" - is about
+# tapping OTHER permanents and needs Kinnan only present. The activated dig is
+# about paying mana. The tap-ness in the first got copied onto the second.
+#
+# It was not a small error. It was the only `untapped` term in the file, it sat
+# on the deck's top-firing pattern, and it was silently doing a DIFFERENT job:
+# limiting a pattern that had no cost check at all. Removing it alone took
+# P(assembled by turn 3) from 9.47% to 20.17% - the wrong constraint had been
+# acting as a brake on a missing one.
+#
+# So the entry cost, which is what the requirement should have been all along.
+# {5}{G}{U} is seven mana. Same shape as kinnan_basalt's `loop_entry_cost = 3`
+# above and the same lesson as section 5.3's 1095 -> 9 -> 1258 history: a proxy
+# replaced by the actual condition, with the number moving in both directions
+# before it was right.
+#
+# APPROXIMATION, stated with its direction: loop_entry_cost is generic-only, so
+# this asks for seven mana and not for {G} and {U} specifically. That is looser
+# than the real cost and therefore OVERSTATES slightly. It is close here because
+# WIDE_COLOUR requires two creatures and Enduring Vitality makes every creature
+# tap for any colour, so a board that can pay seven can essentially always
+# produce a green and a blue among it.
 [win.requires]
-flag     = "WIDE_COLOUR"
-in_play  = ["Kinnan, Bonder Prodigy"]
-untapped = ["Kinnan, Bonder Prodigy"]
+flag            = "WIDE_COLOUR"
+in_play         = ["Kinnan, Bonder Prodigy"]
+loop_entry_cost = 7
 
 [[win]]
 name = "wide_colour_into_thrasios"

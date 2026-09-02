@@ -1240,24 +1240,25 @@ sources pay this cost" — the twelfth rule in the ingestion repo's `PLAN.md`
 §11.0 — with the second one crude, different, and invisible.
 
 **It was measured before it was fixed**, by swapping the turn loop's arbitrary
-tie-break for an equally arbitrary one:
+tie-break for an equally arbitrary one. The figures below are from *after* the
+`wide_colour_into_kinnan_dig` correction; the ones taken before it are in the
+retraction that follows, and they were larger.
 
 | payment rule | turn 3 | turn 6 | turn 12 |
 |---|---|---|---|
-| slot order (what shipped) | 8.67% | 36.96% | 66.61% |
-| lands first (a probe, equally defensible) | 10.00% | 37.36% | 66.48% |
-| **the actual assignment** | **9.47%** | **38.74%** | **67.19%** |
+| slot order (what shipped) | 7.96% | 37.10% | 66.78% |
+| lands first (a probe, equally defensible) | 8.27% | 36.94% | 66.63% |
+| **the actual assignment** | **8.64%** | **38.64%** | **67.25%** |
 
-Against a 95% interval of ±0.34 at turn 3, the two crude rules differ by **1.33
-points** — an uncontrolled term four times the stated uncertainty, at the
-objective §4.1 selects, and larger than all but eight of the 98 cards in §16.5's
-sweep.
+The two crude rules differ by 0.31 points at turn 3, which is inside the ±0.32
+interval — so *arbitrariness alone* does not bound the error usefully. The real
+comparison is crude against correct: the shipped rule cost **0.68 points at turn
+3 and 1.54 at turn 6**, both several times the interval, at the objective §4.1
+selects.
 
-**Two things in that table are worth reading carefully.** At turn 3 the real
-assignment lands *between* the two crude rules, which is the confirmation you
-would hope for. At turns 6 and 12 it lands **above both** — because minimising
-overpayment leaves more mana untapped, and more mana untapped compounds into
-more spells cast in the same turn. Neither crude rule was a bound on it.
+**The real assignment dominates at every turn**, which is what minimising
+overpayment should do: more mana left untapped compounds into more spells cast in
+the same turn.
 
 `plan_payment` now returns the assignment and the turn loop spends exactly it.
 The generic remainder is filled **best fit** — the largest source that does not
@@ -1265,26 +1266,39 @@ exceed what is owed, then the smallest that covers it — which minimises
 overpayment. That is a dominance argument, not a preference: mana left untapped
 is weakly better than mana wasted.
 
-#### What is still deferred, and it now has a name
+#### RETRACTED — a claim that rested on a bug
 
-The one thing the assignment deliberately does **not** do is prefer to keep a
-*particular* source untapped.
+This section briefly carried a note reading roughly: *"minimising overpayment is
+not the same as maximising assembly, because when a pattern names a permanent as
+untapped, which source stays untapped matters."* The evidence given was that
+`lands first` beat the real assignment at turn 3, the only place it did, because
+it never taps *Kinnan* and `wide_colour_into_kinnan_dig` required Kinnan
+untapped.
 
-That is not a gap in the matching; it is a genuine policy question, and the
-measurement above shows it has teeth. `lands first` beat the real assignment at
-turn 3 — the only place it did — because it never taps *Kinnan*, and
-`wide_colour_into_kinnan_dig` requires Kinnan **untapped**. So:
+**That requirement was wrong.** Kinnan's dig is `{5}{G}{U}:` with **no tap
+symbol** — being tapped is irrelevant to it, and the requirement had been copied
+across from the *static* multiplier, which is a different ability. With the
+pattern corrected, the numbers are:
 
-> **Minimising overpayment is not the same as maximising assembly.** When a
-> pattern term names a specific permanent as untapped, *which* source stays
-> untapped matters and not merely how much mana is left. The mana layer cannot
-> see that — it has no patterns — and putting the preference there would hide a
-> decision where the scorer cannot weigh it.
+| payment rule | turn 3 | turn 6 | turn 12 |
+|---|---|---|---|
+| slot order (what shipped) | 7.96% | 37.10% | 66.78% |
+| lands first (probe) | 8.27% | 36.94% | 66.63% |
+| **the actual assignment** | **8.64%** | **38.64%** | **67.25%** |
 
-The right home is §6.2's scorer, as a term over "sources this turn's patterns
-need untapped", and it is not built. Until it is, the model is biased *against*
-lines that need a specific untapped permanent, which is the conservative
-direction and is stated here rather than discovered later.
+**The real assignment now dominates at every turn**, and the gap between the two
+crude rules at turn 3 falls from 1.33 points to 0.31 — inside the interval. The
+lands-first advantage was entirely an artifact of the wrong requirement.
+
+The general claim may still be true. **The evidence for it is gone**, and it is
+retracted rather than re-worded, because no pattern in this deck currently has a
+correct `untapped` term to re-ground it on — that requirement was the only one in
+the file. If one is ever authored correctly, this is the section to revisit.
+
+What remains true and is *not* retracted: the assignment does not prefer to keep
+any particular source untapped, that is a policy question rather than a matching
+one, and §6.2's scorer is where it would live. It is simply not known to cost
+anything today.
 
 ### 6.5 Determinism under the policy
 
@@ -2241,18 +2255,52 @@ Three things worth deciding at the same time, because they interact:
 2. **Cell counts must be reported.** A grid cell holding four sampled hands is
    noise with a number on it, and §10.2's intervals apply per cell — most of the
    sweep's discipline transfers directly.
-3. **§4.1's blind spot lands here.** The objective cannot see mid-game engine
-   pieces, so a feature like "has *Basalt Monolith*" will show near zero. That is
-   correct for a mulligan decision and will read as wrong to anyone who plays the
-   deck, which is a *presentation* problem the feature set can either mitigate or
-   make worse.
+3. **§4.1's blind spot lands here, and this is the one place it stops being
+   analytical and becomes user-facing.** Everywhere else the blind spot is a
+   caveat in a document read by someone already reasoning about objectives. On a
+   keep/mull chart it is a **cell**, and the cell for "has *Basalt Monolith*"
+   will read near zero to every pilot of this deck, all of whom know it is half
+   the primary engine.
 
-**My read, offered rather than adopted:** A, with the cell counts and intervals
-printed, and with D as the thing A is eventually validated against — if a
-decision list over declared terms reproduces the grid, the grid is real; if it
-cannot, the grid was fitting noise. B is worth building first regardless, because
-it is nearly free and it is what tells you which features separate anything at
-all.
+   > **A chart whose most legible cell contradicts universal intuition is a
+   > chart nobody trusts — including in the cells where it is right.** The
+   > blind spot does not merely mislead about Basalt; it discredits the rest of
+   > the chart by association, and it does so to exactly the readers who know the
+   > deck well enough to use it.
+
+   Two consequences for the design:
+
+   **§4.1's three chart-reader warnings belong on the chart, not in this
+   document.** Specifically: the **turn on every cell**, and *"low means does not
+   act by turn N"* adjacent to the numbers rather than in a legend. A caveat one
+   scroll away from a grid is a caveat nobody reads, and §9.5's whole discipline
+   is that the label travels with the number.
+
+   **It is an argument for reporting two turns per cell rather than one.** A cell
+   reading `3: +0.1 | 12: +5.6` is self-explaining in a way that `+0.1` with a
+   footnote is not — the reader sees the card is slow rather than weak, without
+   having to be told what the objective cannot see.
+
+   **What a second turn costs, so the decision can be made on numbers:**
+
+   | | cost |
+   |---|---|
+   | Simulation | **Zero.** `RunSummary` already accumulates `assembled_on` per turn and `PairedRun` already carries a 2×2 table for *every* turn — §16.5's turn-3/6/12 tables are read off one run. Both turns come from the same games |
+   | Statistics | Zero. Wilson and the percentile machinery are per-turn already |
+   | The mulligan recursion | **This is where it is not free.** *Keep* versus *mull* is a comparison, and two objectives can disagree. A cell with two numbers is a chart; a *decision* with two objectives needs a rule for which one decides, and that rule is a new declared assumption |
+   | Screen width | Real and not trivial at grid sizes a person can scan |
+
+   So: two turns per cell is free as **reporting** and not free as a **decision
+   rule**. The honest split is probably to compute the keep/mull decision on one
+   declared objective and *display* the second turn beside it as context — which
+   makes the second number a guard against misreading rather than an input.
+
+**DECIDED: B first, then A.** B is nearly free and it answers whether anything
+separates at all — if raw sampled hands show no separation, A is a grid of noise
+and the feature design was wasted effort. D stays as the thing A is eventually
+validated against: if a decision list over declared terms reproduces the grid,
+the grid is real; if it cannot, the grid was fitting noise. C is not on the table
+while §9.5's auditability discipline holds.
 
 ---
 
@@ -2394,133 +2442,153 @@ believed, and the entries worth writing down are the ones that did not.
 **All figures: 20,000 games, seed 1, `P(assembled by turn N)`, measured by
 declaring the cards in question `inert` and re-running.**
 
-### 16.0 The best result so far is about the author, not the deck
+### 16.0 An ablation measures your implementation, not the card
 
-The authoring order was a judgment call, made deliberately and stated in the
+The authoring order was a judgement call, made deliberately and written into the
 effect file at the time: **convoke last, because it was the hardest cost in the
 deck** — the only one that reads the battlefield, the only one that interacts
-with Kinnan, the one held back and given its own comment block. Tutors were
-authored ahead of clones on similar reasoning.
+with Kinnan, held back and given its own comment block.
 
-| Authored | Effort | Worth (P(assembled by turn 12)) |
-|---|---|---|
-| Chord of Calling, as a tutor | one line of TOML | **+7.66** |
-| Convoke, its cost | a new predicate, a source-augmentation path in the scorer, three tests | **−0.02** |
+That judgement ranked by *how hard this is to model*, which is a property of the
+modeller, against contribution, which is a property of the deck. **Nothing
+connects them**, and that part of the finding stands. What does not stand is the
+number.
 
-**Roughly 300:1 against the ordering, and the sign of the smaller one is not
-established.** The thing most care went into was worth nothing measurable.
+#### The number was wrong, and how it was wrong is the better finding
 
-The mechanism is not mysterious once measured — this deck's creatures are almost
-all mana dorks, a mana dork under Kinnan taps for two where convoking it pays
-one, so convoke may only use the creatures that do nothing else, and those are
-rarely on the battlefield when Chord is castable. The point is that **none of
-that was visible from the card text**, which is what the ordering was made from.
+This section first reported the split as **300 : 1** — one line of TOML declaring
+*Chord of Calling* a tutor worth +7.66 points, against a whole convoke subsystem
+worth −0.02. Measured again after two defects were fixed, both of them mine:
 
-> **Implementation complexity is close to uncorrelated with contribution, and it
-> is not weakly correlated — it was actively misleading here.** The ordering
-> ranked by *how hard this is to model*, which is a property of the modeller.
-> Contribution is a property of the deck. Nothing connects them, and the
-> intuition that they travel together is exactly what produced a 300:1 miss.
+| 200,000 games | turn 3 | turn 6 | turn 12 |
+|---|---|---|---|
+| the whole card | +2.50 | +6.68 | +7.79 |
+| **the tutor half** | +1.83 | +6.02 | +7.67 |
+| **convoke alone** | **+0.67** | **+0.66** | **+0.12** |
+| ratio | **2.7 : 1** | 9.1 : 1 | 64 : 1 |
 
-This generalises past this project in a way the other findings do not. It is an
-argument for measuring effect sizes **before** deciding what to build carefully,
-not after — and, more uncomfortably, for treating "this is the subtle part" as a
-statement about the author's attention rather than about the system.
+At the objective §4.1 recommends, convoke is worth **27% of what the simple half
+is worth** — not 0.3%. The disparity is real and large at the tail and modest at
+turn 3.
 
-It is also why §16.1 through §16.3 are recorded with their measurement method
-attached. A finding that contradicts the person who built the model is only
-worth anything if the reader can check it.
+**The two defects, and only one of them is about the pattern:**
+
+1. `wide_colour_into_kinnan_dig` required Kinnan *untapped* for an ability with
+   no tap symbol (§6.4's retraction), so every number in this section was taken
+   against a pattern that fired on the wrong condition.
+2. **Convoke was paid by a separate loop that ran before the mana system.** It
+   tapped convokable creatures *first, always*, whether or not they were needed.
+   Once §6.4's assignment landed, convoke bodies joined the payable sources and
+   the planner chose between convoking a body and tapping a land under one rule.
+
+The second is the one that matters, and it is the lesson:
+
+> **"Convoke is worth 0.02 points" was a fact about my code, not about the
+> card.** An ablation removes an implementation. When the result is near zero,
+> that is ambiguous between *this mechanism does not matter* and *this mechanism
+> is built badly*, and the two call for opposite responses — one says stop
+> working on it, the other says start.
+
+**So a near-zero ablation result is a hypothesis about the implementation before
+it is a finding about the deck.** The cheap check is the one that would have
+caught this: read a trace of the mechanism actually firing and ask whether it is
+doing the sensible thing. Convoke tapping creatures before the mana system had
+even been consulted would have been obvious in one turn of output.
+
+This is §16.6's rule turned on its author. A declared simplification is not a
+bounded one — and neither is an *undeclared* one, which is what a mechanism paid
+by the wrong code path is.
+
+#### What survives
+
+The ordering claim survives with a smaller number and a sharper edge. Convoke
+took a new predicate, a source-augmentation path in the scorer and three tests;
+the tutor took one line. **At turn 12 that is 64 : 1 and at turn 3 it is 2.7 :
+1**, and in neither case did the effort ranking predict the contribution ranking.
+
+It is also why §16.1 onward record their measurement method. A finding that
+contradicts the person who built the model is only worth anything if the reader
+can re-run it — and this one had to be.
 
 ### 16.1 Clones matter less than their count suggests
 
-| | turn 3 | turn 6 | turn 12 |
-|---|---|---|---|
-| all eight clones inert | 8.38% | 36.30% | 66.36% |
-| baseline | 8.71% | 37.01% | 66.65% |
-| **the eight clones are worth** | **+0.33** | **+0.71** | **+0.29** |
+`CLONE` is the second-largest kind in the deck at 8 cards, and §4.2 makes a point
+of the fact that a taxonomy derived from the format rather than from these 99
+texts would have missed it. That was right about the *modelling* and it is a poor
+guide to the *deck*.
 
-`CLONE` is the second-largest kind in the deck at 8 cards, and §4.2 makes a
-point of the fact that a taxonomy derived from the format rather than from these
-99 texts would have missed it. That was right about the *modelling* and it turns
-out to be a poor guide to the *deck*: eight cards move the curve by about a
-third of a point.
+The measurement that settles it is §16.5's sweep, not the leave-one-out figures
+this section originally carried — those were taken against the wrong pattern and
+the wrong payment rule, and are superseded rather than corrected.
 
 **The reason is specific and is the finding, not the number.** In a Kinnan shell
-a clone's job is copying a mana source. Copying a mana source only pays when
-mana is the binding constraint — and for this deck it usually is not. What binds
-is *finding Thrasios*, which is a tutor's job and not a clone's.
+a clone's job is copying a mana source. Copying a mana source only pays when mana
+is the binding constraint — and for this deck it usually is not. What binds is
+*finding Thrasios*, which is a tutor's job and not a clone's.
 
 This was the first result in the project that was about the DECK rather than
 about the model. Everything before it — the seeding, the pattern proxies, the
 mana payment — was the simulator being wrong and then being less wrong.
 
-**§16.5 sharpens this and corrects its reference point.** Measured against a
-Forest, "+0.29" was inside the noise. Measured against the deck's own 31
-declared blanks, seven of the eight clones are at **zero**, with intervals tight
-enough to say so.
+### 16.2 One tutor is worth several clones
 
-### 16.2 One tutor is worth twenty-five clones
+*Chord of Calling*, made inert, costs the deck **2.50 points at turn 3 and 7.79
+at turn 12** (200,000 games). Against §16.5's clones, which sit at zero.
 
-| | turn 3 | turn 6 | turn 12 |
+The cross-check is *Finale of Devastation*, the same effect already authored, and
+§16.1's explanation predicts both: an X-cost creature tutor straight to the
+battlefield finds Thrasios, and finding Thrasios is what the deck is short of.
+
+### 16.3 Convoke is worth a quarter of the card's simple half
+
+| 200,000 games | turn 3 | turn 6 | turn 12 |
 |---|---|---|---|
-| Chord of Calling inert | 6.51% | 30.98% | 58.99% |
-| baseline | 8.71% | 37.01% | 66.65% |
-| **Chord of Calling is worth** | **+2.20** | **+6.03** | **+7.66** |
+| convoke alone | **+0.67** | **+0.66** | **+0.12** |
 
-The same measurement on *Finale of Devastation*, which is the same card and was
-already authored, costs 7.25 points — so the magnitude is a property of the
-effect and not of the newer code. §16.1's explanation predicts this: an X-cost
-creature tutor straight to the battlefield finds Thrasios, and finding Thrasios
-is what the deck is short of.
+Corrected. §16.0 first reported this as −0.02 and the difference was a defect in
+how convoke was paid, not in the card — see that section, which is now about the
+correction rather than about the ratio.
 
-### 16.3 Convoke — the elaborate half of that card — is worth nothing
-
-| | turn 3 | turn 6 | turn 12 |
-|---|---|---|---|
-| Chord without convoke | 8.47% | 36.63% | 66.67% |
-| baseline | 8.71% | 37.01% | 66.65% |
-| **convoke is worth** | **+0.24** | **+0.38** | **−0.02** |
-
-The measurement behind §16.0. A fraction of a point early and, at turn 12, a
-number whose sign is not established.
+At turn 3 convoke is worth more than 90 of the 98 cards in §16.5's sweep, which
+is not "nothing". At turn 12 it is worth almost nothing, because by then the deck
+has the mana anyway. Both are true and the turn is which one you get.
 
 ### 16.4 The metric is sensitive at turn 3 and numb at turn 12
 
 Not a deck finding — a finding about how to read the other three, and it has
-since been promoted into a decision (§4.1: the default objective is an
-early-turn CDF point). Fixing the mana payment bug — free mana from Enduring
-Vitality, from clones and from Elvish Spirit Guide, §11.0's twelfth rule
-upstream — moved the curve like this:
+since been promoted into a decision (§4.1: the default objective is an early-turn
+CDF point, with the blind spot that follows it).
 
-| | turn 3 | turn 4 | turn 6 | turn 12 |
-|---|---|---|---|---|
-| before | 18.27% | 26.87% | 39.72% | 67.25% |
-| after | 8.71% | 19.59% | 37.01% | 66.65% |
+The clearest demonstration is §6.4's payment fix. The shipped rule cost **0.68
+points at turn 3 and 1.54 at turn 6, and 0.47 at turn 12** — the tail is
+insensitive because by turn 12 the deck has enough real mana anyway, so getting
+payment wrong changes mostly *when*.
 
-**Turn 3 halved and turn 12 moved by six-tenths of a point.** The tail is
-insensitive because by turn 12 the deck has enough real mana anyway, so a bug
-that hands it free mana changes only *when*. Anything reported as a single
+The `wide_colour_into_kinnan_dig` correction shows the same shape from the other
+side: removing the wrong requirement alone moved turn 3 from 9.47% to **20.17%**
+and turn 12 from 67.19% to 67.59%. **A defect that more than doubled the early
+number moved the tail by four-tenths of a point.** Anything reported as a single
 summary number should therefore be an early-turn one; §10.1's insistence on the
 whole CDF over a mean is doing more work than it looked like.
 
 ### 16.5 The sweep, and the answer to what §16.1 could not establish
 
-98 leave-one-out ablations, 30,000 games each, paired against the baseline on
-the same seed sequence. §10.4's variance reduction is **28× on the variance**,
+98 leave-one-out ablations, 30,000 games each, paired against the baseline on the
+same seed sequence, **against the corrected `wide_colour_into_kinnan_dig` and the
+real payment assignment**. §10.4's variance reduction is 28× on the variance,
 measured, which is what makes a third of a point resolvable at all.
 
 #### The inert cards are a measured null, and that is what makes the table readable
 
 The technique is written up as a technique in §9.4, because it generalises past
 this sweep: **any model that forces its unrepresentable inputs to be declared has
-a control group sitting inside it for free.** Ablating an inert card swaps a
-blank for a Forest, so its delta is *exactly* the value of that swap and nothing
-else.
+a control group sitting inside it for free.** Ablating an inert card swaps a blank
+for a Forest, so its delta is *exactly* the value of that swap and nothing else.
 
 | | value |
 |---|---|
-| mean delta of the 31 inert cards, turn 3 | **−0.411%** |
-| range across the 31 | −0.627% to −0.287% |
+| mean delta of the 31 inert cards, turn 3 | **−0.412%** |
+| range across the 31 | −0.597% to −0.287% |
 
 That number **is** §9.4's bias, in the units of the sweep: what a Forest is worth
 over a blank card by turn 3. Without it the table is unreadable — at turn 3 a
@@ -2528,66 +2596,54 @@ Forest beats most of this deck, so almost every nonland reads negative and
 nothing distinguishes "worse than a land" from "worse than nothing".
 
 **Read the re-centred column against the spread, not against the interval.** The
-31 nulls span 0.34 points, wider than any single paired interval, because a
-cheap blank gets cast and wastes mana where an expensive one never does. "A
-blank card" is not one number, so anything within about ±0.17 of zero on `vs
-blank` is not distinguished from doing nothing.
+31 nulls span 0.31 points, wider than any single paired interval, because a cheap
+blank gets cast and wastes mana where an expensive one never does. "A blank card"
+is not one number, so anything within about ±0.155 of zero on `vs blank` is not
+distinguished from doing nothing.
 
-#### The answer
+#### The answer, and it moved
 
-All figures below are **after** §6.4's payment fix, and the "before" column is
-the same sweep run against the old slot-order payment — because a conclusion
-that only holds under one arbitrary tie-break is not a conclusion.
+| Card | delta at turn 3 | vs blank |
+|---|---|---|
+| Enduring Vitality | +6.77% | +7.18% |
+| Thrasios, Triton Hero | +3.32% | +3.73% |
+| Chord of Calling | +1.93% | +2.35% |
+| **Copy Artifact** | −0.20% | **+0.21%** |
+| Mockingbird | −0.27% | +0.14% |
+| Flesh Duplicate | −0.33% | +0.08% |
+| Copy Enchantment | −0.36% | +0.05% |
+| Mirrormade | −0.38% | +0.03% |
+| Flash Photography | −0.39% | +0.03% |
+| Mirage Mirror | −0.40% | +0.02% |
+| Clever Impersonator | −0.42% | −0.01% |
 
-| Card | delta at turn 3 | vs blank (before) | **vs blank (after)** |
-|---|---|---|---|
-| Enduring Vitality | +7.61% | +7.69% | **+8.05%** |
-| Thrasios, Triton Hero | +3.02% | +3.49% | **+3.46%** |
-| Chord of Calling | +2.15% | +2.07% | **+2.59%** |
-| Copy Artifact | −0.29% | +0.15% | **+0.15%** |
-| Copy Enchantment | −0.34% | −0.03% | **+0.10%** |
-| Flesh Duplicate | −0.39% | +0.02% | **+0.05%** |
-| Mockingbird | −0.44% | +0.04% | **+0.00%** |
-| Clever Impersonator | −0.50% | −0.06% | **−0.06%** |
-| Mirrormade | −0.50% | +0.00% | **−0.06%** |
-| Flash Photography | −0.50% | −0.02% | **−0.06%** |
-| Mirage Mirror | −0.51% | −0.00% | **−0.07%** |
+> **Seven of the eight clones are inside the ±0.155 band and cannot be
+> distinguished from a card declared to do nothing.** *Copy Artifact* is at
+> **+0.21%, outside it** — and it is the one that can copy *Basalt Monolith*.
 
-The measured null moved slightly (−0.411% → −0.441%, spread 0.34 → 0.30 points,
-so the not-distinguished band is now ±0.148). **Every clone stays inside it, and
-the ranking of the whole table is unchanged at the top.** The conclusion does not
-depend on the payment rule.
+**This reading has been wrong twice and the history is the useful part.** It
+first read "only Copy Artifact is measurably above a blank" — which was wrong by
+this section's own rule, because the band was then ±0.17 and Copy Artifact was at
++0.154, inside it. That correction was right on the data available. Then the
+pattern and payment fixes moved Copy Artifact to +0.21 and the band to ±0.155,
+and it is outside after all.
 
-> **All eight clones are inside the band where they cannot be distinguished from
-> a card declared to do nothing.** *Copy Artifact* sits exactly on its edge at
-> +0.148 — it is the one that can copy *Basalt Monolith* — and everything else
-> is well within.
-
-**A correction to an earlier reading of this table.** It previously said "only
-*Copy Artifact* is measurably above a blank". That was wrong by this section's
-own stated rule: at the time the band was ±0.17 and Copy Artifact was at +0.154,
-which is inside it. It is the one clone that *might* be above zero, and the data
-does not say it is.
+The stable claim across all three readings is the one worth keeping: **seven of
+the eight clones are at zero.** The eighth has been on both sides of a line drawn
+by a spread that is itself a measurement, which is what "the interval is on
+`delta`, not on `vs blank`" was trying to say.
 
 That answers what §16.1 could not: the question was never "+0.29 or 0" against
 zero, it was against the wrong reference point. Measured against a blank rather
-than against a Forest, the clones are at zero, and the band is tight enough to
-say so.
+than against a Forest, the clones are at zero.
 
 #### The ranking is objective-dependent, and strongly
 
 | Card | turn 3 | turn 6 | turn 12 |
 |---|---|---|---|
-| Enduring Vitality | +7.28% | +24.98% | +30.50% |
-| Basalt Monolith | **−0.61%** | +1.09% | **+5.58%** |
-| Thrasios, Triton Hero | +3.08% | +3.04% | +5.69% |
-| Force of Will (inert) | −0.63% | −1.23% | −0.31% |
-
-(Measured under the old payment rule. §6.4's fix moves *Basalt Monolith* to
-−0.47% at turn 3, or −0.03% against the null — the crude rule had been tapping a
-permanent that does not untap for generic mana when a land would have done, and
-charging the card for it. The blind spot below survives the correction: Basalt is
-still at zero by turn 3.)
+| Enduring Vitality | +6.77% | — | — |
+| **Basalt Monolith** | **−0.33%** | **+2.04%** | **+5.56%** |
+| Thrasios, Triton Hero | +3.32% | — | — |
 
 *Basalt Monolith* is half the deck's primary engine and reads **negative** at
 turn 3 — it is colourless, does not untap, and a turn-3 cast buys nothing that
@@ -2601,32 +2657,85 @@ changing the objective is not a presentational choice**; the honest form names
 the turn every time, which is why the column is `goldfish_turn_to_assembly_delta
 at turn N` and never `score`.
 
-### 16.6 The payment rule was worth more than 90 of the 98 cards
+### 16.6 A declared simplification is not a bounded one
 
-Recorded as a finding rather than as a bug note, because the magnitude is the
-point. Two equally defensible crude payment rules — spend in slot order, spend
-lands first — differ by **1.33 points** of `P(assembled by turn 3)`, against a
-95% interval of ±0.34.
+The finding that should temper every number above.
 
-Eight cards in the §16.5 sweep are worth more than 1.33 points. **Ninety are
-worth less.** For three phases the largest single term in the model at the
-chosen objective was an arbitrary iteration order, and nothing in the output
-distinguished it from the deck.
+§6.4 said mana sequencing was a constraint problem and deferred step 4
+explicitly, in writing, as a known crudeness. The comment beside the code said
+"crude" and "a policy question and a later one". Both true. **Neither is a
+magnitude.**
+
+Measured: the shipped rule cost **0.68 points of `P(assembled by turn 3)`**
+against the correct assignment. **Eight of the 98 cards in §16.5's sweep are
+worth more than that. Ninety are worth less.** For three phases the largest
+single term in the model at the chosen objective was an arbitrary iteration
+order, and nothing in the output distinguished it from the deck.
 
 Two things generalise:
 
-1. **A declared simplification is not a bounded one.** §6.4 said mana sequencing
-   was a constraint problem and deferred step 4 explicitly, in writing, as a
-   known crudeness. Declaring it made it honest and did nothing to make it
-   small. **The declaration and the measurement are different acts**, and only
-   the second one tells you whether the simplification mattered.
+1. **Declaring a simplification makes it honest and does nothing to make it
+   small.** The declaration and the measurement are different acts, and only the
+   second one tells you whether the simplification mattered. Every "known
+   simplification, stated with its direction" comment in `effects.toml` is
+   currently an unmeasured one.
 2. **Measure a simplification by perturbing it, not by reasoning about it.**
-   Swapping one arbitrary rule for another arbitrary rule costs ten minutes and
-   bounds the term from below. Nothing about reading the code suggested 1.33
-   points; the comment beside it said "crude" and "a policy question and a later
-   one", both true and neither a magnitude.
+   Swapping one arbitrary rule for another costs ten minutes. Note that here it
+   would have *under*-reported: the two crude rules differ by only 0.31 points
+   from each other, and it took the correct implementation to show the error was
+   0.68. **Arbitrariness bounds the error from below, not from above.**
 
-### 16.7 What is still not established
+And §16.0 is the same rule applied to a mechanism rather than a rule: convoke's
+"worth 0.02 points" was an undeclared simplification — a mechanism paid by the
+wrong code path — measured as though it were the card.
+
+### 16.7 OPEN — the model does not represent repeatability at all
+
+Raised while auditing Kinnan's abilities, and it is a design gap rather than a
+bug, so it is recorded rather than fixed.
+
+**How repeatability is represented now: it is not.** Patterns *detect a state*
+and the metric is the turn that state is reached (§5.4), after which the game
+stops being simulated. "How many times can this be activated" is outside the
+measured quantity by construction. The one place the question is asked at all is
+`loop_entry_cost`, which asks *can you enter the loop once*, and it is the right
+question for *Kinnan + Basalt* because that loop untaps itself.
+
+**It is the wrong question for Kinnan's dig, and in the direction that
+overstates.** `{5}{G}{U}` has no tap symbol and no untap: each activation costs
+seven mana, of which two must be `{G}` and `{U}` from sources that do **not**
+renew. So a *Vitality* board buys some number of activations, not unbounded ones,
+and `wide_colour_into_kinnan_dig` currently fires when **one** is payable.
+
+Per §5.4 a win pattern means "a state from which a competent pilot wins". One
+Kinnan activation looks at five cards and may put one non-Human creature onto the
+battlefield. **That is a good turn, not an assembled combo** — and it is the
+deck's *top-firing* pattern at ~37% of games. This is the most likely
+overstatement left in the model.
+
+Note the contrast that makes the typed flags (§2.6) look right again:
+`infinite_C_into_thrasios` is genuinely unbounded, because *Thrasios* costs `{4}`
+**generic** and unbounded `{C}` pays it every time. Kinnan's dig needs coloured
+mana per activation and unbounded `{C}` cannot pay for it. **The two outlets are
+not interchangeable and the model already knows that** — what it does not know is
+how many activations "not interchangeable" buys.
+
+Three ways to represent it, none chosen:
+
+| Option | What it says | Cost | What it gets wrong |
+|---|---|---|---|
+| **A. Raise the entry cost to N activations** | `loop_entry_cost = 14` for two digs | One number in the deck file, today | Still generic-only, so it never checks that `{G}{U}` is available *twice*. Crude, honest, and available now |
+| **B. A coloured, repeated entry cost** | A `Cost` rather than an int, times N | Extends §5.2's vocabulary — governance, and a re-audit of every pattern | Nothing much; it is the correct version of A |
+| **C. Execute the dig** | `TUTOR` with a five-card look, actually resolved | The largest: the policy has to choose targets, and each dig changes the board the next one sees | Turns a detect-model into an execute-model, which §5.4 deliberately is not |
+
+**The cheap partial answer, worth doing before any of them:** re-run with
+`loop_entry_cost` at 7, 14 and 21 and see how much the pattern's fire rate moves.
+If two activations are nearly as common as one, the distinction does not matter
+here and A is enough. If it collapses, the pattern was measuring something much
+weaker than it claimed and B is required. That is one afternoon and it settles
+which of the three is worth building.
+
+### 16.8 What is still not established
 
 - The paired interval is **Wald on the discordant pairs**, not a score interval.
   §10.2 insists on Wilson for proportions because the normal approximation fails
