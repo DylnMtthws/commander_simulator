@@ -1634,6 +1634,32 @@ to **~4 minutes across 4 P-cores** rather than §2.4's pessimistic 21.
 > Re-measure at Phase 5 with the same command. The counter is already there:
 > `cs data/cards.json --games N --seed S`.
 
+### 11.3 Measured, Phase 5 — the authored policy
+
+Same command, same deck, 200,000 games:
+
+| | Stub (Phase 3) | Authored (Phase 5) | |
+|---|---|---|---|
+| `can_pay` calls/game | 62.5 | **94.8** | 1.5x |
+| Wall clock | 4.1 µs | **9.1 µs** | 2.2x |
+
+**The 5-10x did not happen.** The scorer does evaluate every candidate rather
+than stopping at the first affordable one, which is where the extra calls come
+from — but `pattern_completion` turned out cheap, because a requirement check is
+a mask compare and the hypothetical state is a stack copy of ~200 bytes.
+
+Wall clock grew faster than call count (2.2x against 1.5x), so the added cost is
+mostly scoring rather than mana. `can_pay` is no longer the whole story, though
+it remains the single largest item.
+
+Extrapolated: the full pairwise sweep is **~9.5 minutes across 4 P-cores**,
+against §2.4's pessimistic 21 and Phase 3's optimistic 4. Still no optimisation
+warranted, and §2.4's conclusion holds — the budget was never the constraint.
+
+> Re-measure again when effects are authored (Phase 7). Real mana sources mean
+> more sources per `can_pay` call and more castable candidates per turn, and
+> that is the change most likely to move this.
+
 ---
 
 ## 12. The C++ project
@@ -1764,6 +1790,15 @@ never touches `io/`.
 > |---|---|---|
 > | `mtg_consumer` cannot read `mtg_internal` | No `USAGE` grant | Query fails: `permission denied for schema mtg_internal` |
 > | `cs_core` cannot use JSON | `cs_core` links only the standard library | **Fails to compile** — the include path is not there to find |
+> | A pattern cannot be named for an outcome | `reject_outcome_naming` at load | **Deck fails to load**, naming the pattern and why |
+>
+> The third is one tier weaker than the first two — a check that runs, not an
+> impossibility — but it is the same move: `win_thrasios` is not discouraged in
+> a style guide, it is unusable. **What makes it usable rather than merely
+> strict is the guard-the-guard test**: `windfall_engine_online` must pass, so
+> the check is word-boundary matched rather than a substring search. A guard
+> that fires on correct input gets disabled within a week, and then it is worse
+> than nothing, because everyone remembers there is a check.
 >
 > Neither is a rule someone remembers. In both cases the wrong thing is not
 > discouraged, it is *unavailable*: the upstream one fails at the first query,

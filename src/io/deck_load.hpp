@@ -12,6 +12,7 @@
 
 #include "core/card.hpp"
 #include "core/pattern.hpp"
+#include "core/policy.hpp"
 
 namespace cs::io {
 
@@ -31,6 +32,7 @@ struct DeckFile {
     TableContext table;
     std::string ablation_replacement;
     PatternSet patterns;
+    PolicyWeights weights;
 };
 
 // Parses and validates against a loaded card database. The database is required

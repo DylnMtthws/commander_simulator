@@ -8,25 +8,39 @@
 // to retrofit; the real authored policy is Phase 5 and the search-based one is
 // not designed at all.
 
+#include <vector>
+
 #include "core/card.hpp"
 #include "core/mana.hpp"
+#include "core/observer.hpp"
+#include "core/pattern.hpp"
 #include "core/state.hpp"
 
 namespace cs {
 
 struct GameStats;
 
+// Everything a decision is allowed to see. Bundled so the signature does not
+// grow a parameter every time a term is added, and so it is visibly a view of
+// the CURRENT state: there is no move list here, which is the wall against the
+// scorer becoming a search (section 6.3).
+struct Context {
+    const CardDb& db;
+    const PatternSet& patterns;
+    const GameState& state;
+    std::span<const Source> sources;
+    Observer* observer = nullptr;
+};
+
 class Policy {
 public:
     virtual ~Policy() = default;
 
     // Which card in hand to play as a land this turn, or -1 for none.
-    [[nodiscard]] virtual int choose_land(const CardDb& db, const GameState& state) const = 0;
+    [[nodiscard]] virtual int choose_land(const Context& context, GameStats& stats) const = 0;
 
-    // Which card in hand to cast next, or -1 to stop casting this turn.
-    [[nodiscard]] virtual int choose_spell(const CardDb& db, const GameState& state,
-                                           std::span<const Source> sources,
-                                           GameStats& stats) const = 0;
+    // Which card to cast next, or -1 to stop casting this turn.
+    [[nodiscard]] virtual int choose_spell(const Context& context, GameStats& stats) const = 0;
 
     // Shown in traces and run output so a number is never separated from the
     // piloting that produced it.
@@ -52,13 +66,75 @@ public:
 // 5; nothing here should be carried forward.
 class StubPolicyDoNotUseForResults final : public Policy {
 public:
-    [[nodiscard]] int choose_land(const CardDb& db, const GameState& state) const override;
-    [[nodiscard]] int choose_spell(const CardDb& db, const GameState& state,
-                                   std::span<const Source> sources,
-                                   GameStats& stats) const override;
+    [[nodiscard]] int choose_land(const Context& context, GameStats& stats) const override;
+    [[nodiscard]] int choose_spell(const Context& context, GameStats& stats) const override;
     [[nodiscard]] const char* name() const override {
         return "StubPolicyDoNotUseForResults (plays the lowest-indexed legal thing)";
     }
+};
+
+// The authored policy (section 6.2).
+//
+// ONE scoring function, used everywhere, not two mechanisms:
+//
+//     score(card, state) = 1000 * authored_rank[card] + situational(card, state)
+//
+// The "static priority list" IS the scorer with a large constant term. That
+// matters for three reasons: one thing to test, one thing to print in a trace,
+// and no question about which mechanism governs a given decision.
+//
+// THE WALL AGAINST SEARCH: situational() takes the CURRENT state and no move
+// list. It never evaluates a hypothetical future position. That single rule is
+// what separates this from a 1-ply search and it is enforceable by inspection.
+// The weight LADDER, stated as an ordering rather than as a set of numbers.
+//
+// Each tier must dominate every tier below it no matter what ranks are
+// authored, so the magnitudes are derived from the rank range rather than
+// picked. Ranks are 0..100 and the rank term is rank*1000, so the rank term
+// spans 0..100,000 and every tier below is a decade clear of it:
+//
+//   uncastable          -100,000,000   excludes, always
+//   completes a pattern  +10,000,000   the game ends; nothing else competes
+//   completes an engine   +1,000,000   the only card that matters this turn
+//   land below floor        +400,000   beats any spell on rank alone
+//   land above ceiling      -300,000   flooding stops without a separate rule
+//   authored rank            0..100,000
+//
+// This ordering was NOT the first attempt. completes_engine started at 50,000
+// against a rank term of up to 100,000, so a rank gap of 70 outvoted finishing
+// the engine - "an enormous bonus" that a static ranking could overrule, which
+// is precisely the term failing to do its job. A test caught it; reading the
+// numbers did not.
+struct PolicyWeights {
+    // Ranks are per-card and authored; anything unlisted gets default_rank.
+    std::vector<int> rank;
+    int land_floor = 3;
+    int land_ceiling = 6;
+
+    int completes_pattern = 10000000;
+    int completes_engine = 1000000;
+    int land_below_floor = 400000;
+    int land_above_ceiling = -300000;
+    int uncastable = -100000000;
+};
+
+class AuthoredPolicy final : public Policy {
+public:
+    explicit AuthoredPolicy(PolicyWeights weights) : weights_(std::move(weights)) {}
+
+    [[nodiscard]] int choose_land(const Context& context, GameStats& stats) const override;
+    [[nodiscard]] int choose_spell(const Context& context, GameStats& stats) const override;
+    [[nodiscard]] const char* name() const override {
+        return "AuthoredPolicy (authored ranks plus state-dependent terms)";
+    }
+
+    // Exposed for testing: the terms are the thing worth asserting on, and a
+    // test that can only see the winner cannot tell WHY it won.
+    [[nodiscard]] Consideration score(const Context& context, int slot, bool as_land,
+                                      GameStats& stats) const;
+
+private:
+    PolicyWeights weights_;
 };
 
 }  // namespace cs

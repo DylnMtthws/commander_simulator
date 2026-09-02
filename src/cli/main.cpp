@@ -18,6 +18,7 @@
 #include "core/version.hpp"
 #include "io/card_db_load.hpp"
 #include "io/deck_load.hpp"
+#include "io/trace.hpp"
 
 namespace {
 
@@ -86,6 +87,41 @@ int summarise(const std::filesystem::path& path) {
 // at ~65 ns and noted that per-game cost is calls x 65 ns, with the call count
 // a property of the policy. This is the first time that number can be observed
 // at all - against the stub, so it is a floor rather than an estimate.
+// Plays ONE game and prints it turn by turn.
+//
+// A v1 feature, not a debugging afterthought (SIM_PLAN.md section 6.6). It is
+// how a policy bug is found at all: aggregate numbers can tell you the deck is
+// slow and never that it kept a Forest over Basalt Monolith on turn three.
+int trace_one(const std::filesystem::path& path, const std::filesystem::path& deck_path,
+              std::uint64_t seed) {
+    cs::CardDb db;
+    cs::io::DeckFile deck;
+    try {
+        db = cs::io::load_card_db(path);
+        deck = cs::io::load_deck(deck_path, db);
+    } catch (const std::runtime_error& error) {
+        std::fflush(stdout);
+        std::fprintf(stderr, "error: %s\n", error.what());
+        return 1;
+    }
+
+    const cs::AuthoredPolicy policy(deck.weights);
+    cs::GameConfig config;
+    config.on_the_play = deck.table.on_the_play;
+    cs::io::TraceWriter writer(db, deck.patterns, stdout);
+
+    std::printf("\ntrace: seed %llu, policy %s\n",
+                static_cast<unsigned long long>(seed), policy.name());
+    std::printf("  scores shown are rank*1000 plus state-dependent terms; rejected\n");
+    std::printf("  candidates are listed so the ranking can be disagreed with.\n");
+    std::printf("\n  WARNING: mana sources are STUB-QUALITY until Phase 7. Only cards with a\n");
+    std::printf("  LAND face produce mana, so every rock and dork on the board produces\n");
+    std::printf("  nothing, and each land wrongly taps for any colour. The POLICY's\n");
+    std::printf("  decisions below are real; the mana it decides against is not.\n");
+    static_cast<void>(cs::run_game(db, deck.patterns, config, policy, seed, &writer));
+    return 0;
+}
+
 int simulate(const std::filesystem::path& path, const std::filesystem::path& deck_path, int games,
              std::uint64_t base_seed) {
     cs::CardDb db;
@@ -99,7 +135,7 @@ int simulate(const std::filesystem::path& path, const std::filesystem::path& dec
         return 1;
     }
 
-    const cs::StubPolicyDoNotUseForResults policy;
+    const cs::AuthoredPolicy policy(deck.weights);
     cs::GameConfig config;
     config.on_the_play = deck.table.on_the_play;
 
@@ -193,10 +229,13 @@ int main(int argc, char** argv) {
     std::filesystem::path path{"data/cards.json"};
     std::filesystem::path deck_path{"data/kinnan.deck.toml"};
     int games = 0;
+    long long trace_seed = -1;
     std::uint64_t seed = 1;
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--games") == 0 && i + 1 < argc) {
             games = std::atoi(argv[++i]);
+        } else if (std::strcmp(argv[i], "--trace") == 0 && i + 1 < argc) {
+            trace_seed = std::atoll(argv[++i]);
         } else if (std::strcmp(argv[i], "--deck") == 0 && i + 1 < argc) {
             deck_path = argv[++i];
         } else if (std::strcmp(argv[i], "--seed") == 0 && i + 1 < argc) {
@@ -207,8 +246,14 @@ int main(int argc, char** argv) {
     }
 
     const int status = summarise(path);
-    if (status != 0 || games <= 0) {
+    if (status != 0) {
         return status;
+    }
+    if (trace_seed >= 0) {
+        return trace_one(path, deck_path, static_cast<std::uint64_t>(trace_seed));
+    }
+    if (games <= 0) {
+        return 0;
     }
     return simulate(path, deck_path, games, seed);
 }

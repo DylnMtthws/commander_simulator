@@ -10,6 +10,7 @@
 #include <optional>
 
 #include "core/card.hpp"
+#include "core/observer.hpp"
 #include "core/pattern.hpp"
 #include "core/policy.hpp"
 #include "core/state.hpp"
@@ -81,6 +82,6 @@ struct GameConfig {
 // Plays one game. A pure function of (db, config, seed) - INVARIANT S1.
 [[nodiscard]] GameResult run_game(const CardDb& db, const PatternSet& patterns,
                                   const GameConfig& config, const Policy& policy,
-                                  std::uint64_t seed);
+                                  std::uint64_t seed, Observer* observer = nullptr);
 
 }  // namespace cs

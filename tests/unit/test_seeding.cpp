@@ -19,6 +19,7 @@
 #include "core/rng.hpp"
 #include "core/sim.hpp"
 #include "io/card_db_load.hpp"
+#include "core/policy.hpp"
 
 namespace {
 
@@ -62,6 +63,38 @@ Signature sign(const cs::GameResult& r) {
 }
 
 constexpr int kGames = 64;
+
+// S1 again, with the AUTHORED policy rather than the stub.
+//
+// Re-run after the policy landed, because the policy is exactly where new
+// nondeterminism enters: a tiebreak resolved by container order would pass
+// every mana and pattern test and show up here as variance. The stub is too
+// simple to have ties worth breaking; the scorer is not.
+cs::PatternSet engine_patterns() {
+    cs::PatternSet set;
+    set.flag_names.emplace_back("ONLINE");
+    cs::Engine engine;
+    engine.sets = cs::FlagMask{1};
+    engine.requires_.in_play.set(0);
+    set.engines.push_back(engine);
+    cs::WinPattern pattern;
+    pattern.requires_.flags = cs::FlagMask{1};
+    pattern.requires_.in_play.set(1);
+    set.patterns.push_back(pattern);
+    return set;
+}
+
+cs::GameResult play_authored(std::uint64_t index) {
+    static const cs::PatternSet patterns = engine_patterns();
+    static const cs::AuthoredPolicy policy([] {
+        cs::PolicyWeights weights;
+        weights.rank.assign(fixture().cards.size(), 10);
+        weights.rank[0] = 90;
+        return weights;
+    }());
+    return cs::run_game(fixture(), patterns, cs::GameConfig{}, policy,
+                        cs::seed_for_game(kBaseSeed, index));
+}
 
 }  // namespace
 
@@ -138,6 +171,44 @@ TEST_CASE("S1: thread count does not change a result", "[seeding][S1]") {
             worker.join();
         }
         REQUIRE(shared == single);
+    }
+}
+
+TEST_CASE("S1 still holds with the authored policy", "[seeding][S1][policy]") {
+    // The scorer is where a tie broken by iteration order would hide.
+    std::vector<Signature> single;
+    for (std::uint64_t i = 0; i < kGames; ++i) {
+        single.push_back(sign(play_authored(i)));
+    }
+    SECTION("same index, same game") {
+        for (std::uint64_t i = 0; i < kGames; ++i) {
+            REQUIRE(sign(play_authored(i)) == single[static_cast<std::size_t>(i)]);
+        }
+    }
+    SECTION("reversed order changes nothing") {
+        for (int i = kGames - 1; i >= 0; --i) {
+            REQUIRE(sign(play_authored(static_cast<std::uint64_t>(i))) ==
+                    single[static_cast<std::size_t>(i)]);
+        }
+    }
+    SECTION("thread count changes nothing") {
+        for (const int threads : {1, 4, 8}) {
+            std::vector<Signature> shared(kGames);
+            std::atomic<int> next{0};
+            std::vector<std::thread> workers;
+            for (int t = 0; t < threads; ++t) {
+                workers.emplace_back([&] {
+                    for (int i = next.fetch_add(1); i < kGames; i = next.fetch_add(1)) {
+                        shared[static_cast<std::size_t>(i)] =
+                            sign(play_authored(static_cast<std::uint64_t>(i)));
+                    }
+                });
+            }
+            for (std::thread& worker : workers) {
+                worker.join();
+            }
+            REQUIRE(shared == single);
+        }
     }
 }
 

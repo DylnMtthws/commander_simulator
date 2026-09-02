@@ -200,3 +200,63 @@ name = "wide_colour_into_thrasios"
 [win.requires]
 flag    = "WIDE_COLOUR"
 in_play = ["Thrasios, Triton Hero"]
+
+# ---------------------------------------------------------------------------
+# Policy (SIM_PLAN.md section 6.2).
+#
+# These numbers ARE the model's bias, and the point of authoring them is that
+# the bias becomes stateable: "these results assume this piloting" is a claim
+# you can read and disagree with. Read a trace before trusting any of it:
+#
+#     cs data/cards.json --trace 12345
+#
+# PROVISIONAL until effects are authored (Phase 7). Ranks below cover the
+# engine pieces, the outlets and the fast mana; everything else takes
+# default_rank. A rank is a relative preference, not a power level.
+# ---------------------------------------------------------------------------
+
+[policy]
+land_floor   = 3     # below this, a land outranks almost any spell
+land_ceiling = 6     # at or above this, lands are near-worthless
+default_rank = 10
+
+[policy.rank]
+# The engine and its outlets. Kinnan is the deck.
+"Kinnan, Bonder Prodigy"  = 100
+"Basalt Monolith"         = 90
+"Thrasios, Triton Hero"   = 88
+"Enduring Vitality"       = 80
+
+# Fast mana: cheap, and every one of them is a turn.
+# (No Mana Crypt in this list - the loader caught that when it was ranked here.)
+"Sol Ring"                = 70
+"Mana Vault"              = 65
+"Grim Monolith"           = 65
+"Lotus Petal"             = 55
+"Chrome Mox"              = 50
+"Mox Diamond"             = 50
+"Mox Opal"                = 45
+"Mox Amber"               = 45
+
+# Mana creatures, which Kinnan doubles.
+"Birds of Paradise"       = 60
+"Delighted Halfling"      = 60
+"Llanowar Elves"          = 55
+"Elvish Mystic"           = 55
+"Fyndhorn Elves"          = 55
+"Gene Pollinator"         = 45
+"Springleaf Drum"         = 40
+
+# Tutors: the deck's real card selection.
+"Finale of Devastation"   = 62
+"Chord of Calling"        = 60
+"Nature's Rhythm"         = 58
+"Invasion of Ikoria"      = 58
+"Transmute Artifact"      = 55
+"Trophy Mage"             = 45
+"Drift of Phantasms"      = 40
+"Dizzy Spell"             = 40
+
+# Card advantage that actually works with no opponents.
+"The One Ring"            = 50
+"Sylvan Library"          = 45

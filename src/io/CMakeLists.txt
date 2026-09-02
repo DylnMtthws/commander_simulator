@@ -44,7 +44,7 @@ FetchContent_Declare(
     FIND_PACKAGE_ARGS NAMES tomlplusplus)
 FetchContent_MakeAvailable(tomlplusplus)
 
-add_library(cs_io card_db_load.cpp deck_load.cpp)
+add_library(cs_io card_db_load.cpp deck_load.cpp trace.cpp)
 target_include_directories(cs_io PUBLIC ${PROJECT_SOURCE_DIR}/src)
 
 # nlohmann_json is PRIVATE: cs_io's header exposes only core types and

@@ -19,6 +19,7 @@ add_library(cs_core
     mana.cpp
     state.cpp
     pattern.cpp
+    policy.cpp
     sim.cpp)
 
 # PUBLIC on the include directory: anything linking cs_core inherits the path,

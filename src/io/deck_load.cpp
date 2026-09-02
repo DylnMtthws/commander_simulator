@@ -251,6 +251,30 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db) {
         }
     }
 
+    // [policy]. Ranks are per-slot, so the lookup in the hot path is an array
+    // index rather than a name comparison.
+    deck.weights.rank.assign(db.cards.size(), 0);
+    if (const auto* policy = root["policy"].as_table()) {
+        deck.weights.land_floor =
+            static_cast<int>((*policy)["land_floor"].value_or<int64_t>(3));
+        deck.weights.land_ceiling =
+            static_cast<int>((*policy)["land_ceiling"].value_or<int64_t>(6));
+        const auto default_rank =
+            static_cast<int>((*policy)["default_rank"].value_or<int64_t>(0));
+        std::fill(deck.weights.rank.begin(), deck.weights.rank.end(), default_rank);
+
+        if (const auto* ranks = (*policy)["rank"].as_table()) {
+            for (const auto& [key, value] : *ranks) {
+                // A rank naming a card not in the deck is a typo that would
+                // silently do nothing - the same shape as a pattern naming an
+                // absent card, and refused for the same reason.
+                const int slot = slot_for(db, std::string(key.str()), "[policy.rank]");
+                deck.weights.rank[static_cast<std::size_t>(slot)] =
+                    static_cast<int>(value.value_or<int64_t>(0));
+            }
+        }
+    }
+
     if (set.patterns.empty()) {
         fail(path.string() + ": no [[win]] patterns declared. Without one the simulator has "
                              "nothing to detect and every game is censored.");

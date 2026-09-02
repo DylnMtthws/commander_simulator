@@ -85,46 +85,8 @@ std::uint64_t digest_state(const GameState& state) noexcept {
 
 }  // namespace
 
-int StubPolicyDoNotUseForResults::choose_land(const CardDb& db, const GameState& state) const {
-    int chosen = -1;
-    state.hand.for_each([&](int slot) {
-        if (chosen == -1 && has_land_face(db.cards[static_cast<std::size_t>(slot)])) {
-            chosen = slot;  // lowest slot wins: for_each ascends
-        }
-    });
-    return chosen;
-}
-
-int StubPolicyDoNotUseForResults::choose_spell(const CardDb& db, const GameState& state,
-                                              std::span<const Source> sources,
-                                              GameStats& stats) const {
-    int chosen = -1;
-    // Hand and command zone together. The commander is castable from the
-    // command zone, and without this every pattern naming Kinnan is unreachable
-    // by construction - which is exactly what the never-fired report said when
-    // this was missing.
-    const Zone castable_from = state.hand | state.command_zone;
-    castable_from.for_each([&](int slot) {
-        if (chosen != -1) {
-            return;
-        }
-        const Card& card = db.cards[static_cast<std::size_t>(slot)];
-        const Face* face = castable_face(card);
-        if (face == nullptr) {
-            return;
-        }
-        // Every candidate costs one can_pay. This is the count that decides
-        // whether can_pay needs optimising (section 11.1).
-        ++stats.can_pay_calls;
-        if (can_pay(*face->cost, sources, 0)) {
-            chosen = slot;
-        }
-    });
-    return chosen;
-}
-
 GameResult run_game(const CardDb& db, const PatternSet& patterns, const GameConfig& config,
-                    const Policy& policy, std::uint64_t seed) {
+                    const Policy& policy, std::uint64_t seed, Observer* observer) {
     Rng rng(seed);
     GameState state;
 
@@ -151,25 +113,48 @@ GameResult run_game(const CardDb& db, const PatternSet& patterns, const GameConf
         // Draw. Skipped on turn 1 when on the play - which is itself a declared
         // assumption with a stated bias, since a real pod is on the play 25% of
         // the time (section 2.8).
+        if (observer != nullptr) {
+            observer->turn_begin(turn, state);
+        }
         if (!(turn == 1 && config.on_the_play)) {
-            if (draw_one(state, rng) >= 0) {
+            const int slot = draw_one(state, rng);
+            if (slot >= 0) {
                 ++result.stats.cards_drawn;
+                if (observer != nullptr) {
+                    observer->drew(slot, state.hand.count());
+                }
             }
         }
 
         // Land drop.
-        const int land = policy.choose_land(db, state);
+        std::vector<Source> sources = stub_sources(db, state);
+        const Context land_context{db, patterns, state, sources, observer};
+        const int land = policy.choose_land(land_context, result.stats);
         if (land >= 0) {
             state.hand.clear(land);
             state.battlefield.set(land);
             state.land_played_this_turn = true;
             ++result.stats.lands_played;
+            if (observer != nullptr) {
+                observer->played_land(land);
+            }
         }
 
         // Main phase. Cast until the policy declines or nothing is affordable.
+        // Recomputed after the land drop, and printed HERE rather than before
+        // it. An earlier version printed mana at the top of the turn, so a
+        // trace showed one source and then a two-mana cast on the next line -
+        // technically consistent, unreadable, and exactly the kind of thing
+        // this output exists to make obvious.
+        bool announced = false;
         for (;;) {
-            const std::vector<Source> sources = stub_sources(db, state);
-            const int spell = policy.choose_spell(db, state, sources, result.stats);
+            sources = stub_sources(db, state);
+            if (observer != nullptr && !announced) {
+                observer->mana(sources);
+                announced = true;
+            }
+            const Context context{db, patterns, state, sources, observer};
+            const int spell = policy.choose_spell(context, result.stats);
             if (spell < 0) {
                 break;
             }
@@ -183,6 +168,9 @@ GameResult run_game(const CardDb& db, const PatternSet& patterns, const GameConf
             // without it the loop would cast the whole hand every turn.
             const Face* face = castable_face(db.cards[static_cast<std::size_t>(spell)]);
             int to_tap = face != nullptr ? face->cost->mana_value_at_x_zero() : 0;
+            if (observer != nullptr) {
+                observer->cast_spell(spell, to_tap);
+            }
             state.battlefield.for_each([&](int slot) {
                 if (to_tap > 0 && !state.tapped.test(slot) &&
                     has_land_face(db.cards[static_cast<std::size_t>(slot)])) {
@@ -199,15 +187,24 @@ GameResult run_game(const CardDb& db, const PatternSet& patterns, const GameConf
         // after every individual cast would report the same TURN number, since
         // that is the reported quantity - so per-turn is exact for the metric,
         // not an approximation of it.
+        if (observer != nullptr) {
+            observer->engines_active(active_flags(patterns, state));
+        }
         const int fired = first_satisfied(patterns, state);
         if (fired >= 0) {
             result.outcome.assembled_turn = turn;
             result.outcome.pattern_id = static_cast<std::uint8_t>(fired);
             result.outcome.satisfied_mask = all_satisfied(patterns, state);
+            if (observer != nullptr) {
+                observer->pattern_fired(fired, turn);
+            }
             break;  // first assembly is the answer; nothing after it is measured
         }
     }
     result.state_digest = digest_state(state);
+    if (observer != nullptr) {
+        observer->game_end(result.turns_simulated, result.outcome.censored());
+    }
     return result;
 }
 
