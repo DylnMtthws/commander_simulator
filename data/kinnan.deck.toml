@@ -1,0 +1,136 @@
+# The Kinnan deck.
+#
+# Phase 1 needs only the card list and the declared assumptions. Authored
+# ranks, win patterns, engines and scorer weights arrive in Phases 4-5
+# (SIM_PLAN.md sections 5 and 6); this file grows rather than being replaced.
+
+[deck]
+name      = "Kinnan cEDH"
+commander = "Kinnan, Bonder Prodigy"
+
+# Every field below is REQUIRED and none has a default. An unstated assumption
+# is the failure SIM_PLAN.md sections 2.8 and 9.4 exist to prevent, so omitting
+# one fails the build rather than silently picking a value.
+
+[table]
+# What the model assumes about the rest of the table. NOT an opponent model -
+# only cards whose text tests these values read them (section 2.8).
+opponents       = 3                          # a four-player pod
+opponent_colors = ["W", "U", "B", "R", "G"]  # Exotic Orchard / Fellwar Stone
+on_the_play     = true                       # biases Gemstone Caverns; see 2.8
+
+[ablation]
+# The baseline every leave-one-out result is measured against (section 9.4).
+# A finding that survives a change of baseline is about the card; one that does
+# not was about the baseline.
+replacement = "Forest"
+
+[cards]
+# The 99, as front-face names printed on a decklist. The exporter resolves
+# "Sink into Stupor" to "Sink into Stupor // Soporific Springs" (section 2.3).
+#
+# A TOML note worth knowing: this array lives under its own [cards] header
+# because a bare key written after [ablation] would silently become part of
+# THAT table. TOML keys belong to the most recent header, which is a quiet way
+# to misplace data.
+mainboard = [
+  "An Offer You Can't Refuse",
+  "Ancient Tomb",
+  "Arcane Signet",
+  "Basalt Monolith",
+  "Birds of Paradise",
+  "Borne Upon a Wind",
+  "Boseiju, Who Endures",
+  "Botanical Sanctum",
+  "Breeding Pool",
+  "Chain of Vapor",
+  "Chord of Calling",
+  "Chrome Mox",
+  "City of Brass",
+  "Clever Impersonator",
+  "Colossal Skyturtle",
+  "Command Tower",
+  "Commandeer",
+  "Consecrated Sphinx",
+  "Copy Artifact",
+  "Copy Enchantment",
+  "Delighted Halfling",
+  "Dispel",
+  "Disrupting Shoal",
+  "Dizzy Spell",
+  "Dramatic Reversal",
+  "Drift of Phantasms",
+  "Elvish Mystic",
+  "Elvish Spirit Guide",
+  "Emrakul, the Promised End",
+  "Endurance",
+  "Enduring Vitality",
+  "Exotic Orchard",
+  "Faerie Mastermind",
+  "Fellwar Stone",
+  "Fierce Guardianship",
+  "Finale of Devastation",
+  "Flash Photography",
+  "Flesh Duplicate",
+  "Flooded Strand",
+  "Flusterstorm",
+  "Force of Negation",
+  "Force of Will",
+  "Forest",
+  "Fyndhorn Elves",
+  "Gemstone Caverns",
+  "Gene Pollinator",
+  "Grim Monolith",
+  "Hidden Strings",
+  "High Fae Trickster",
+  "Hullbreaker Horror",
+  "Imposter Mech",
+  "Invasion of Ikoria",
+  "Island",
+  "Llanowar Elves",
+  "Lotus Petal",
+  "Mana Confluence",
+  "Mana Vault",
+  "Mental Misstep",
+  "Mindbreak Trap",
+  "Mirage Mirror",
+  "Mirrormade",
+  "Misdirection",
+  "Misty Rainforest",
+  "Mockingbird",
+  "Mox Amber",
+  "Mox Diamond",
+  "Mox Opal",
+  "Mystic Remora",
+  "Nature's Rhythm",
+  "Otawara, Soaring City",
+  "Pact of Negation",
+  "Polluted Delta",
+  "Rejuvenating Springs",
+  "Rhystic Study",
+  "Scalding Tarn",
+  "Sink into Stupor",
+  "Snapback",
+  "Sol Ring",
+  "Springleaf Drum",
+  "Sudden Substitution",
+  "Swan Song",
+  "Sylvan Library",
+  "Talisman of Curiosity",
+  "Tarnished Citadel",
+  "The Cabbage Merchant",
+  "The One Ring",
+  "Thrasios, Triton Hero",
+  "Transmute Artifact",
+  "Trophy Mage",
+  "Tropical Island",
+  "Twincast",
+  "Valley Floodcaller",
+  "Verdant Catacombs",
+  "Volatile Stormdrake",
+  "Wan Shi Tong, Librarian",
+  "Waterlogged Grove",
+  "Windswept Heath",
+  "Wooded Foothills",
+  "Yavimaya Coast",
+]

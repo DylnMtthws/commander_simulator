@@ -1,0 +1,41 @@
+# The exporter: database -> cards.json.
+#
+# Python rather than C++ on purpose. This is a database-to-JSON transform, it
+# runs once per data refresh rather than per simulation, and keeping it here
+# means the C++ build never needs libpq (SIM_PLAN.md section 8). It is also the
+# half of the project you already know how to maintain.
+#
+# A separate project from the simulator, with its own pyproject, because they
+# share nothing but a file format.
+
+[project]
+name = "mtgsim-export"
+version = "0.1.0"
+description = "Export card data from mtg_v1 into a static file the simulator reads"
+requires-python = ">=3.13"
+dependencies = ["psycopg[binary]>=3.2"]
+
+[project.scripts]
+mtgsim-export = "mtgsim_export.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.11"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mtgsim_export"]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+files = ["src"]
+strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

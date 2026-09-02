@@ -91,6 +91,50 @@ Concretely, for *Bala Ged Recovery // Bala Ged Sanctuary* the contract yields
 tapped, and not what colour it taps for. A cEDH Kinnan list runs several MDFCs.
 Any colour-aware mana model needs `card_face`.
 
+#### The same warning, landing on X spells — 7 of the 99
+
+The ingestion README warns that `mana_value` distorts a curve and that
+`castable_cmcs` is the column to use instead. **For X spells `castable_cmcs` is
+technically correct and practically meaningless**, and this deck has seven:
+
+| Card | Cost | `castable_cmcs` | What it does at that cost |
+|---|---|---|---|
+| Chord of Calling | `{X}{G}{G}{G}` | `{3}` | finds a creature with MV ≤ 0 — nothing |
+| Finale of Devastation | `{X}{G}{G}` | `{2}` | creature MV ≤ 0 — nothing |
+| Nature's Rhythm | `{X}{G}{G}` | `{2}` | creature MV ≤ 0 — nothing |
+| Invasion of Ikoria | `{X}{G}{G}` | `{2}` | non-Human MV ≤ 0 — nothing |
+| Disrupting Shoal | `{X}{U}{U}` | `{2}` | counters a spell of MV 0 |
+| Wan Shi Tong | `{X}{U}{U}` | `{2}` | 0 counters, draws 0 cards |
+| **Mockingbird** | `{X}{U}` | `{1}` | **functional** — copies a 1-drop dork |
+
+**Six of seven are castable at a cost where the card does nothing.** The column
+is not wrong — X=0 genuinely is a legal cost — but "the earliest slot this card
+can be played into" is the wrong question for a spell whose whole purpose is
+scaling. *Castable at 2 and useless at 2* is precisely the distortion
+`castable_cmcs` exists to prevent, reappearing one level down.
+
+Two consequences, both load-bearing:
+
+1. **The exporter must not treat `castable_cmcs` as the cost.** A cost with an
+   `{X}` is exported as a *variable* cost: fixed pips plus a free variable. Any
+   model reading `min(castable_cmcs)` here would let the deck cast *Finale of
+   Devastation* on turn two and find nothing — a play that is legal, useless,
+   and would look like the deck functioning.
+2. **Choosing X is a policy decision, not a cost lookup** (§6). "How much X do I
+   want, and can I afford it?" belongs to `Policy`, and for a `TUTOR` the answer
+   is driven by the mana value of the target the scorer picked. This is the
+   first place the mana system (§6.4) and the scorer (§6.2) genuinely have to
+   talk to each other, and Phase 2 should build `can_pay` with a variable
+   component from the start rather than retrofitting one.
+
+*Chord of Calling* additionally has **convoke**, which pays part of its cost by
+tapping creatures — interacting with both the mana system and Kinnan (a tapped
+creature is not producing mana). It is the single most complex cost in the deck
+and worth authoring last.
+
+**No human noticed this from the schema; it took reading seven oracle texts.**
+The contract cannot flag it, because from the database's side nothing is wrong.
+
 ### 2.3 Names are stored in combined form
 
 `mtg_v1.card.name` for an MDFC is `Bala Ged Recovery // Bala Ged Sanctuary`.

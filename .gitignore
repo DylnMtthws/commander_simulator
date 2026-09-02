@@ -5,3 +5,11 @@ build/
 # Editor / IDE
 .cache/
 compile_commands.json
+
+# Exporter
+export/.venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+export/.env
