@@ -94,16 +94,31 @@ void tutor_candidates(const TutorEffect& tutor, const CardDb& db, const GameStat
         const int slot = state.library[i];
         const Card& card = db.cards[static_cast<std::size_t>(slot)];
 
-        bool creature = false;
-        bool human = false;
-        bool artifact = false;
-        bool land = false;
-        for (const std::string& type : card.all_types) {
-            creature = creature || type == "Creature";
-            human = human || type == "Human";
-            artifact = artifact || type == "Artifact";
-            land = land || type == "Land";
-        }
+        // The FRONT FACE, because this is a search of the LIBRARY, and a card
+        // in the library has only its front face's characteristics. all_types
+        // is a union over faces, and using it here let every creature tutor in
+        // the deck find INVASION OF IKORIA - a Battle card whose back face is
+        // Zilortha, a Legendary Creature. You cannot Chord of Calling for a
+        // Battle. It was being offered at rank 58, above three of the mana
+        // dorks, so it was not a target the scorer merely tolerated.
+        //
+        // Third instance of one shape in one sitting: a card-level field that
+        // aggregates faces answers a question about no particular face, and
+        // never errors. See is_permanent above, and the ingestion PLAN.md 11.0
+        // rule about oracle_text.
+        //
+        // The battlefield-facing predicates below and in collect_sources still
+        // read all_types, and that is correct there rather than an oversight:
+        // for every card in this deck that reaches the battlefield, all_types
+        // is a superset that agrees. Sink into Stupor is only ever there as its
+        // land face and all_types contains Land; Invasion of Ikoria never
+        // reaches the battlefield at all, because a Battle is not a permanent
+        // this model keeps (section 4.6).
+        const std::string& line = card.faces.empty() ? card.name : card.faces.front().type_line;
+        const bool creature = line.find("Creature") != std::string::npos;
+        const bool human = line.find("Human") != std::string::npos;
+        const bool artifact = line.find("Artifact") != std::string::npos;
+        const bool land = line.find("Land") != std::string::npos;
         bool matches = false;
         switch (tutor.filter) {
             case TutorFilter::Any: matches = true; break;
@@ -262,7 +277,8 @@ void collect_sources(const CardDb& db, const EffectDb& effects, const GameState&
             out.push_back(Source{.produces = entry.ritual.produces,
                                  .amount = entry.ritual.amount,
                                  .is_land = false,
-                                 .is_creature = false});
+                                 .is_creature = false,
+                                 .slot = slot});
         }
     });
 
@@ -287,7 +303,8 @@ void collect_sources(const CardDb& db, const EffectDb& effects, const GameState&
             out.push_back(Source{.produces = entry.ritual.produces,
                                  .amount = entry.ritual.amount,
                                  .is_land = false,
-                                 .is_creature = false});
+                                 .is_creature = false,
+                                 .slot = slot});
             return;
         }
         if (entry.has_mana_source) {
@@ -337,13 +354,18 @@ void collect_sources(const CardDb& db, const EffectDb& effects, const GameState&
             source = with_multiplier(source, ManaMultiplier{.bonus = multiplier.bonus,
                                                             .nonland_only = multiplier.nonland_only});
         }
+        // The slot as it sits on the battlefield, NOT the effective one: paying
+        // taps the permanent that is there, and a clone is its own permanent.
+        source.slot = slot;
         out.push_back(source);
     });
 }
 
 int life_cost_of_tapping(const EffectDb& effects, const GameState& state, int slot) noexcept {
-    static_cast<void>(state);
-    const CardEffects& entry = effects.by_slot[static_cast<std::size_t>(slot)];
+    // Through effective(), because a clone taps as the card it copied and pays
+    // that card's life cost.
+    const CardEffects& entry =
+        effects.by_slot[static_cast<std::size_t>(state.effective(slot))];
     return entry.has_mana_source ? entry.mana_source.life_cost : 0;
 }
 

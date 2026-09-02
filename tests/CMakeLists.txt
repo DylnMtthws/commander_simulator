@@ -36,7 +36,8 @@ add_executable(cs_tests
     unit/test_policy.cpp
     unit/test_pattern.cpp
     unit/test_clone.cpp
-    unit/test_convoke.cpp)
+    unit/test_convoke.cpp
+    unit/test_payment.cpp)
 
 # Catch2WithMain supplies main(), so no test file writes one.
 # cs_core arrives transitively via cs_io's PUBLIC link.

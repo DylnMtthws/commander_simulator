@@ -176,12 +176,19 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
         // trace showed one source and then a two-mana cast on the next line -
         // technically consistent, unreadable, and exactly the kind of thing
         // this output exists to make obvious.
-        bool announced = false;
+        // Mana is printed before EVERY cast decision, not once per turn.
+        //
+        // Once per turn was readable and wrong, in the way section 11.0's ninth
+        // rule describes: a turn's own casts change the board, so a trace read
+        // "mana: 2x{G} 1x{UG}" and then paid 2, then 4, then 1 out of it. Every
+        // number was correct and the log argued with itself, because the line a
+        // reader compares against was three casts stale. The reader cannot tell
+        // a payment bug from a legal mid-turn ramp - which is exactly the
+        // distinction they are reading the trace to make.
         for (;;) {
             collect_sources(db, effects, state, config.table, sources);
-            if (observer != nullptr && !announced) {
+            if (observer != nullptr) {
                 observer->mana(sources);
-                announced = true;
             }
             const Context context{db, patterns, state, sources, observer, &effects};
             const int spell = policy.choose_spell(context, result.stats);
@@ -310,26 +317,66 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
                 }
             }
 
-            // Paying taps sources. Crude - it taps in slot order rather than
-            // solving which sources to spend, which is a policy question and a
-            // later one (section 6.4). Without it mana would be infinite.
-            state.battlefield.for_each([&](int slot) {
-                const CardEffects& source_entry = effects.by_slot[static_cast<std::size_t>(slot)];
-                // A ritual is consumed rather than tapped: Lotus Petal
-                // sacrifices itself.
-                if (to_tap > 0 && !state.tapped.test(slot) && source_entry.has_ritual &&
-                    source_entry.ritual.from_zone == RitualZone::Battlefield) {
-                    state.battlefield.clear(slot);
-                    state.graveyard.set(slot);
-                    to_tap -= source_entry.ritual.amount;
+            // Paying SPENDS THE SOURCES collect_sources produced.
+            //
+            // It used to walk the battlefield and re-derive what a source was,
+            // and re-derived it differently: it required `has_mana_source`, so
+            // a creature that is a source only because Enduring Vitality grants
+            // it one was never tapped, and a clone was looked up by its own slot
+            // rather than the card it copies, so it was never tapped either.
+            // It also subtracted the UNMULTIPLIED amount, ignoring Kinnan. Mana
+            // from Vitality, from every clone, and from Elvish Spirit Guide in
+            // hand was therefore free and unlimited - the deck could spend
+            // twenty-four mana off a board of two lands, which is what reading
+            // one trace showed and no counter did.
+            //
+            // One function decides what a source is; this one spends what that
+            // function returned. Any future disagreement between them is now
+            // impossible rather than unlikely.
+            //
+            // Still crude in the DECLARED way (section 6.4): it spends in a
+            // fixed order rather than solving which sources to keep. The order
+            // is cheapest resource first - tap a permanent, then sacrifice one,
+            // then exile a card from hand - so Elvish Spirit Guide is the last
+            // thing spent rather than the first.
+            const auto spend = [&](const Source& source, int pass) {
+                if (to_tap <= 0 || source.slot < 0) {
                     return;
                 }
-                if (to_tap > 0 && !state.tapped.test(slot) && source_entry.has_mana_source) {
-                    state.tapped.set(slot);
-                    state.life -= life_cost_of_tapping(effects, state, slot);
-                    to_tap -= source_entry.mana_source.amount;
+                const auto index = static_cast<std::size_t>(source.slot);
+                const CardEffects& source_entry =
+                    effects.by_slot[static_cast<std::size_t>(state.effective(source.slot))];
+                const bool from_hand =
+                    source_entry.has_ritual && source_entry.ritual.from_zone == RitualZone::Hand;
+                const bool sacrifices = source_entry.has_ritual && !from_hand;
+                const int want = from_hand ? 2 : (sacrifices ? 1 : 0);
+                if (want != pass) {
+                    return;
                 }
-            });
+                if (from_hand) {
+                    state.hand.clear(source.slot);
+                } else {
+                    if (state.tapped.test(source.slot)) {
+                        return;
+                    }
+                    if (sacrifices) {
+                        state.battlefield.clear(source.slot);
+                    } else {
+                        state.tapped.set(source.slot);
+                        state.life -= life_cost_of_tapping(effects, state, source.slot);
+                    }
+                }
+                if (from_hand || sacrifices) {
+                    state.graveyard.set(source.slot);
+                }
+                static_cast<void>(index);
+                to_tap -= source.amount;
+            };
+            for (int pass = 0; pass < 3 && to_tap > 0; ++pass) {
+                for (const Source& source : sources) {
+                    spend(source, pass);
+                }
+            }
 
             // An instant or sorcery does not stay on the battlefield.
             //

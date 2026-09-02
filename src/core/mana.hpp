@@ -36,6 +36,19 @@ struct Source {
     // MANA_SOURCE field with a test of its own (section 4.2).
     bool is_land = false;
     bool is_creature = false;
+
+    // WHERE this mana came from, so that spending it can consume it.
+    //
+    // -1, not 0, and the choice is the eleventh rule in the ingestion repo's
+    // PLAN.md 11.0: a "no value" state expressible as a valid value gets read
+    // as one. Slot 0 is a real card. -1 is outside the domain of deck slots and
+    // cannot be produced by value-initialisation, by memset, or by a caller
+    // that builds a Source with designated initialisers and forgets this field
+    // - which every test in this repo does.
+    //
+    // A Source with no slot is legitimate: a test constructs abstract mana that
+    // came from nowhere. It simply cannot be spent.
+    int slot = -1;
 };
 
 // Kinnan, and anything shaped like it.
