@@ -43,6 +43,9 @@ std::uint64_t digest_state(const GameState& state) noexcept {
         zone.for_each([&](int slot) { mix(static_cast<std::uint64_t>(slot)); });
         mix(0xFFFF);  // separator, so adjacent zones cannot alias
     };
+    for (std::size_t i = 0; i < kMaxDeckSlots; ++i) {
+        mix(static_cast<std::uint64_t>(state.copy_of[i] + 1));
+    }
     mix_zone(state.hand);
     mix_zone(state.command_zone);
     mix_zone(state.battlefield);
@@ -106,7 +109,7 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
         // Land drop.
         std::vector<Source> sources;
         collect_sources(db, effects, state, config.table, sources);
-        const Context land_context{db, patterns, state, sources, observer};
+        const Context land_context{db, patterns, state, sources, observer, &effects};
         const int land = policy.choose_land(land_context, result.stats);
         if (land >= 0) {
             state.hand.clear(land);
@@ -180,7 +183,7 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
                 observer->mana(sources);
                 announced = true;
             }
-            const Context context{db, patterns, state, sources, observer};
+            const Context context{db, patterns, state, sources, observer, &effects};
             const int spell = policy.choose_spell(context, result.stats);
             if (spell < 0) {
                 break;
@@ -203,6 +206,21 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
 
             const CardEffects& cast_entry = effects.by_slot[static_cast<std::size_t>(spell)];
 
+            if (cast_entry.has_clone) {
+                std::vector<int> targets;
+                clone_candidates(cast_entry.clone, db, state, total_mana(sources), targets);
+                const Context clone_context{db, patterns, state, sources, observer, &effects};
+                const int copied = policy.choose_clone(clone_context, targets, result.stats);
+                if (observer != nullptr) {
+                    observer->cloned(spell, copied);
+                }
+                if (copied >= 0) {
+                    state.copy_of[static_cast<std::size_t>(spell)] =
+                        static_cast<std::int8_t>(copied);
+                    ++result.stats.clones_made;
+                }
+            }
+
             if (cast_entry.has_tutor) {
                 // The cap for an X tutor is the mana LEFT after paying the
                 // coloured part, approximated as everything currently
@@ -210,7 +228,7 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
                 std::vector<int> targets;
                 tutor_candidates(cast_entry.tutor, db, state, total_mana(sources), targets);
                 const bool to_hand = cast_entry.tutor.destination == TutorDestination::Hand;
-                const Context tutor_context{db, patterns, state, sources, observer};
+                const Context tutor_context{db, patterns, state, sources, observer, &effects};
                 const int found =
                     policy.choose_tutor(tutor_context, targets, to_hand, result.stats);
                 if (observer != nullptr) {

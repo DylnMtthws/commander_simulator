@@ -122,6 +122,23 @@ struct MassUntapEffect {
     bool nonland_only = true;
 };
 
+// CLONE: enter as a copy of a permanent already on the battlefield.
+//
+// A clone's value is entirely "what is the best permanent available to copy",
+// which the existing scorer answers directly - the candidate set is the
+// battlefield instead of the hand and nothing else changes. What it DID need is
+// state (GameState::copy_of), because a copy is genuinely another card.
+//
+// A clone with no legal target is DEAD, not merely mediocre, and is scored as
+// uncastable rather than as zero.
+enum class CloneFilter : std::uint8_t { NonlandPermanent = 0, Artifact, Enchantment, Creature,
+                                        ArtifactOrEnchantment };
+
+struct CloneEffect {
+    CloneFilter filter = CloneFilter::NonlandPermanent;
+    bool max_from_x = false;  // Mockingbird: mana value <= mana spent
+};
+
 enum class ModifierMode : std::uint8_t { Multiply, GrantCreatureMana };
 
 struct ModifierEffect {
@@ -148,6 +165,8 @@ struct CardEffects {
     MassUntapEffect mass_untap;
     bool has_tutor = false;
     TutorEffect tutor;
+    bool has_clone = false;
+    CloneEffect clone;
     std::string reason_category;
 };
 
@@ -200,6 +219,10 @@ void fetch_candidates(const FetchEffect& fetch, const CardDb& db, const GameStat
 
 // Library slots this tutor could find, given the mana actually available.
 void tutor_candidates(const TutorEffect& tutor, const CardDb& db, const GameState& state,
+                      int mana_available, std::vector<int>& out);
+
+// Battlefield slots this clone could copy.
+void clone_candidates(const CloneEffect& clone, const CardDb& db, const GameState& state,
                       int mana_available, std::vector<int>& out);
 
 // Does this land enter tapped, given the board and the declared table context?

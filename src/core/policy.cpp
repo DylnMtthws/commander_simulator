@@ -115,6 +115,11 @@ int StubPolicyDoNotUseForResults::choose_tutor(const Context&, std::span<const i
     return candidates.empty() ? -1 : candidates.front();
 }
 
+int StubPolicyDoNotUseForResults::choose_clone(const Context&, std::span<const int> candidates,
+                                               GameStats&) const {
+    return candidates.empty() ? -1 : candidates.front();
+}
+
 // ---------------------------------------------------------------------------
 // Authored
 // ---------------------------------------------------------------------------
@@ -143,6 +148,22 @@ Consideration AuthoredPolicy::score(const Context& context, int slot, bool as_la
         if (face != nullptr) {
             ++stats.can_pay_calls;
             result.castable = can_pay(*face->cost, context.sources, 0);
+        }
+        if (result.castable && context.effects != nullptr) {
+            // A CLONE with nothing legal to copy is DEAD, not merely mediocre.
+            // Scoring it zero would leave it mid-table on an empty board and
+            // the policy would cast it for nothing; the uncastable term is what
+            // says "this card does not function right now".
+            const CardEffects& entry =
+                context.effects->by_slot[static_cast<std::size_t>(slot)];
+            if (entry.has_clone) {
+                std::vector<int> targets;
+                clone_candidates(entry.clone, context.db, context.state,
+                                 total_mana(context.sources), targets);
+                if (targets.empty()) {
+                    result.castable = false;
+                }
+            }
         }
         if (!result.castable) {
             result.castable_term = weights_.uncastable;
@@ -210,6 +231,31 @@ int AuthoredPolicy::choose_tutor(const Context& context, std::span<const int> ca
     if (context.observer != nullptr) {
         context.observer->considering(scored, to_hand ? "tutor target (to hand)"
                                                       : "tutor target (to battlefield)");
+    }
+    int best = -1;
+    int best_score = 0;
+    for (const Consideration& candidate : scored) {
+        if (best < 0 || candidate.score > best_score ||
+            (candidate.score == best_score && candidate.slot < best)) {
+            best = candidate.slot;
+            best_score = candidate.score;
+        }
+    }
+    return best;
+}
+
+int AuthoredPolicy::choose_clone(const Context& context, std::span<const int> candidates,
+                                 GameStats& stats) const {
+    // The same scorer again, with the BATTLEFIELD as its candidate set. No new
+    // term was needed - a clone's value is "what is the best permanent to
+    // copy", and "best permanent" is what the scorer already computes.
+    std::vector<Consideration> scored;
+    scored.reserve(candidates.size());
+    for (const int slot : candidates) {
+        scored.push_back(score_arrival(context, slot, /*to_hand=*/false, stats));
+    }
+    if (context.observer != nullptr) {
+        context.observer->considering(scored, "clone target");
     }
     int best = -1;
     int best_score = 0;

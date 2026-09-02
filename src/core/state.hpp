@@ -94,6 +94,17 @@ private:
 };
 
 struct GameState {
+    // A constructor, not a default member initialiser, because `{}` on an array
+    // value-initialises to ZERO - and zero is a valid slot number, so a
+    // default-constructed state would claim every permanent is a copy of slot
+    // 0. begin_game filled it correctly and a directly-constructed GameState
+    // did not, which an existing policy test caught immediately.
+    //
+    // The sentinel being an in-range value is the hazard. -1 is outside the
+    // slot range and cannot be produced by value-initialisation, which is
+    // exactly why it has to be set explicitly.
+    GameState() { copy_of.fill(-1); }
+
     // The library, as slot indices. Cards at [0, drawn) have already been
     // drawn; [drawn, library_count) are still in it.
     //
@@ -104,6 +115,16 @@ struct GameState {
     std::array<std::uint8_t, kMaxDeckSlots> library{};
     std::uint8_t library_count = 0;
     std::uint8_t drawn = 0;
+
+    // Which slot each permanent is a COPY of, or -1. A clone is genuinely a
+    // second copy of another card, so this is state rather than a policy
+    // notion: a Copy Artifact on Basalt Monolith taps for {C}{C}{C} and is
+    // named Basalt Monolith for every purpose the model has.
+    //
+    // Not a scorer question. This is the one place in Phase 7 where authoring a
+    // kind needed new STATE rather than a new term - and that is a fact about
+    // the game, not a thinness in the policy.
+    std::array<std::int8_t, kMaxDeckSlots> copy_of{};
 
     Zone hand;
     // The command zone. Holds the commander until it is cast, and is a separate
@@ -133,6 +154,25 @@ struct GameState {
     int commander_slot = -1;
 
     [[nodiscard]] int library_size() const noexcept { return library_count - drawn; }
+
+    // What a slot counts AS. A clone answers with the card it copied.
+    [[nodiscard]] int effective(int slot) const noexcept {
+        const std::int8_t copied = copy_of[static_cast<std::size_t>(slot)];
+        return copied >= 0 ? copied : slot;
+    }
+
+    // The battlefield with every clone counted as the card it copied, so a
+    // pattern naming "Basalt Monolith" is satisfied by a Copy Artifact on one.
+    [[nodiscard]] Zone effective_battlefield() const noexcept {
+        Zone result = battlefield;
+        battlefield.for_each([&](int slot) {
+            const std::int8_t copied = copy_of[static_cast<std::size_t>(slot)];
+            if (copied >= 0) {
+                result.set(copied);
+            }
+        });
+        return result;
+    }
 };
 
 // Draws the top card, returning its slot, or -1 if the library is empty.

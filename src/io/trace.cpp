@@ -86,6 +86,15 @@ void TraceWriter::tutored(int from_slot, int to_slot, bool to_hand) {
                  to_hand ? "hand" : "battlefield");
 }
 
+void TraceWriter::cloned(int clone_slot, int copied_slot) {
+    if (copied_slot < 0) {
+        std::fprintf(out_, "     CLONE: %s has nothing legal to copy\n", name_of(clone_slot));
+        return;
+    }
+    std::fprintf(out_, "     CLONE: %s becomes a copy of %s\n", name_of(clone_slot),
+                 name_of(copied_slot));
+}
+
 void TraceWriter::cast_spell(int slot, int paid) {
     std::fprintf(out_, "     CAST: %-28s paying %d\n", name_of(slot), paid);
 }

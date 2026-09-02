@@ -233,6 +233,19 @@ EffectDb load_effects(const std::filesystem::path& path, const CardDb& db) {
                 tutor.max_from_x = (*effect)["max_from_x"].value_or<bool>(false);
                 target.has_tutor = true;
                 target.tutor = tutor;
+            } else if (kind == "CLONE") {
+                CloneEffect clone;
+                const auto filter = (*effect)["filter"].value_or<std::string>("nonland_permanent");
+                if (filter == "nonland_permanent") clone.filter = CloneFilter::NonlandPermanent;
+                else if (filter == "artifact") clone.filter = CloneFilter::Artifact;
+                else if (filter == "enchantment") clone.filter = CloneFilter::Enchantment;
+                else if (filter == "creature") clone.filter = CloneFilter::Creature;
+                else if (filter == "artifact_or_enchantment")
+                    clone.filter = CloneFilter::ArtifactOrEnchantment;
+                else fail(context + ": unknown clone filter '" + filter + "'");
+                clone.max_from_x = (*effect)["max_from_x"].value_or<bool>(false);
+                target.has_clone = true;
+                target.clone = clone;
             } else if (kind == "MASS_UNTAP") {
                 MassUntapEffect untap;
                 untap.nonland_only = (*effect)["nonland_only"].value_or<bool>(true);

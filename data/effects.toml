@@ -227,6 +227,67 @@ authored_from = "65ab0b0aa45c34ba286fd1f4d817e4524aaa47e927fcd44038c3877bce672aa
 effects = [ { kind = "MANA_SOURCE", colors = [], amount = 1, is_creature = true } ]
 
 # ===========================================================================
+# CLONE - eight cards, the second-largest kind, and the one the first draft of
+# the taxonomy missed entirely (section 4.2). In a Kinnan shell a clone's usual
+# job is copying a mana source, and the copy is a separate permanent that Kinnan
+# multiplies independently.
+#
+# A clone with nothing legal to copy is DEAD, not mediocre, and the scorer marks
+# it uncastable rather than zero - otherwise an empty board leaves it mid-table
+# and the policy casts it for nothing.
+# ===========================================================================
+
+[cards."Copy Artifact"]
+status = "modeled"
+authored_from = "a58a1d586f721c83f86bed3491b1ac2af723ec14e257aa573a7f3dd843fd1d8b"
+effects = [ { kind = "CLONE", filter = "artifact" } ]
+
+[cards."Mirrormade"]
+status = "modeled"
+authored_from = "e07cbaa6a36a7fca9260c827ea68c9de32d12e8423663cddcb052e81a88cd39f"
+effects = [ { kind = "CLONE", filter = "artifact_or_enchantment" } ]
+
+[cards."Copy Enchantment"]
+status = "modeled"
+authored_from = "23bb10598f1ac0eaf1fbc41124d01284244e003c09e36c7ac67b6457d4928ba8"
+effects = [ { kind = "CLONE", filter = "enchantment" } ]
+
+[cards."Clever Impersonator"]
+status = "modeled"
+authored_from = "7068c0cad86d1ca39bd5530830657245f2499d6ae1bd8775af7d1986b34a9c13"
+# "any nonland permanent" - the widest clone in the deck.
+effects = [ { kind = "CLONE", filter = "nonland_permanent" } ]
+
+[cards."Flesh Duplicate"]
+status = "modeled"
+authored_from = "a9c23c66d6505eca7f4aaa5abd59095887db603a1c13ee638c6f9520ce120a44"
+# Vanishing 3 is a real drawback and is NOT modelled - the copy never expires,
+# which overstates it. Twelve turns is long enough for that to matter.
+effects = [ { kind = "CLONE", filter = "creature" } ]
+
+[cards."Mockingbird"]
+status = "modeled"
+authored_from = "c791fcc97e3fa8f74adfb1c7468666563a770abd8db37273212cdbb155fb1674"
+# {X}{U}: copies a creature with mana value <= the mana spent. The only clone
+# whose reach depends on available mana.
+effects = [ { kind = "CLONE", filter = "creature", max_from_x = true } ]
+
+[cards."Flash Photography"]
+status = "modeled"
+authored_from = "b8b23c10fee3c37709024f0a6b909cb02be9690a09232769aef1aeb8d3f466ea"
+# Creates a TOKEN copy rather than entering as one; identical for this model,
+# since nothing here distinguishes a token from a permanent.
+effects = [ { kind = "CLONE", filter = "nonland_permanent" } ]
+
+[cards."Mirage Mirror"]
+status = "modeled"
+authored_from = "c22fa529c4ea718d25331d1e50c711560b022bd74f77c152a1e9c37bc8f5ea55"
+# "{2}: becomes a copy until end of turn" - a repeatable, temporary copy. The
+# temporariness is NOT modelled, so this is treated as a permanent clone, which
+# overstates it. The {2} activation is likewise free here.
+effects = [ { kind = "CLONE", filter = "nonland_permanent" } ]
+
+# ===========================================================================
 # INERT - declared to do nothing in this model, each with a required category.
 #
 # A count says how much the model cannot see. The CATEGORIES say what, and

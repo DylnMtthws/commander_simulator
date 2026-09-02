@@ -10,7 +10,10 @@ bool requirement_holds(const Requirement& requirement, const PatternSet& set,
     if ((active & requirement.flags) != requirement.flags) {
         return false;
     }
-    if (!state.battlefield.contains(requirement.in_play)) {
+    // Clones count as what they copied - a Copy Artifact on Basalt Monolith IS
+    // a Basalt Monolith for a pattern naming one.
+    const Zone board = state.effective_battlefield();
+    if (!board.contains(requirement.in_play)) {
         return false;
     }
     if (!state.hand.contains(requirement.in_hand)) {
@@ -18,14 +21,14 @@ bool requirement_holds(const Requirement& requirement, const PatternSet& set,
     }
     // "in either zone" is not "in the union of the zones" for a single card,
     // but for a conjunction of cards it is exactly that.
-    if (!(state.battlefield | state.hand).contains(requirement.in_play_or_hand)) {
+    if (!(board | state.hand).contains(requirement.in_play_or_hand)) {
         return false;
     }
-    if (requirement.has_any_of && !state.battlefield.intersects(requirement.any_of)) {
+    if (requirement.has_any_of && !board.intersects(requirement.any_of)) {
         return false;
     }
     if (!requirement.untapped.empty()) {
-        if (!state.battlefield.contains(requirement.untapped)) {
+        if (!board.contains(requirement.untapped)) {
             return false;
         }
         // Present is not enough: a tapped Kinnan is not an engine.
@@ -37,7 +40,7 @@ bool requirement_holds(const Requirement& requirement, const PatternSet& set,
         return false;
     }
     if (requirement.creature_count_gte > 0 &&
-        (state.battlefield & set.creature_slots).count() < requirement.creature_count_gte) {
+        (board & set.creature_slots).count() < requirement.creature_count_gte) {
         return false;
     }
     if (requirement.library_size_lte >= 0 &&

@@ -26,6 +26,7 @@ int draw_one(GameState& state, Rng& rng) noexcept {
 void begin_game(GameState& state, int deck_slots, int commander_slot, int hand_size,
                 Rng& rng) noexcept {
     state = GameState{};
+    state.copy_of.fill(-1);
     state.commander_slot = commander_slot;
     if (commander_slot >= 0) {
         state.command_zone.set(commander_slot);

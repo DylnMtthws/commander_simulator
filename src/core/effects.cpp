@@ -125,6 +125,40 @@ void tutor_candidates(const TutorEffect& tutor, const CardDb& db, const GameStat
     }
 }
 
+void clone_candidates(const CloneEffect& clone, const CardDb& db, const GameState& state,
+                      int mana_available, std::vector<int>& out) {
+    out.clear();
+    state.battlefield.for_each([&](int slot) {
+        // Copy what the target IS, so cloning a clone copies the original.
+        const int effective = state.effective(slot);
+        const Card& card = db.cards[static_cast<std::size_t>(effective)];
+        bool creature = false;
+        bool artifact = false;
+        bool enchantment = false;
+        bool land = false;
+        for (const std::string& type : card.all_types) {
+            creature = creature || type == "Creature";
+            artifact = artifact || type == "Artifact";
+            enchantment = enchantment || type == "Enchantment";
+            land = land || type == "Land";
+        }
+        bool matches = false;
+        switch (clone.filter) {
+            case CloneFilter::NonlandPermanent: matches = !land; break;
+            case CloneFilter::Artifact: matches = artifact; break;
+            case CloneFilter::Enchantment: matches = enchantment; break;
+            case CloneFilter::Creature: matches = creature; break;
+            case CloneFilter::ArtifactOrEnchantment: matches = artifact || enchantment; break;
+        }
+        if (matches && clone.max_from_x && card.mana_value > mana_available) {
+            matches = false;
+        }
+        if (matches) {
+            out.push_back(effective);
+        }
+    });
+}
+
 void collect_sources(const CardDb& db, const EffectDb& effects, const GameState& state,
                      const TableContext& table, std::vector<Source>& out) {
     out.clear();
@@ -167,8 +201,13 @@ void collect_sources(const CardDb& db, const EffectDb& effects, const GameState&
         if (state.tapped.test(slot)) {
             return;
         }
-        const CardEffects& entry = effects.by_slot[static_cast<std::size_t>(slot)];
-        const Card& card = db.cards[static_cast<std::size_t>(slot)];
+        // A clone taps as the card it copied - and because it is a separate
+        // permanent, Kinnan multiplies it independently. That falls out of
+        // resolving the effect here rather than needing a special case, but it
+        // is verified rather than assumed (tests/unit/test_clone.cpp).
+        const int effective = state.effective(slot);
+        const CardEffects& entry = effects.by_slot[static_cast<std::size_t>(effective)];
+        const Card& card = db.cards[static_cast<std::size_t>(effective)];
 
         Source source;
         bool have = false;

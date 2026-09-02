@@ -26,6 +26,7 @@ public:
     void played_land(int slot) override;
     void fetched(int from_slot, int to_slot) override;
     void tutored(int from_slot, int to_slot, bool to_hand) override;
+    void cloned(int clone_slot, int copied_slot) override;
     void cast_spell(int slot, int paid) override;
     void pattern_fired(int pattern, int turn) override;
     void engines_active(FlagMask flags) override;

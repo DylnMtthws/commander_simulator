@@ -34,6 +34,7 @@ struct GameStats {
     std::uint32_t fetches_used = 0;
     std::uint32_t mass_untaps = 0;
     std::uint32_t tutors_used = 0;
+    std::uint32_t clones_made = 0;
 };
 
 struct GameOutcome {

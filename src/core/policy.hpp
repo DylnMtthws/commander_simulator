@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "core/card.hpp"
+#include "core/effects.hpp"
 #include "core/mana.hpp"
 #include "core/observer.hpp"
 #include "core/pattern.hpp"
@@ -30,6 +31,9 @@ struct Context {
     const GameState& state;
     std::span<const Source> sources;
     Observer* observer = nullptr;
+    // Nullable so existing tests can build a Context without one. Present in
+    // every real call; only the clone check reads it.
+    const EffectDb* effects = nullptr;
 };
 
 class Policy {
@@ -47,6 +51,10 @@ public:
     // handled (core/effects.hpp).
     [[nodiscard]] virtual int choose_tutor(const Context& context, std::span<const int> candidates,
                                            bool to_hand, GameStats& stats) const = 0;
+
+    // Which permanent to copy, or -1 if there is nothing legal to copy.
+    [[nodiscard]] virtual int choose_clone(const Context& context, std::span<const int> candidates,
+                                           GameStats& stats) const = 0;
 
     // Which land to fetch from a set of candidates, or -1 for none.
     //
@@ -86,6 +94,8 @@ public:
                                    GameStats& stats) const override;
     [[nodiscard]] int choose_tutor(const Context& context, std::span<const int> candidates,
                                    bool to_hand, GameStats& stats) const override;
+    [[nodiscard]] int choose_clone(const Context& context, std::span<const int> candidates,
+                                   GameStats& stats) const override;
     [[nodiscard]] const char* name() const override {
         return "StubPolicyDoNotUseForResults (plays the lowest-indexed legal thing)";
     }
@@ -146,6 +156,8 @@ public:
                                    GameStats& stats) const override;
     [[nodiscard]] int choose_tutor(const Context& context, std::span<const int> candidates,
                                    bool to_hand, GameStats& stats) const override;
+    [[nodiscard]] int choose_clone(const Context& context, std::span<const int> candidates,
+                                   GameStats& stats) const override;
     [[nodiscard]] const char* name() const override {
         return "AuthoredPolicy (authored ranks plus state-dependent terms)";
     }
