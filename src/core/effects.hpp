@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "core/card.hpp"
@@ -198,6 +199,17 @@ struct EffectDb {
     std::vector<std::string> inert_categories;   // parallel arrays, sorted
     std::vector<int> inert_counts;
 };
+
+// What each reason_category MEANS, for the run report's grouped table.
+//
+// It lives beside the closed set rather than in the CLI because section 9.5's
+// third rule says an assumption's text is emitted by the thing that owns the
+// assumption: a hand-written caveat block goes stale, and one generated from
+// the enum cannot, since changing the enum changes the text.
+//
+// Returns nullptr for a category outside the set, which is what the loader
+// tests to reject one.
+[[nodiscard]] const char* reason_category_meaning(std::string_view category) noexcept;
 
 // What the table looks like, from the deck file's [table] block. Read only by
 // effects whose text tests it (section 2.8).

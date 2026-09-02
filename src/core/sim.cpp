@@ -451,4 +451,43 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
     return result;
 }
 
+RunSummary simulate_batch(const CardDb& db, const EffectDb& effects, const PatternSet& patterns,
+                          const GameConfig& config, const Policy& policy, std::uint64_t base_seed,
+                          int first_game, int games) {
+    RunSummary summary;
+    summary.assembled_on.assign(static_cast<std::size_t>(config.turn_cap) + 1, 0);
+    summary.fired.assign(patterns.patterns.size(), 0);
+    summary.satisfied.assign(patterns.patterns.size(), 0);
+
+    for (int i = 0; i < games; ++i) {
+        const auto index = static_cast<std::uint64_t>(first_game + i);
+        const GameResult result =
+            run_game(db, effects, patterns, config, policy, seed_for_game(base_seed, index));
+
+        ++summary.games;
+        summary.can_pay_calls += result.stats.can_pay_calls;
+        summary.turns_total += result.stats.turns;
+        summary.cards_drawn += result.stats.cards_drawn;
+        summary.cards_drawn_by_effect += result.stats.cards_drawn_by_effect;
+        summary.spells_cast += result.stats.spells_cast;
+        summary.tutors_used += result.stats.tutors_used;
+        summary.clones_made += result.stats.clones_made;
+        summary.convoked += result.stats.convoked;
+        summary.digest_xor ^= result.state_digest;
+
+        if (result.outcome.censored()) {
+            ++summary.censored;
+            continue;
+        }
+        ++summary.assembled_on[*result.outcome.assembled_turn];
+        ++summary.fired[result.outcome.pattern_id];
+        for (std::size_t p = 0; p < patterns.patterns.size(); ++p) {
+            if ((result.outcome.satisfied_mask & (FlagMask{1} << p)) != 0) {
+                ++summary.satisfied[p];
+            }
+        }
+    }
+    return summary;
+}
+
 }  // namespace cs

@@ -1621,6 +1621,46 @@ keeps the draw sequence far better aligned than a 98-card deck would.
 - Mean and standard deviation — last, and clearly subordinate to the CDF
 - The data manifest hash (§8.3)
 
+### 10.6 Built, Phase 6 — and the two things reading the output changed
+
+`core/stats.hpp` holds Wilson, the binomial CDF, the percentiles and
+`RunSummary`. All of it is a function of **counts**, so every reported number is
+testable without running a game, and there is one place a figure can be wrong.
+
+Two decisions that only became visible once real output existed:
+
+- **The metric banner was not first, for three phases.** §9.5's rule 1 says
+  "before any number, on every run", and every run in fact opened with the card
+  database summary — *100 cards, 25 with a land face, 76 castable* — and only
+  then said what was being measured. The rule was written down, agreed, and
+  violated by the code that printed it, because the violation was in the
+  ordering of two functions in `main` and nothing reads that as a claim.
+- **The generated card list had to become one card per line.** *Wan Shi Tong,
+  Librarian* is one card whose name contains a comma, and in a comma-joined list
+  it reads as two. A caveat block that miscounts the cards it is warning about
+  is worse than no caveat block, and no assertion on that line would have
+  noticed — the sixth instance of §11.0's "output correctness is not testable,
+  only readable".
+
+**The percentile intervals invert the binomial CDF** rather than approximating.
+The count of games at or below the true *p*-quantile is Binomial(*n*, *p*), so
+the bracketing ranks come straight off that CDF and each rank maps back to a
+turn through the cumulative histogram. That construction is what makes the
+censored case honest: a rank past the last uncensored game has **no turn**, so
+the report prints `[8, censored]` rather than clipping the bound to the cap in
+the flattering direction.
+
+The regularized incomplete beta is the only special function in the project. It
+is here rather than a normal approximation because turn-to-assembly has a
+twelve-point integer support, and a normal approximation over twelve points is
+not an approximation of anything.
+
+**What Phase 6 did not do:** §10.4's realised-variance-reduction measurement,
+because it needs the ablation sweep (§15 item 22). Until it exists, §16.5's
+admission stands — the ablations reported in §16 are paired but the pairing is
+not exploited, so a difference of a few tenths of a point is not distinguished
+from zero.
+
 ---
 
 ## 11. Where the hot path is

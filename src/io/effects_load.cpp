@@ -109,6 +109,16 @@ EffectDb load_effects(const std::filesystem::path& path, const CardDb& db) {
                 fail(name + ": an inert card requires a reason_category. A count says how "
                             "much the model cannot see; the category says what.");
             }
+            // The enumeration is CLOSED (section 4.4) and was documented as
+            // closed for a whole phase without anything enforcing it - a check
+            // that accepts every string checks nothing. One free-text outlier
+            // turns the grouped table back into a list.
+            if (reason_category_meaning(target.reason_category) == nullptr) {
+                fail(name + ": unknown reason_category '" + target.reason_category +
+                     "'. The set is closed (SIM_PLAN.md section 4.4): interaction, "
+                     "opponent_trigger, opponent_permanent, timing_only, "
+                     "no_object_in_model.");
+            }
             if ((*entry)["reason"].value_or<std::string>("").empty()) {
                 fail(name + ": an inert card requires a free-text 'reason' a human can "
                             "disagree with.");

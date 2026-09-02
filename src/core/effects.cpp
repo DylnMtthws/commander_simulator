@@ -4,6 +4,29 @@
 
 namespace cs {
 
+const char* reason_category_meaning(std::string_view category) noexcept {
+    // The closed enumeration of section 4.4. A category outside it is refused
+    // at load: the categories are the whole reason the inert set has a shape
+    // rather than a size, and one free-text outlier makes the grouped table a
+    // list again.
+    if (category == "interaction") {
+        return "counters or removal with nothing to answer";
+    }
+    if (category == "opponent_trigger") {
+        return "fires only when an opponent acts";
+    }
+    if (category == "opponent_permanent") {
+        return "targets, copies or steals an opponent's permanent";
+    }
+    if (category == "timing_only") {
+        return "alters timing; no stack and no priority here";
+    }
+    if (category == "no_object_in_model") {
+        return "needs combat, the stack, or a meaningful graveyard";
+    }
+    return nullptr;
+}
+
 bool enters_tapped(const ManaSourceEffect& effect, const CardDb& db, const EffectDb& effects,
                    const GameState& state, const TableContext& table) noexcept {
     switch (effect.enters_tapped_unless) {

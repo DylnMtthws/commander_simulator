@@ -287,3 +287,71 @@ TEST_CASE("below() is unbiased", "[seeding]") {
     REQUIRE(static_cast<double>(*low) > expected * 0.85);
     REQUIRE(static_cast<double>(*high) < expected * 1.15);
 }
+
+TEST_CASE("simulate_batch decomposes into disjoint ranges", "[seeding][S1][batch]") {
+    // Section 7.4's whole justification: batching is where the parallel
+    // decomposition lands, and a decomposition is only one if splitting the
+    // range and merging the summaries reproduces the whole range exactly.
+    //
+    // The digest is the part worth asserting. Counts would agree between two
+    // different sets of games that happened to end the same way - the seeding
+    // tests above found exactly that, reporting two different seeds as the same
+    // game because only the counters were compared. The digest cannot.
+    const cs::StubPolicyDoNotUseForResults policy;
+    cs::GameConfig config;
+
+    const cs::RunSummary whole = cs::simulate_batch(fixture(), simple_effects(), no_patterns(),
+                                                    config, policy, kBaseSeed, 0, 40);
+
+    for (const int splits : {2, 3, 7}) {
+        cs::RunSummary merged;
+        int first = 0;
+        for (int part = 0; part < splits; ++part) {
+            const int count = (40 / splits) + (part < 40 % splits ? 1 : 0);
+            cs::merge(merged, cs::simulate_batch(fixture(), simple_effects(), no_patterns(),
+                                                 config, policy, kBaseSeed, first, count));
+            first += count;
+        }
+        REQUIRE(first == 40);
+        REQUIRE(merged.games == whole.games);
+        REQUIRE(merged.censored == whole.censored);
+        REQUIRE(merged.assembled_on == whole.assembled_on);
+        REQUIRE(merged.can_pay_calls == whole.can_pay_calls);
+        REQUIRE(merged.digest_xor == whole.digest_xor);
+    }
+}
+
+TEST_CASE("a batch run in parallel equals the same batch run serially",
+          "[seeding][S1][batch]") {
+    // The claim section 7.3 makes about the ablation sweep, asserted rather
+    // than assumed. Threads take disjoint index ranges; merge order varies with
+    // scheduling and the answer does not, because merge() adds counts and XORs
+    // digests.
+    const cs::StubPolicyDoNotUseForResults policy;
+    cs::GameConfig config;
+    const cs::RunSummary serial = cs::simulate_batch(fixture(), simple_effects(), no_patterns(),
+                                                     config, policy, kBaseSeed, 0, 64);
+
+    for (const int threads : {2, 4, 8}) {
+        std::vector<cs::RunSummary> parts(static_cast<std::size_t>(threads));
+        std::vector<std::thread> workers;
+        const int per = 64 / threads;
+        for (int t = 0; t < threads; ++t) {
+            workers.emplace_back([&, t] {
+                parts[static_cast<std::size_t>(t)] =
+                    cs::simulate_batch(fixture(), simple_effects(), no_patterns(), config, policy,
+                                       kBaseSeed, t * per, per);
+            });
+        }
+        for (std::thread& worker : workers) {
+            worker.join();
+        }
+        cs::RunSummary merged;
+        for (const cs::RunSummary& part : parts) {
+            cs::merge(merged, part);
+        }
+        REQUIRE(merged.games == serial.games);
+        REQUIRE(merged.assembled_on == serial.assembled_on);
+        REQUIRE(merged.digest_xor == serial.digest_xor);
+    }
+}

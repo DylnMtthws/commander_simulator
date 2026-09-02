@@ -15,6 +15,7 @@
 #include "core/pattern.hpp"
 #include "core/policy.hpp"
 #include "core/state.hpp"
+#include "core/stats.hpp"
 
 namespace cs {
 
@@ -95,5 +96,21 @@ struct GameConfig {
                                   const PatternSet& patterns, const GameConfig& config,
                                   const Policy& policy, std::uint64_t seed,
                                   Observer* observer = nullptr);
+
+// Plays games [first_game, first_game + games) and accumulates them.
+//
+// Section 7.4: batching is in the interface because per-call overhead matters
+// at 4,851 pairs x 50,000 games, and because it is where the parallel
+// decomposition lands. It is a loop - but it is THE loop, and a caller written
+// against it does not change when that loop is handed to threads.
+//
+// INDEXED BY GAME, never by thread (INVARIANT S1). A parallel driver hands each
+// worker a disjoint [first_game, games) range and merges the summaries; the
+// result is identical to running the whole range serially, including the digest,
+// because merge() adds counts and XORs digests.
+[[nodiscard]] RunSummary simulate_batch(const CardDb& db, const EffectDb& effects,
+                                        const PatternSet& patterns, const GameConfig& config,
+                                        const Policy& policy, std::uint64_t base_seed,
+                                        int first_game, int games);
 
 }  // namespace cs

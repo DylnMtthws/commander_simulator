@@ -3,8 +3,19 @@
 A Monte Carlo goldfishing simulator for one cEDH Commander deck. Design and
 reasoning live in [SIM_PLAN.md](SIM_PLAN.md); this file is how to build it.
 
-**Status:** Phase 0. Build system, layout, test framework and CI. No domain
-logic yet, deliberately.
+**Status:** Phases 0-7 landed except the ablation sweep. The card model is
+authored (94 of 100 cards; the four that remain each need an effect kind the
+loop does not have), the mana system is real, the policy is authored and
+traceable, and the run report carries Wilson intervals and censored percentiles.
+
+What it says so far is in [SIM_PLAN.md](SIM_PLAN.md) §16, and the short version
+is that eight clones are worth a third of a point and one tutor is worth seven
+and a half.
+
+```bash
+./build/release/src/cli/cs --games 20000        # the report
+./build/release/src/cli/cs --trace 12           # one game, turn by turn
+```
 
 ## Build
 
@@ -97,6 +108,13 @@ export/.venv/bin/mtgsim-export       # writes data/cards.json
 
 Every generated file carries a manifest, and the loader surfaces it on every
 run rather than hiding it behind a flag:
+
+```
+deck: kinnan.deck.toml   cards: 100   modelled: 65   inert: 31   patterns: 4
+data: manifest 0ca3ccc3 (2026-09-01)
+```
+
+with the full provenance printed on a bare `cs` run:
 
 ```
 data/cards.json
