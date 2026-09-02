@@ -66,6 +66,18 @@ struct Requirement {
     // tightened never.
     int loop_entry_cost = -1;  // -1 == not required
 
+    // How many activations the pattern claims are needed. REQUIRED wherever
+    // loop_entry_cost is, with no default, because it is a JUDGEMENT ABOUT
+    // MAGIC and not a fact about the card - and it is worth 2.97 points of
+    // P(assembled by turn 3) between 1 and 2, which is more than every card in
+    // the deck except three (SIM_PLAN.md section 16.7).
+    //
+    // Splitting it from loop_entry_cost separates the two kinds of claim. The
+    // cost is read off the card and can be checked against printed text; the
+    // count is someone deciding when a line has been assembled, and it belongs
+    // in the honesty header beside opponents and on_the_play.
+    int activations = 1;
+
     // Set when a card this requirement names has been ABLATED out of the deck
     // (core/ablation.hpp). Requirements compile to SLOT MASKS at load, and a
     // slot swap silently rebinds them: with Enduring Vitality replaced by a

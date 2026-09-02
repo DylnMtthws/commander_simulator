@@ -22,7 +22,8 @@ namespace {
 constexpr std::string_view kZoneTerms[] = {"in_play", "in_hand", "in_play_or_hand", "untapped",
                                            "any_of"};
 constexpr std::string_view kScalarTerms[] = {"turn_gte", "creature_count_gte",
-                                            "library_size_lte", "loop_entry_cost"};
+                                            "library_size_lte", "loop_entry_cost",
+                                            "activations"};
 constexpr std::string_view kOtherTerms[] = {"flag", "flags"};
 
 // Declared in section 5.2 but not implemented yet. Named separately so the
@@ -81,6 +82,7 @@ int flag_index(std::vector<std::string>& names, const std::string& flag,
 Requirement parse_requirement(const toml::table& table, const CardDb& db, PatternSet& set,
                               const std::string& context, bool allow_flags) {
     Requirement requirement;
+    bool saw_activations = false;
     for (const auto& [key, value] : table) {
         const std::string_view name{key.str()};
         if (contains(kNotYetImplemented, name)) {
@@ -106,6 +108,10 @@ Requirement parse_requirement(const toml::table& table, const CardDb& db, Patter
                 requirement.creature_count_gte = static_cast<int>(*number);
             else if (name == "loop_entry_cost")
                 requirement.loop_entry_cost = static_cast<int>(*number);
+            else if (name == "activations") {
+                requirement.activations = static_cast<int>(*number);
+                saw_activations = true;
+            }
             else requirement.library_size_lte = static_cast<int>(*number);
         } else if (contains(kOtherTerms, name)) {
             if (!allow_flags) {
@@ -129,6 +135,22 @@ Requirement parse_requirement(const toml::table& table, const CardDb& db, Patter
                  "'. The vocabulary is closed (section 5.2) - a term outside it is a typo "
                  "or a feature nobody implemented, and both must fail here.");
         }
+    }
+    // REQUIRED WHERE IT APPLIES, with no default. `activations` is a judgement
+    // about when a line counts as assembled, not a fact read off a card, and
+    // section 16.7 measured it at 2.97 points of P(assembled by turn 3) between
+    // one and two - more than every card in the deck except three. A silently
+    // defaulted 1 would be the largest unstated assumption in the model.
+    if (requirement.loop_entry_cost >= 0 && !saw_activations) {
+        fail(context +
+             ": a requirement with `loop_entry_cost` must also declare `activations` - how "
+             "many times the ability has to be used before this counts as assembled. It has "
+             "no default: it is a judgement about Magic rather than a fact about the card, "
+             "it is worth ~3 points of P(assembled by turn 3) between 1 and 2, and it is "
+             "printed in the honesty header (SIM_PLAN.md section 16.7).");
+    }
+    if (requirement.activations < 1) {
+        fail(context + ": `activations` must be at least 1");
     }
     return requirement;
 }

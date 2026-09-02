@@ -164,6 +164,11 @@ in_play = ["Kinnan, Bonder Prodigy", "Basalt Monolith"]
 # the {3} from elsewhere. Presence alone would fire with two mana and a tapped
 # Basalt, which is a loop you cannot enter.
 loop_entry_cost = 3
+# ONE activation is unbounded here, and that is the whole difference from the
+# dig below: {3} untaps Basalt, which then taps for 4 again, so entering the
+# loop once is entering it forever. Declared rather than defaulted so that the
+# contrast with `activations = 2` is visible in the file.
+activations     = 1
 
 [[engine]]
 name = "kinnan_enduring_vitality"
@@ -224,10 +229,30 @@ name = "wide_colour_into_kinnan_dig"
 # WIDE_COLOUR requires two creatures and Enduring Vitality makes every creature
 # tap for any colour, so a board that can pay seven can essentially always
 # produce a green and a blue among it.
+#
+# HOW MANY ACTIVATIONS COUNT AS ASSEMBLED - a judgement about Magic, declared
+# here, printed in the honesty header, and worth ~3 points of P(assembled by
+# turn 3) between 1 and 2 (section 16.7). More than every card in this deck
+# except three.
+#
+# Two, on the reading that ONE dig looks at five cards and puts one non-Human
+# creature onto the battlefield - a good turn, not an assembled combo (section
+# 5.4) - and the second is what converts it into Thrasios plus a board.
+#
+# UNLIKE kinnan_basalt, this does not self-sustain, and that was measured rather
+# than assumed before the number was fixed. At the moment this pattern fires the
+# undrawn library averages 84.6 cards holding 19.4 non-Human creatures, so the
+# dig hits in 73.6% of activations. Every hit is worth exactly 2 mana - Enduring
+# Vitality grants "{T}: add one mana of any colour" uniformly and Kinnan doubles
+# it - so the expected return is 1.47 mana against a 7-mana cost. **A hit funds
+# 21% of the next activation**, and 0% within the same turn in real Magic, since
+# a creature that just entered has summoning sickness. The engine does not pay
+# for itself, so a constant N is the right parameterisation.
 [win.requires]
 flag            = "WIDE_COLOUR"
 in_play         = ["Kinnan, Bonder Prodigy"]
 loop_entry_cost = 7
+activations     = 2
 
 [[win]]
 name = "wide_colour_into_thrasios"

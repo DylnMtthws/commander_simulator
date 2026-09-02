@@ -280,6 +280,31 @@ void print_header(const cs::CardDb& db, const cs::io::DeckFile& deck, const cs::
     std::printf("  - Patterns are ASSEMBLY states, not wins. This deck has no \"you win the\n"
                 "    game\" card; its real kills are opponent-facing (section 5.4).\n");
 
+    // ACTIVATIONS, beside opponents and on_the_play, because it is the same kind
+    // of thing: a required declaration with no default that moves the headline.
+    // Section 16.7 measured 2.97 points of P(assembled by turn 3) between one
+    // activation and two - more than every card in the sweep except three - so
+    // it is printed next to the number it moves rather than left in a file.
+    for (const cs::WinPattern& pattern : deck.patterns.patterns) {
+        if (pattern.requires_.loop_entry_cost < 0) {
+            continue;
+        }
+        std::printf("  - %s counts as assembled at %d activation%s of a %d-mana\n"
+                    "    ability. That is a judgement about Magic, not a fact about the card,\n"
+                    "    and it moves this result by about %.1f points per activation.\n",
+                    pattern.name.c_str(), pattern.requires_.activations,
+                    pattern.requires_.activations == 1 ? "" : "s",
+                    pattern.requires_.loop_entry_cost, 3.0);
+    }
+    for (const cs::Engine& engine : deck.patterns.engines) {
+        if (engine.requires_.loop_entry_cost < 0) {
+            continue;
+        }
+        std::printf("  - %s is UNBOUNDED once entered, so one activation is all of\n"
+                    "    them: entry costs %d and the loop untaps itself.\n",
+                    engine.name.c_str(), engine.requires_.loop_entry_cost);
+    }
+
     if (effects.unauthored > 0) {
         std::printf("  - %d of %zu cards are UNAUTHORED. They are drawn and dilute every draw,\n"
                     "    but do nothing when cast, which UNDERSTATES the deck.\n",

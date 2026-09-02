@@ -2674,14 +2674,57 @@ nothing; that is the model working. *Thrasios* is at +3.567 despite being
 unauthored, because it is a **pattern term** — the value is the outlet being on
 the battlefield, which the pattern detects without the ability being modelled.
 
-#### So what the clone finding now is
+#### So what the clone finding now is — the trace was read
 
 The claim §16.1 has been circling: **seven of the eight clones are
 indistinguishable from a card declared to do nothing.** That is stable across
-every reading. What is *not* established is why — whether clones genuinely do
-little in this deck, or whether `CLONE` has a convoke-shaped defect nobody has
-looked for. **Reading a trace of a clone firing is the outstanding work**, and
-until it is done the clone finding is a hypothesis with a number attached.
+every reading. What was *not* established is why — clones genuinely doing little,
+or `CLONE` having a convoke-shaped defect nobody had looked for. §16.0 says a
+near-zero result is a hypothesis about the implementation until someone reads a
+trace of the mechanism firing, so that was done.
+
+**What the trace showed, and it looked like a defect:**
+
+```
+CAST: Flash Photography            paying 4
+considering (clone target):
+  Birds of Paradise            score  60000
+  Kinnan, Bonder Prodigy       score 100000
+  Mox Diamond                  score  50000
+CLONE: Flash Photography becomes a copy of Kinnan, Bonder Prodigy
+```
+
+`choose_clone` picks by **authored rank**, and rank measures *how good is this
+card to draw*. The question a clone asks is *how good is this permanent to have
+twice*, and for the two highest-ranked permanents in the deck those are opposite:
+a second *Kinnan* adds no multiplier (the model takes one modifier, and in real
+Magic the legend rule kills it anyway), and a second *Enduring Vitality* grants
+an ability every creature already has. **The scorer was systematically steering
+clones at the two worst targets in the deck.**
+
+**Then it was measured rather than believed**, by making `choose_clone` copy the
+largest mana source instead of the highest rank:
+
+| | turn 3 | turn 6 | turn 12 |
+|---|---|---|---|
+| copy the highest rank (ships) | 5.10% | 31.34% | 66.31% |
+| copy the biggest mana source | 5.19% | 31.99% | 66.61% |
+| individual clone ablations | −0.257% | | (unchanged, ±0.02) |
+
+**The defect is real and worth about a tenth of a point.** Fixing the targeting
+does not move any clone out of the band — it would take ~0.4 — so the answer to
+§16.0's ambiguity, for this set, is **cause 1: the clones genuinely do little in
+this deck.**
+
+Stated with its limit: one alternative policy was tested, the one the trace
+suggested. That does not rule out every implementation defect, but it does rule
+out the obvious one, and it is more than a hypothesis with a number attached.
+
+**A separate small gap the trace exposed, unmeasured:** the **legend rule is not
+modelled**. A clone of *Kinnan* or *Thrasios* should die immediately. Here the
+value comes out approximately right by accident — a second Kinnan contributes as
+a vanilla creature rather than as nothing — so it has not been fixed, but it is a
+real divergence and it is recorded rather than left to be rediscovered.
 
 **Copy Artifact has now given three different answers across three readings**,
 and the history is more useful than any one of them:
@@ -2783,11 +2826,14 @@ how many activations "not interchangeable" buys.
 
 Three ways to represent it, none chosen:
 
+Labelled **R1/R2/R3** rather than A/B/C, because §13.1's chart options are
+already A/B/C/D and the two sets were being read across each other.
+
 | Option | What it says | Cost | What it gets wrong |
 |---|---|---|---|
-| **A. Raise the entry cost to N activations** | `loop_entry_cost = 14` for two digs | One number in the deck file, today | Still generic-only, so it never checks that `{G}{U}` is available *twice*. Crude, honest, and available now |
-| **B. A coloured, repeated entry cost** | A `Cost` rather than an int, times N | Extends §5.2's vocabulary — governance, and a re-audit of every pattern | Nothing much; it is the correct version of A |
-| **C. Execute the dig** | `TUTOR` with a five-card look, actually resolved | The largest: the policy has to choose targets, and each dig changes the board the next one sees | Turns a detect-model into an execute-model, which §5.4 deliberately is not |
+| **R1. Raise the entry cost to N activations** | `loop_entry_cost = 7`, `activations = N` | One number in the deck file, today | Still generic-only, so it never checks that `{G}{U}` is available *N* times. Crude, honest, and available now |
+| **R2. A coloured, repeated entry cost** | A `Cost` rather than an int, times N | Extends §5.2's vocabulary — governance, and a re-audit of every pattern | Nothing much; it is the correct version of R1 |
+| **R3. Execute the dig** | `TUTOR` with a five-card look, actually resolved | The largest: the policy has to choose targets, and each dig changes the board the next one sees | Turns a detect-model into an execute-model, which §5.4 deliberately is not |
 
 #### PROBE RUN — and it collapses
 
@@ -2813,24 +2859,73 @@ fires in ~37% of games at N = 1 and ~11% at N = 3.
 
 Two things the probe settled on the way:
 
-- **Option A is adequate for the mechanism.** Generic-only asks for 7N mana
-  rather than `{5}{G}{U}` × N, and under WIDE_COLOUR every creature taps for any
-  colour with Kinnan doubling it, so a board that can pay 7N can essentially
-  always find the coloured pips among it. **B buys accuracy the deck cannot
-  currently exercise.** The gap between A and B is far smaller than the gap
-  between N = 1 and N = 2.
-- **Option C is not needed to decide this.** Executing the dig would answer *how
-  many activations the deck gets*; it would not answer *how many it needs*, which
-  is the question. C remains the right answer for a different question.
+- **R1 is adequate for the mechanism.** Generic-only asks for 7N mana rather
+  than `{5}{G}{U}` × N, and under WIDE_COLOUR every creature taps for any colour
+  with Kinnan doubling it, so a board that can pay 7N can essentially always find
+  the coloured pips among it. **R2 buys accuracy the deck cannot currently
+  exercise**, and the R1/R2 gap is far smaller than the N = 1 / N = 2 gap.
+- **R3 is not needed to decide this.** Executing the dig would answer *how many
+  activations the deck gets*; it would not answer *how many it needs*, which is
+  the question. R3 remains the right answer for a different question.
 
-**Recommended, not adopted:** N = 2, on the reading that one dig finding one
-non-Human creature is a good turn rather than an assembled combo (§5.4), and the
-second is what converts it into *Thrasios* plus a board. That is a judgement about
-Magic and it should be yours. The number moves 3 points of the headline either
-way, so it belongs in the deck file with a comment saying who decided it and why —
-not in code.
+#### DECIDED: R1 with N = 2, after one more measurement
+
+The proposal was N = 2 provisionally, conditional on checking whether the engine
+partly funds itself — **because if a hit substantially paid for the next
+activation, a constant N would be the wrong shape entirely**, and that is a
+different finding rather than a different number.
+
+Measured at the moment the pattern fires, over 20,000 firings:
+
+| | |
+|---|---|
+| mean undrawn library | 84.6 cards |
+| non-Human creatures still in it | 19.4 |
+| **P(dig hits in the top five)** | **0.736** |
+| mana per hit, under Kinnan + *Enduring Vitality* | **2.00, uniformly** |
+| expected mana per activation | **1.47** |
+| activation cost | **7** |
+| **a hit funds** | **21% of the next activation** |
+
+The mana figure has no variance worth averaging, and that is itself the finding:
+WIDE_COLOUR *requires* Enduring Vitality, which grants every creature `{T}: add
+one mana of any colour`, and Kinnan doubles it. **Every non-Human creature the
+dig can find is worth exactly two mana**, whether it is *Birds of Paradise* or
+*Emrakul*. There is no "typical hit" to average — they are all the same.
+
+And the real figure is lower than 21%, because **summoning sickness is not
+modelled** (see §16.8): a creature that just entered cannot tap for mana until
+the next turn, so within a turn a hit funds **0%** of the next dig.
+
+**So the engine does not pay for itself, a constant N is the right
+parameterisation, and N = 2 stands.**
+
+It is now a *declared* assumption rather than an arithmetic detail:
+`loop_entry_cost = 7` is a fact read off the card, `activations = 2` is the
+judgement, they are separate keys, `activations` is **required wherever
+`loop_entry_cost` appears with no default**, and both are printed in the honesty
+header beside `opponents` and `on_the_play`. `kinnan_basalt` declares
+`activations = 1` explicitly, so the contrast — that loop untaps itself, this one
+does not — is visible in the file rather than inferable.
 
 ### 16.8 What is still not established
+
+- **Summoning sickness is not modelled.** A creature that enters the battlefield
+  can tap for mana on the same turn — from a tutor, from a clone, or from
+  Kinnan's dig. Under *Enduring Vitality* that is 2 mana per creature, arriving a
+  full turn early. It **overstates**, it is on the deck's main line, and it is
+  unmeasured. Found while measuring §16.7's self-funding question, where it is
+  the difference between "a hit funds 21% of the next activation" and "0% within
+  the same turn".
+- **The legend rule is not modelled.** A clone of *Kinnan* or *Thrasios* should
+  die. §16.5's trace reading found it; the value happens to come out about right,
+  which is why it is here rather than in a fix.
+- **The `activations` judgement is one number, declared, and worth 3 points.**
+  §16.7 fixes it at 2 with the reasoning stated, and it is the single largest
+  unmeasured *judgement* in the model — as opposed to the unmeasured
+  *simplifications*, which §16.6 says are all of them.
+
+#### Previously listed, still true
 
 - The paired interval is **Wald on the discordant pairs**, not a score interval.
   §10.2 insists on Wilson for proportions because the normal approximation fails

@@ -55,7 +55,8 @@ bool requirement_holds(const Requirement& requirement, const PatternSet& set,
     }
     if (requirement.loop_entry_cost >= 0) {
         Cost entry;
-        entry.generic = static_cast<std::uint8_t>(requirement.loop_entry_cost);
+        entry.generic = static_cast<std::uint8_t>(requirement.loop_entry_cost *
+                                                  requirement.activations);
         if (!can_pay(entry, sources, 0)) {
             return false;
         }

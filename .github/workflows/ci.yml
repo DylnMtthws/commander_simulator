@@ -39,6 +39,9 @@ jobs:
       - name: Core is sealed
         run: ./scripts/check_core_is_sealed.sh
 
+      - name: Every authored field has a reader
+        run: ./scripts/check_effects_are_read.sh
+
       - name: Configure
         run: cmake --preset ci
 
