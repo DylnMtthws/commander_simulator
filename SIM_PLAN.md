@@ -894,6 +894,28 @@ how you get a pattern that silently succeeds due to a modelling gap.
   every declared pattern with its count, including zeroes, under a heading that
   names them as either dead lines or modelling bugs. Zero-count patterns are
   printed *first*, because they are the interesting ones.
+> **A never-fired pattern has FOUR causes, not two.** §5.3 originally named
+> two; the report has since found the others by itself:
+>
+> | Cause | Signal | The fix is |
+> |---|---|---|
+> | Dead line | fired 0, also-satisfied 0 | a deck change, or delete the pattern |
+> | Modelling bug | fired 0, also-satisfied 0 | code |
+> | **Shadowed** | fired 0, also-satisfied **> 0** | reorder or narrow the patterns |
+> | **Resolved intra-turn** | fired 0, also-satisfied 0 | evaluate more often, or accept it |
+>
+> The fourth arrived in Phase 7 and is the subtlest. Patterns are checked once
+> per turn, after the main phase, which is exact for the turn *number* but blind
+> to any state the policy creates and resolves within a turn.
+> `infinite_C_outlet_in_hand` fired 145 times under the stub and **zero** under
+> the authored policy — not because the deck changed, but because the policy
+> casts a rank-88 Thrasios the moment it is affordable, so the outlet is never
+> still in hand when the check runs.
+>
+> It is indistinguishable from a dead line in the output, and it is the one
+> cause that a *better* policy makes *more* likely. Worth remembering whenever a
+> pattern describes a transient state rather than a stable one.
+
 - **Validated at load.** Every card named in any pattern must be in the deck;
   every deck card must resolve in the export. Both fail loudly at load with the
   offending name. Never mid-simulation — a simulation that can fail is a
@@ -1001,6 +1023,27 @@ and no question about which mechanism governs a given decision.
 - **Redundancy** — penalty for the Nth copy of an effect already online.
 
 Integer, not floating point (§7.3).
+
+> **The weight ladder is derived, not chosen — and it was wrong the first time.**
+>
+> `completes_engine` was set to 50,000 against a rank term spanning 0–100,000,
+> so a rank gap of 70 outvoted *finishing the engine*. An "enormous bonus" a
+> static ranking could overrule is the term failing at its only job.
+>
+> **The shape is a magnitude mismatch between two independently-chosen scales.**
+> The rank scale (0–100, authored by hand in the deck file) and the bonus scale
+> (round numbers, picked while writing the code) were each reasonable alone and
+> had never been compared. No single line was wrong — the *relationship* between
+> two lines was, and neither line's author was in a position to notice.
+>
+> This recurs anywhere terms are summed: a scorer, a heuristic, a weighted
+> objective, a cost function. **The fix is not better numbers, it is deriving one
+> scale from the other**, so the ordering is a property of the code rather than a
+> coincidence of two authors' taste. Every tier is now computed a decade clear of
+> the rank term's maximum, so the ladder cannot silently regress when the rank
+> list grows — which it will, since ranks are authored per deck.
+>
+> Reading the numbers did not catch this. A test did.
 
 ### 6.3 Tutors and selection are the same problem
 

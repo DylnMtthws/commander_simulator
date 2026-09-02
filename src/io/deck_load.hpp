@@ -11,6 +11,7 @@
 #include <string>
 
 #include "core/card.hpp"
+#include "core/effects.hpp"
 #include "core/pattern.hpp"
 #include "core/policy.hpp"
 
@@ -21,15 +22,18 @@ public:
     explicit DeckError(const std::string& what) : std::runtime_error(what) {}
 };
 
-struct TableContext {
+// Mirrors core's TableContext; kept separate so io owns the parsing and core
+// owns the meaning.
+struct DeckTable {
     int opponents = 0;
+    ColourMask opponent_colors = 0;
     bool on_the_play = true;
 };
 
 struct DeckFile {
     std::string name;
     std::string commander;
-    TableContext table;
+    DeckTable table;
     std::string ablation_replacement;
     PatternSet patterns;
     PolicyWeights weights;

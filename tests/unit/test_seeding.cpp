@@ -33,6 +33,24 @@ const cs::CardDb& fixture() {
 
 // An empty pattern set: S1 is about the RNG, and a pattern firing would end
 // games early and vary the number of turns for reasons unrelated to seeding.
+// An effect set where every fixture card is a plain colourless source, so the
+// loop has mana without depending on the authored file. S1 is about the RNG.
+const cs::EffectDb& simple_effects() {
+    static const cs::EffectDb effects = [] {
+        cs::EffectDb db;
+        db.by_slot.assign(fixture().cards.size(), cs::CardEffects{});
+        for (auto& entry : db.by_slot) {
+            entry.status = cs::AuthorStatus::Modeled;
+            entry.has_mana_source = true;
+            entry.mana_source.produces = 0x1F;
+            entry.mana_source.amount = 1;
+            entry.mana_source.is_land = true;
+        }
+        return db;
+    }();
+    return effects;
+}
+
 const cs::PatternSet& no_patterns() {
     static const cs::PatternSet empty;
     return empty;
@@ -40,7 +58,7 @@ const cs::PatternSet& no_patterns() {
 
 cs::GameResult play(std::uint64_t index) {
     const cs::StubPolicyDoNotUseForResults policy;
-    return cs::run_game(fixture(), no_patterns(), cs::GameConfig{}, policy,
+    return cs::run_game(fixture(), simple_effects(), no_patterns(), cs::GameConfig{}, policy,
                         cs::seed_for_game(kBaseSeed, index));
 }
 
@@ -92,7 +110,7 @@ cs::GameResult play_authored(std::uint64_t index) {
         weights.rank[0] = 90;
         return weights;
     }());
-    return cs::run_game(fixture(), patterns, cs::GameConfig{}, policy,
+    return cs::run_game(fixture(), simple_effects(), patterns, cs::GameConfig{}, policy,
                         cs::seed_for_game(kBaseSeed, index));
 }
 
@@ -230,9 +248,9 @@ TEST_CASE("seed derivation is counter-based, not sequential", "[seeding][S1]") {
     }
     SECTION("a different base seed gives a different game") {
         const cs::StubPolicyDoNotUseForResults policy;
-        const auto one = cs::run_game(fixture(), no_patterns(), cs::GameConfig{}, policy,
+        const auto one = cs::run_game(fixture(), simple_effects(), no_patterns(), cs::GameConfig{}, policy,
                                       cs::seed_for_game(1, 0));
-        const auto two = cs::run_game(fixture(), no_patterns(), cs::GameConfig{}, policy,
+        const auto two = cs::run_game(fixture(), simple_effects(), no_patterns(), cs::GameConfig{}, policy,
                                       cs::seed_for_game(2, 0));
         REQUIRE_FALSE(sign(one) == sign(two));
     }

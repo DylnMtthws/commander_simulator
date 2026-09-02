@@ -13,6 +13,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 from mtgsim_export.deck import DeckError, load_deck
+from mtgsim_export.effects import check_effects
 from mtgsim_export.export import ExportError, build_export
 from mtgsim_export.mana import ManaCostError
 
@@ -47,6 +48,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Export card data for the simulator.")
     parser.add_argument("--deck", type=Path, default=Path("data/kinnan.deck.toml"))
     parser.add_argument("--out", type=Path, default=Path("data/cards.json"))
+    parser.add_argument("--effects", type=Path, default=Path("data/effects.toml"))
     parser.add_argument(
         "--database-url",
         default=os.environ.get(ENV_VAR),
@@ -82,6 +84,35 @@ def main(argv: list[str] | None = None) -> int:
     print(f"wrote {args.out}: {manifest['card_count']} cards from {manifest['source_view']}")
     print(f"  data as of {manifest['max_content_updated_at']}")
     print(f"  cards sha256 {manifest['cards_sha256'][:12]}")
+
+    report = check_effects(args.effects, document["cards"])
+    print(
+        f"\neffects: {report.authored}/{manifest['card_count']} authored "
+        f"({report.modeled} modeled, {report.inert} inert, "
+        f"{len(report.unauthored)} unauthored)"
+    )
+    for category, count in sorted(report.inert_by_category.items(), key=lambda kv: -kv[1]):
+        print(f"    inert/{category:<22} {count}")
+    for name in report.unknown:
+        print(f"  effects.toml has an entry for '{name}', which is not in this deck")
+
+    # Not fatal, deliberately. A drift warning means a human should RE-READ the
+    # card, and failing the export would tempt someone to re-stamp the hash to
+    # make it go away - which records "a script ran", not "a person read this".
+    if report.drifted:
+        print(f"\n  WARNING: {len(report.drifted)} card(s) changed text since authoring.")
+        print("  Re-read each and re-run scripts/stamp_effects.py ONLY after reading:")
+        for drift in report.drifted:
+            print(f"    {drift.name}")
+
+            # Head AND tail: a truncated hash can be identical at the front
+            # while differing at the back, which made the first version of this
+            # warning print two apparently equal values.
+            def brief(value: str) -> str:
+                return f"{value[:10]}...{value[-10:]}" if len(value) > 24 else value
+
+            print(f"      authored against {brief(drift.authored_from)}")
+            print(f"      text is now      {brief(drift.actual)}")
     return 0
 
 

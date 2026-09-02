@@ -197,7 +197,20 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db) {
         static_cast<int>(require_field(table_ctx, "table", "opponents").value_or<int64_t>(-1));
     deck.table.on_the_play =
         require_field(table_ctx, "table", "on_the_play").value_or<bool>(true);
-    static_cast<void>(require_field(table_ctx, "table", "opponent_colors"));
+    {
+        const toml::node& colours = require_field(table_ctx, "table", "opponent_colors");
+        static constexpr std::string_view kOrder = "WUBRG";
+        if (const auto* array = colours.as_array()) {
+            for (const toml::node& entry : *array) {
+                const auto letter = entry.value<std::string>();
+                const auto at = letter ? kOrder.find(*letter) : std::string_view::npos;
+                if (!letter || at == std::string_view::npos) {
+                    fail(path.string() + ": [table] opponent_colors must be WUBRG letters");
+                }
+                deck.table.opponent_colors |= static_cast<ColourMask>(1U << at);
+            }
+        }
+    }
     deck.ablation_replacement =
         require_field(ablation, "ablation", "replacement").value_or<std::string>("");
 

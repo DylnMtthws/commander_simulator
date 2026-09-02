@@ -18,6 +18,7 @@
 #include "core/version.hpp"
 #include "io/card_db_load.hpp"
 #include "io/deck_load.hpp"
+#include "io/effects_load.hpp"
 #include "io/trace.hpp"
 
 namespace {
@@ -92,13 +93,26 @@ int summarise(const std::filesystem::path& path) {
 // A v1 feature, not a debugging afterthought (SIM_PLAN.md section 6.6). It is
 // how a policy bug is found at all: aggregate numbers can tell you the deck is
 // slow and never that it kept a Forest over Basalt Monolith on turn three.
+// [table] flows from the deck file into the simulation. Every field is
+// required there and none has a default, so this cannot silently pick one.
+cs::GameConfig make_config(const cs::io::DeckFile& deck) {
+    cs::GameConfig config;
+    config.table.opponents = deck.table.opponents;
+    config.table.opponent_colors = deck.table.opponent_colors;
+    config.table.on_the_play = deck.table.on_the_play;
+    config.on_the_play = deck.table.on_the_play;
+    return config;
+}
+
 int trace_one(const std::filesystem::path& path, const std::filesystem::path& deck_path,
-              std::uint64_t seed) {
+              const std::filesystem::path& effects_path, std::uint64_t seed) {
     cs::CardDb db;
     cs::io::DeckFile deck;
+    cs::EffectDb effects;
     try {
         db = cs::io::load_card_db(path);
         deck = cs::io::load_deck(deck_path, db);
+        effects = cs::io::load_effects(effects_path, db);
     } catch (const std::runtime_error& error) {
         std::fflush(stdout);
         std::fprintf(stderr, "error: %s\n", error.what());
@@ -106,8 +120,7 @@ int trace_one(const std::filesystem::path& path, const std::filesystem::path& de
     }
 
     const cs::AuthoredPolicy policy(deck.weights);
-    cs::GameConfig config;
-    config.on_the_play = deck.table.on_the_play;
+    cs::GameConfig config = make_config(deck);
     cs::io::TraceWriter writer(db, deck.patterns, stdout);
 
     std::printf("\ntrace: seed %llu, policy %s\n",
@@ -118,17 +131,19 @@ int trace_one(const std::filesystem::path& path, const std::filesystem::path& de
     std::printf("  LAND face produce mana, so every rock and dork on the board produces\n");
     std::printf("  nothing, and each land wrongly taps for any colour. The POLICY's\n");
     std::printf("  decisions below are real; the mana it decides against is not.\n");
-    static_cast<void>(cs::run_game(db, deck.patterns, config, policy, seed, &writer));
+    static_cast<void>(cs::run_game(db, effects, deck.patterns, config, policy, seed, &writer));
     return 0;
 }
 
-int simulate(const std::filesystem::path& path, const std::filesystem::path& deck_path, int games,
-             std::uint64_t base_seed) {
+int simulate(const std::filesystem::path& path, const std::filesystem::path& deck_path,
+             const std::filesystem::path& effects_path, int games, std::uint64_t base_seed) {
     cs::CardDb db;
     cs::io::DeckFile deck;
+    cs::EffectDb effects;
     try {
         db = cs::io::load_card_db(path);
         deck = cs::io::load_deck(deck_path, db);
+        effects = cs::io::load_effects(effects_path, db);
     } catch (const std::runtime_error& error) {
         std::fflush(stdout);
         std::fprintf(stderr, "error: %s\n", error.what());
@@ -136,8 +151,7 @@ int simulate(const std::filesystem::path& path, const std::filesystem::path& dec
     }
 
     const cs::AuthoredPolicy policy(deck.weights);
-    cs::GameConfig config;
-    config.on_the_play = deck.table.on_the_play;
+    const cs::GameConfig config = make_config(deck);
 
     std::uint64_t can_pay_calls = 0;
     std::uint64_t digest_mix = 0;
@@ -149,7 +163,7 @@ int simulate(const std::filesystem::path& path, const std::filesystem::path& dec
 
     for (int i = 0; i < games; ++i) {
         const cs::GameResult result =
-            cs::run_game(db, deck.patterns, config, policy,
+            cs::run_game(db, effects, deck.patterns, config, policy,
                          cs::seed_for_game(base_seed, static_cast<std::uint64_t>(i)));
         can_pay_calls += result.stats.can_pay_calls;
         digest_mix ^= result.state_digest;
@@ -171,6 +185,19 @@ int simulate(const std::filesystem::path& path, const std::filesystem::path& dec
     std::printf("\n%d games, seed %llu\n  policy: %s\n", games,
                 static_cast<unsigned long long>(base_seed), policy.name());
     std::printf("  can_pay calls/game %.1f\n", static_cast<double>(can_pay_calls) / games);
+
+    // The grouped table, not the bare count. A count says how much the model
+    // cannot see; the categories say WHAT, and if `interaction` dominates the
+    // fix is opposition profiles rather than a bigger card model (section 4.4).
+    std::printf("\nWHAT THE MODEL CANNOT SEE  (%d inert cards, by reason)\n", effects.inert);
+    for (std::size_t i = 0; i < effects.inert_categories.size(); ++i) {
+        std::printf("  %-22s %4d\n", effects.inert_categories[i].c_str(), effects.inert_counts[i]);
+    }
+    if (effects.unauthored > 0) {
+        std::printf("\n  %d of %zu cards are UNAUTHORED (Phase 7 incomplete). They are drawn\n",
+                    effects.unauthored, db.size());
+        std::printf("  and dilute every draw, but do nothing when cast.\n");
+    }
 
     std::printf("\nP(assembled by turn N)\n");
     int cumulative = 0;
@@ -228,6 +255,7 @@ int main(int argc, char** argv) {
 
     std::filesystem::path path{"data/cards.json"};
     std::filesystem::path deck_path{"data/kinnan.deck.toml"};
+    std::filesystem::path effects_path{"data/effects.toml"};
     int games = 0;
     long long trace_seed = -1;
     std::uint64_t seed = 1;
@@ -238,6 +266,8 @@ int main(int argc, char** argv) {
             trace_seed = std::atoll(argv[++i]);
         } else if (std::strcmp(argv[i], "--deck") == 0 && i + 1 < argc) {
             deck_path = argv[++i];
+        } else if (std::strcmp(argv[i], "--effects") == 0 && i + 1 < argc) {
+            effects_path = argv[++i];
         } else if (std::strcmp(argv[i], "--seed") == 0 && i + 1 < argc) {
             seed = std::strtoull(argv[++i], nullptr, 10);
         } else {
@@ -250,10 +280,10 @@ int main(int argc, char** argv) {
         return status;
     }
     if (trace_seed >= 0) {
-        return trace_one(path, deck_path, static_cast<std::uint64_t>(trace_seed));
+        return trace_one(path, deck_path, effects_path, static_cast<std::uint64_t>(trace_seed));
     }
     if (games <= 0) {
         return 0;
     }
-    return simulate(path, deck_path, games, seed);
+    return simulate(path, deck_path, effects_path, games, seed);
 }

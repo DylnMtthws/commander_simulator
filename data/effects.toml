@@ -1,0 +1,424 @@
+# Hand-authored card effects (SIM_PLAN.md sections 4.2, 4.7).
+#
+# A property of the CARD, not the deck, so ablated variants share one copy and
+# cannot drift. Authored in DEPENDENCY ORDER: MANA_SOURCE and
+# STATIC_MANA_MODIFIER first, because Kinnan's multiplier is the piece every
+# other effect is measured through and it has to be right before anything is
+# authored against it.
+#
+# `authored_from` pins the rules text the author actually read. The exporter
+# rehashes it and warns on drift, because the nightly ingest moves card text and
+# an effect authored against text that has since changed is where this layer
+# rots silently.
+#
+# KNOWN SIMPLIFICATION, stated with its direction: LIFE IS NOT TRACKED. Ancient
+# Tomb, City of Brass, Mana Confluence, Tarnished Citadel, Yavimaya Coast,
+# Waterlogged Grove and Talisman of Curiosity all cost life to use, and Breeding
+# Pool and Soporific Springs cost life to enter untapped. All are treated as
+# free, which OVERSTATES the deck. `life_cost` is recorded but unused, so the
+# day life is tracked the data is already here.
+
+# ===========================================================================
+# STATIC_MANA_MODIFIER - authored first; everything else is measured through it
+# ===========================================================================
+
+[cards."Kinnan, Bonder Prodigy"]
+status = "modeled"
+authored_from = "e5200fde30b8b8ca9b11a65c8865acb68e413e913714acde53623d8467d10589"
+# "Whenever you tap a nonland permanent for mana, add one mana of any type that
+# permanent produced." ADDITIVE +1 of an already-produced type, not a doubler:
+# Basalt taps for {C}{C}{C} and becomes 4, not 6. And the bonus matches the type
+# produced, so a Birds under Kinnan makes TWO OF ONE COLOUR - not one of each.
+# The {5}{G}{U} dig ability is a TUTOR and is not authored yet.
+effects = [ { kind = "STATIC_MANA_MODIFIER", mode = "multiply", bonus = 1, nonland_only = true } ]
+
+[cards."Enduring Vitality"]
+status = "modeled"
+authored_from = "c5318d2091951d0c8ab73641e34301abc30f9e80461dde4f8744d7dc348dd4ac"
+# "Creatures you control have '{T}: Add one mana of any color.'" Turns every
+# creature into a source, which Kinnan then doubles.
+effects = [ { kind = "STATIC_MANA_MODIFIER", mode = "grant_creature_mana", colors = ["W","U","B","R","G"], amount = 1 } ]
+
+# ===========================================================================
+# MANA_SOURCE - lands
+# ===========================================================================
+
+[cards."Forest"]
+status = "modeled"
+authored_from = "e5abb333a2acb98188f78781b6cbb687cdcaa98e27bde62ed686f36550abfeed"
+effects = [ { kind = "MANA_SOURCE", colors = ["G"], amount = 1, is_land = true } ]
+
+[cards."Island"]
+status = "modeled"
+authored_from = "3a5acfe61c4cd27823a5df7b73c4c0e6606f683bae09a9eee27f9bc5c258db04"
+effects = [ { kind = "MANA_SOURCE", colors = ["U"], amount = 1, is_land = true } ]
+
+[cards."Tropical Island"]
+status = "modeled"
+authored_from = "908d9d20bd2242b5f8050ad489ed0e96459ccf4571b2eb5d29a495116b61374a"
+effects = [ { kind = "MANA_SOURCE", colors = ["G","U"], amount = 1, is_land = true } ]
+
+[cards."Breeding Pool"]
+status = "modeled"
+authored_from = "342701d31f42324e38877501d2c8788d19527d16a81b6180aad6f37f476c9084"
+# enters_tapped_unless shape: pay_life. See RULE K1 - this flag is at 3 of 4
+# distinct predicate shapes and a fourth promotes it to its own kind.
+effects = [ { kind = "MANA_SOURCE", colors = ["G","U"], amount = 1, is_land = true, enters_tapped_unless = "pay_life", enters_tapped_param = 2 } ]
+
+[cards."Botanical Sanctum"]
+status = "modeled"
+authored_from = "3f84018bb744b3b135067737216345080fce2a49b119442fc67600b1bb14b7ee"
+# enters_tapped_unless shape: land_count.
+effects = [ { kind = "MANA_SOURCE", colors = ["G","U"], amount = 1, is_land = true, enters_tapped_unless = "land_count", enters_tapped_param = 2 } ]
+
+[cards."Rejuvenating Springs"]
+status = "modeled"
+authored_from = "5648dc7c81945a555b8411aa2f8d37c96eefee74d23ba2befc5554eb7a285ca3"
+# enters_tapped_unless shape: opponent_count. Reads [table].opponents, which is
+# why that field is required and has no default (section 2.8).
+effects = [ { kind = "MANA_SOURCE", colors = ["G","U"], amount = 1, is_land = true, enters_tapped_unless = "opponent_count", enters_tapped_param = 2 } ]
+
+[cards."Yavimaya Coast"]
+status = "modeled"
+authored_from = "b467a264f4dcbd77280a2d8f12a6d3add6e2bd362376a60b009abcf517670d1c"
+effects = [ { kind = "MANA_SOURCE", colors = ["G","U"], amount = 1, is_land = true, life_cost = 1 } ]
+
+[cards."Waterlogged Grove"]
+status = "modeled"
+authored_from = "29f22b1584cbdde46ffc01128ee49296423e6213b31a57f593c7d3f53ba690da"
+# The {1},{T},sacrifice: draw ability is not authored (it is a DRAW).
+effects = [ { kind = "MANA_SOURCE", colors = ["G","U"], amount = 1, is_land = true, life_cost = 1 } ]
+
+[cards."Command Tower"]
+status = "modeled"
+authored_from = "1165ca4879fecf81c3348ff89ad931b28446c292e333063d2cdc9d310ba250fd"
+# "any color in your commander's color identity" - Kinnan is {G}{U}.
+effects = [ { kind = "MANA_SOURCE", colors = ["G","U"], amount = 1, is_land = true } ]
+
+[cards."City of Brass"]
+status = "modeled"
+authored_from = "84e04172b156aa1f9084a77aa425184e16295c79763371151b5e583f47bf9689"
+effects = [ { kind = "MANA_SOURCE", colors = ["W","U","B","R","G"], amount = 1, is_land = true, life_cost = 1 } ]
+
+[cards."Mana Confluence"]
+status = "modeled"
+authored_from = "4961f21334a7073cfeae5aecc3fc5f207852fd2df3e139ed5f61f0b611f5ba59"
+effects = [ { kind = "MANA_SOURCE", colors = ["W","U","B","R","G"], amount = 1, is_land = true, life_cost = 1 } ]
+
+[cards."Tarnished Citadel"]
+status = "modeled"
+authored_from = "f9294c978c3fc5105384707ff5bc96c0ffd4e7d4eabebd3c5173825c4de0f9e5"
+# {T}: Add {C}, or any colour for 3 damage. Modelled as the any-colour mode,
+# since life is not tracked - which is exactly the overstatement noted above.
+effects = [ { kind = "MANA_SOURCE", colors = ["W","U","B","R","G"], amount = 1, is_land = true, life_cost = 3 } ]
+
+[cards."Ancient Tomb"]
+status = "modeled"
+authored_from = "d5aefe5f1fe2e3a22e64ec42d9b82c6d0b3fb709a16163df050e0b303f3d5641"
+# {C}{C} and 2 damage. A LAND that taps for two, so Kinnan must not see it -
+# the case that gives is_land its own test.
+effects = [ { kind = "MANA_SOURCE", colors = [], amount = 2, is_land = true, life_cost = 2 } ]
+
+[cards."Boseiju, Who Endures"]
+status = "modeled"
+authored_from = "e1af1f194b651805b84ff8f39950ae6a20b278482c27ba0f1a17eea8d62783a8"
+# The channel ability is removal aimed at an opponent, and is not authored.
+effects = [ { kind = "MANA_SOURCE", colors = ["G"], amount = 1, is_land = true } ]
+
+[cards."Otawara, Soaring City"]
+status = "modeled"
+authored_from = "a44663e9ff699b0e92ee1981003111a52cc682a3e3389622edf9fdc2bc78b620"
+effects = [ { kind = "MANA_SOURCE", colors = ["U"], amount = 1, is_land = true } ]
+
+[cards."Gemstone Caverns"]
+status = "modeled"
+authored_from = "3a16f0e5072d472e09669fb4b9e1a7752edaaa7bb181ec40627f5ed69f19842d"
+# The free turn-zero play needs you NOT to be the starting player. With
+# on_the_play = true it never applies, so this is a colourless land (section
+# 2.8). Setting on_the_play = false is what makes the other mode reachable.
+effects = [ { kind = "MANA_SOURCE", colors = [], amount = 1, is_land = true } ]
+
+[cards."Exotic Orchard"]
+status = "modeled"
+authored_from = "c8546ceaa68113c1d0fed7a2e27562f1b703e91ef437a9623ccafa7d59e06554"
+# "any color that a land an opponent controls could produce" - with no
+# opponents this produces NOTHING unless [table].opponent_colors says otherwise.
+effects = [ { kind = "MANA_SOURCE", colors_from_table = "opponent_colors", amount = 1, is_land = true } ]
+
+[cards."Sink into Stupor"]
+status = "modeled"
+authored_from = "ee2ef80eb499b1ad76d0df8a52eb1d434222a4f6e92e64513b00519cbf888c3f"
+# The land back face, Soporific Springs. The spell face is opponent-facing and
+# inert; a card may be both, and this one is.
+effects = [ { kind = "MANA_SOURCE", colors = ["U"], amount = 1, is_land = true, enters_tapped_unless = "pay_life", enters_tapped_param = 3 } ]
+
+# ===========================================================================
+# MANA_SOURCE - rocks
+# ===========================================================================
+
+[cards."Sol Ring"]
+status = "modeled"
+authored_from = "4f100c118908dd1d09ac54e0e81a97730271e6686654aa979059832204dc179a"
+effects = [ { kind = "MANA_SOURCE", colors = [], amount = 2 } ]
+
+[cards."Basalt Monolith"]
+status = "modeled"
+authored_from = "88e613c1f5458431835e8d53811ebb6ce619e017867823839327d1ad591ea54b"
+# SELF_UNTAP ({3}: untap) is a separate kind and is not authored yet, so the
+# Kinnan+Basalt loop cannot actually iterate - the engine PATTERN detects the
+# board state, which is what the pattern layer is for.
+effects = [ { kind = "MANA_SOURCE", colors = [], amount = 3, untaps_normally = false } ]
+
+[cards."Grim Monolith"]
+status = "modeled"
+authored_from = "cb0be04837f70f321dc7ff482df25bcddb7378e3941143fe0293b1736457e790"
+effects = [ { kind = "MANA_SOURCE", colors = [], amount = 3, untaps_normally = false } ]
+
+[cards."Mana Vault"]
+status = "modeled"
+authored_from = "8bbfe2b3475f1fcda839032d79a8ba355fe5a07105b3f36bb3d4a1c6e859214c"
+effects = [ { kind = "MANA_SOURCE", colors = [], amount = 3, untaps_normally = false } ]
+
+[cards."Arcane Signet"]
+status = "modeled"
+authored_from = "2bd897636fa9130945bbb9494bdee6f8cf44d9b332eef4ad537733a001d0b1e7"
+effects = [ { kind = "MANA_SOURCE", colors = ["G","U"], amount = 1 } ]
+
+[cards."Talisman of Curiosity"]
+status = "modeled"
+authored_from = "ac0dc138b7de9104ecf8f22f3ac9e384455dfcd5f157acf9c31019b7a579c65e"
+effects = [ { kind = "MANA_SOURCE", colors = ["G","U"], amount = 1, life_cost = 1 } ]
+
+[cards."Fellwar Stone"]
+status = "modeled"
+authored_from = "7462c8c9ae753d8e4b00910b052904ce3f6f42fa71e4e3e8cbb7309bc7e3bd53"
+effects = [ { kind = "MANA_SOURCE", colors_from_table = "opponent_colors", amount = 1 } ]
+
+# ===========================================================================
+# MANA_SOURCE - creatures. Kinnan doubles every one of these.
+# ===========================================================================
+
+[cards."Birds of Paradise"]
+status = "modeled"
+authored_from = "e2243e151c965b6eed2237c3ffdade4397110e506c26a1796f8f1f2428a2e4eb"
+effects = [ { kind = "MANA_SOURCE", colors = ["W","U","B","R","G"], amount = 1, is_creature = true } ]
+
+[cards."Llanowar Elves"]
+status = "modeled"
+authored_from = "db057866ad9810e2873fc7c0b5d16b44b55b3593102359f60139702b6da0a47b"
+effects = [ { kind = "MANA_SOURCE", colors = ["G"], amount = 1, is_creature = true } ]
+
+[cards."Elvish Mystic"]
+status = "modeled"
+authored_from = "b1e0297b4f5df8aad7d647a8e01f51a60e9610de533d75e866ecc79f841d0d9b"
+effects = [ { kind = "MANA_SOURCE", colors = ["G"], amount = 1, is_creature = true } ]
+
+[cards."Fyndhorn Elves"]
+status = "modeled"
+authored_from = "be5b95c21f9eb68b9e6c7d48d8ad6c2b69c6711efe9959b18deb4d38130ec225"
+effects = [ { kind = "MANA_SOURCE", colors = ["G"], amount = 1, is_creature = true } ]
+
+[cards."Delighted Halfling"]
+status = "modeled"
+authored_from = "65ab0b0aa45c34ba286fd1f4d817e4524aaa47e927fcd44038c3877bce672aa9"
+# "{T}: Add {C}" or any colour restricted to legendary spells. Restricted-use
+# mana is not modelled, so this is the colourless mode only - which UNDERSTATES
+# it, since casting Kinnan is exactly what the restricted mode is for.
+effects = [ { kind = "MANA_SOURCE", colors = [], amount = 1, is_creature = true } ]
+
+# ===========================================================================
+# INERT - declared to do nothing in this model, each with a required category.
+#
+# A count says how much the model cannot see. The CATEGORIES say what, and
+# those are different questions (section 4.4). Read the grouped table in the
+# run output: if `interaction` dominates, the model is missing OPPOSITION and
+# the fix is opposition profiles. If `no_object_in_model` dominated instead it
+# would be missing MECHANICS, and the fix would be a bigger card model - a
+# completely different project.
+# ===========================================================================
+
+[cards."Force of Will"]
+status = "inert"
+reason_category = "interaction"
+authored_from = "a21dd2d864c53703ae24e1c6d8e6e3712ec89b78b4f08610582d37211df6bc60"
+reason = "counterspell; no opponents cast spells in this model"
+
+[cards."Force of Negation"]
+status = "inert"
+reason_category = "interaction"
+authored_from = "d41f6fd2b2dc7baad7b226a8aaf8e8c5db76a2128087d66214f754a75da0f841"
+reason = "counterspell"
+
+[cards."Fierce Guardianship"]
+status = "inert"
+reason_category = "interaction"
+authored_from = "7798f86711c1e0403f672962eeb80d764b1c1dfbe63115aa20d3436503f738e0"
+reason = "counterspell"
+
+[cards."Pact of Negation"]
+status = "inert"
+reason_category = "interaction"
+authored_from = "fb1b83ae26cacb2c22aae3ce127ac8823d2660313071374674f8be17a4e62950"
+reason = "counterspell; its upkeep cost would matter only if it were cast"
+
+[cards."Mental Misstep"]
+status = "inert"
+reason_category = "interaction"
+authored_from = "a1b9c2795dee6c3d5d51deccdf92605cc41cb8063d7d38a8f686868794aac89f"
+reason = "counterspell; also the deck's only Phyrexian cost"
+
+[cards."Flusterstorm"]
+status = "inert"
+reason_category = "interaction"
+authored_from = "37fff166e128e91534f88becd9f2cef838e125ce126c923d9f5e7b10687f60ce"
+reason = "counterspell"
+
+[cards."Swan Song"]
+status = "inert"
+reason_category = "interaction"
+authored_from = "eabf930d703f8bfb2a8be546a674b50992d45262bf92b177d40416af1aa07f28"
+reason = "counterspell"
+
+[cards."Dispel"]
+status = "inert"
+reason_category = "interaction"
+authored_from = "774ee7ee65920af9421a81fd1fe4003f394f984ed1ca2a77c73057ef3b26d08f"
+reason = "counterspell"
+
+[cards."Disrupting Shoal"]
+status = "inert"
+reason_category = "interaction"
+authored_from = "2a5e595cacbce04d20aa9c457ea3c7e30fb05d29dc78235c5779e9a75a0b734c"
+reason = "counterspell"
+
+[cards."An Offer You Can't Refuse"]
+status = "inert"
+reason_category = "interaction"
+authored_from = "bba93cac300dedeae53bf7cea6cbce5b1d73b774987df895dd5050b18c11753a"
+reason = "counterspell"
+
+[cards."Mindbreak Trap"]
+status = "inert"
+reason_category = "interaction"
+authored_from = "e82c7d900c156892a2de8017f8d23661d0f1f50425fb2c979f961eaf866916af"
+reason = "exiles opposing spells"
+
+[cards."Misdirection"]
+status = "inert"
+reason_category = "interaction"
+authored_from = "1dad26004348cce2d60d3cb80e51913796075b5144c51cde290d493f56119f1e"
+reason = "retargets an opposing spell"
+
+[cards."Commandeer"]
+status = "inert"
+reason_category = "interaction"
+authored_from = "e1c1e52fc04fd2ecfc49bf05642aef5e6703db286cf825ae771499702131259e"
+reason = "steals an opposing noncreature spell"
+
+[cards."Sudden Substitution"]
+status = "inert"
+reason_category = "interaction"
+authored_from = "40e2a23a30e33c0e822739ccdf6cf538c1141230ef2a2b11b43ae56c11ff7408"
+reason = "exchanges control of an opposing spell"
+
+[cards."Chain of Vapor"]
+status = "inert"
+reason_category = "interaction"
+authored_from = "9ff44ed56ef2d9612a03e5f8c6b617f06c7cb17652a5e26df06908b2cb387fd7"
+reason = "bounce; could target your own permanent but never usefully here"
+
+[cards."Snapback"]
+status = "inert"
+reason_category = "interaction"
+authored_from = "0ed18109d0734ad1be0bd8d9bcbc29c0e8d44d11dfddbb165af10da3f0a9d8ce"
+reason = "bounce a creature"
+
+[cards."Endurance"]
+status = "inert"
+reason_category = "interaction"
+authored_from = "53963610267cc7d981a55a0d6b8cb37749c1fade2ff903ddaa1ce01c2d76263c"
+reason = "graveyard hate and a flash blocker; nothing to answer and nothing to block"
+
+[cards."Rhystic Study"]
+status = "inert"
+reason_category = "opponent_trigger"
+authored_from = "ccaba911e1f67126d832c64d961d6b978d0f2b5432bd70b389e97ea3c69a8bc9"
+reason = "draws only when an opponent casts a spell; draws ZERO cards here"
+
+[cards."Mystic Remora"]
+status = "inert"
+reason_category = "opponent_trigger"
+authored_from = "66c64c1875c036215ee1e080963180940f201fcc1ac692a00bc2ac934dfc5c1a"
+reason = "draws only when an opponent casts a noncreature spell; draws ZERO"
+
+[cards."Consecrated Sphinx"]
+status = "inert"
+reason_category = "opponent_trigger"
+authored_from = "8e11f4b9bd44a846ee181f1d93d06d894b10f4176211aa86f8733c05cff1fb7b"
+reason = "triggers on an opponent drawing"
+
+[cards."Faerie Mastermind"]
+status = "inert"
+reason_category = "opponent_trigger"
+authored_from = "24529981bc0f46f7c9321456c33ee65749d1f097489518911a91093ecc961175"
+reason = "triggers on an opponent's second draw; its {3}{U} activation is a DRAW, unauthored"
+
+[cards."The Cabbage Merchant"]
+status = "inert"
+reason_category = "opponent_trigger"
+authored_from = "af5bcdbdd8f4ae8d464159e8f4163ec78aa770e3eb7428328a0609fcc938538c"
+reason = "makes Food only when an opponent casts a noncreature spell, so its mana ability never turns on"
+
+[cards."Wan Shi Tong, Librarian"]
+status = "inert"
+reason_category = "opponent_trigger"
+authored_from = "f2ff090196994e0fe8adeb05b2c3eac66565e2851e40a78a129d16547f89c812"
+reason = "the opponent-search trigger is dead; its ETB draw is an X-dependent DRAW, unauthored"
+
+[cards."Hullbreaker Horror"]
+status = "inert"
+reason_category = "opponent_permanent"
+authored_from = "82b5c7398d0096cdb53842d5904f1283d3e9389b475ec3341891dd2745b31aa3"
+reason = "bounces spells and permanents you do not control"
+
+[cards."Imposter Mech"]
+status = "inert"
+reason_category = "opponent_permanent"
+authored_from = "021af81ebb464ebb6ba4ff6a402b072eb71e0f8290bcf42b13ab0bf73ded3a67"
+reason = "enters as a copy of a creature AN OPPONENT controls"
+
+[cards."Volatile Stormdrake"]
+status = "inert"
+reason_category = "opponent_permanent"
+authored_from = "3718ecd2d85fe2d81d6a1b721e32f3536cc9e9514085f32ac22946c7adb3c83a"
+reason = "exchanges control with an opponent's creature"
+
+[cards."Emrakul, the Promised End"]
+status = "inert"
+reason_category = "opponent_permanent"
+authored_from = "9aa8b43671a5a55a7139198acb61079949d2ebfe874d0427bb417dd15af250ad"
+reason = "gives target opponent your next turn; its cost reduction is real but it does nothing here"
+
+[cards."High Fae Trickster"]
+status = "inert"
+reason_category = "timing_only"
+authored_from = "d16f39c2ea0fd1f83f9a6cc47f1d73ae49d105b58d3f629cd16e9626a0ffa9a5"
+reason = "grants flash; there is no stack and no priority to use it in"
+
+[cards."Twincast"]
+status = "inert"
+reason_category = "no_object_in_model"
+authored_from = "db7bf05ceb3f9dedf32c808a9dc6e5e71eb49507d54f56c067b24afb02994adb"
+reason = "copies an instant or sorcery on the stack; there is no stack"
+
+[cards."Colossal Skyturtle"]
+status = "inert"
+reason_category = "no_object_in_model"
+authored_from = "6e8197cacb7af86be4205da63672d2e8447a8f95756e4e611513e64523beb84d"
+reason = "channel returns from the graveyard or bounces; neither zone is meaningful here"
+
+[cards."Hidden Strings"]
+status = "inert"
+reason_category = "no_object_in_model"
+authored_from = "9e9e3daa005feb29b96587ccc700b87c83e41081eaca8aa3e39abc3efb4b1b79"
+reason = "tap/untap two targets, plus cipher, which needs combat damage"

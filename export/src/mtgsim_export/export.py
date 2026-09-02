@@ -36,14 +36,14 @@ SOURCE_VIEW = "mtg_v1.card_any_medium"
 EXPORTER_VERSION = "0.1.0"
 
 _CARD_QUERY = f"""
-SELECT oracle_id, name, layout, mana_cost, mana_value, type_line, castable_cmcs,
+SELECT oracle_id, name, layout, mana_cost, mana_value, type_line, oracle_text, castable_cmcs,
        all_types, color_identity, has_land_face, face_count, content_updated_at
 FROM {SOURCE_VIEW}
 WHERE name = ANY(%(names)s) OR split_part(name, ' // ', 1) = ANY(%(names)s)
 """
 
 _FACE_QUERY = """
-SELECT oracle_id, face_index, name, mana_cost, face_mana_value, type_line
+SELECT oracle_id, face_index, name, mana_cost, face_mana_value, type_line, oracle_text
 FROM mtg_v1.card_face
 WHERE oracle_id = ANY(%(ids)s)
 ORDER BY oracle_id, face_index
@@ -52,6 +52,21 @@ ORDER BY oracle_id, face_index
 
 class ExportError(RuntimeError):
     """An export that must not produce a file. Always names what is missing."""
+
+
+def _oracle_hash(row: dict[str, Any], faces: list[dict[str, Any]]) -> str:
+    """Hash the rules text of a card, faces included.
+
+    Faces are included because for a transform or modal_dfc card the card-level
+    oracle_text is empty and ALL the text lives on the faces - hashing only the
+    card row would give every one of them the same hash and the drift check
+    would never fire for exactly the cards whose text is hardest to read.
+    """
+    parts = [row["name"], row["oracle_text"] or ""]
+    for face in sorted(faces, key=lambda f: f["face_index"]):
+        parts.append(face["name"])
+        parts.append(face["oracle_text"] or "")
+    return hashlib.sha256("\u241f".join(parts).encode()).hexdigest()
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,6 +199,12 @@ def build_export(conn: psycopg.Connection[dict[str, Any]], deck: Deck) -> dict[s
                 "color_identity": list(row["color_identity"]),
                 "has_land_face": bool(row["has_land_face"]),
                 "is_commander": item.listed == deck.commander,
+                # Hash of the rules text an author would have read, faces
+                # included. effects.toml pins this as `authored_from`, and the
+                # exporter warns when they differ: the nightly ingest moves card
+                # text, and a hand-authored effect written against text that has
+                # since changed is the seam where this layer rots silently.
+                "oracle_sha256": _oracle_hash(row, faces_by_id.get(row["oracle_id"], [])),
                 "faces": _face_documents(row, faces_by_id.get(row["oracle_id"], []), item.listed),
             }
         )

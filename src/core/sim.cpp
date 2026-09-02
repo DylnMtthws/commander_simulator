@@ -19,39 +19,6 @@ const Face* castable_face(const Card& card) noexcept {
     return nullptr;
 }
 
-bool has_land_face(const Card& card) noexcept {
-    for (const Face& face : card.faces) {
-        if (face.is_land) {
-            return true;
-        }
-    }
-    return false;
-}
-
-// Mana available from the battlefield.
-//
-// STUB-QUALITY, and wrong on purpose: every untapped permanent with a land face
-// is treated as tapping for one mana of ANY colour. Real sources come from the
-// authored effects in Phase 7, which do not exist yet.
-//
-// The error is in the GENEROUS direction - a Forest here can produce blue - so
-// the loop actually casts things and exercises can_pay. Nothing measured with
-// this in place says anything about the deck.
-std::vector<Source> stub_sources(const CardDb& db, const GameState& state) {
-    std::vector<Source> sources;
-    state.battlefield.for_each([&](int slot) {
-        if (state.tapped.test(slot)) {
-            return;
-        }
-        const Card& card = db.cards[static_cast<std::size_t>(slot)];
-        if (has_land_face(card)) {
-            sources.push_back(Source{.produces = 0x1F, .amount = 1, .is_land = true,
-                                     .is_creature = false});
-        }
-    });
-    return sources;
-}
-
 // FNV-1a over the parts of the state that define what actually happened.
 // Not cryptographic and does not need to be: it is a comparison key for "did
 // these two runs play the same game", where the alternative is comparing
@@ -85,8 +52,9 @@ std::uint64_t digest_state(const GameState& state) noexcept {
 
 }  // namespace
 
-GameResult run_game(const CardDb& db, const PatternSet& patterns, const GameConfig& config,
-                    const Policy& policy, std::uint64_t seed, Observer* observer) {
+GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet& patterns,
+                    const GameConfig& config, const Policy& policy, std::uint64_t seed,
+                    Observer* observer) {
     Rng rng(seed);
     GameState state;
 
@@ -105,10 +73,18 @@ GameResult run_game(const CardDb& db, const PatternSet& patterns, const GameConf
         state.turn = turn;
         state.land_played_this_turn = false;
 
-        // Untap. Cards that do not untap normally (Basalt Monolith, Grim
-        // Monolith, Mana Vault) are a Phase 7 authoring concern; the stub
-        // untaps everything.
-        state.tapped.reset();
+        // Untap - except the cards whose text says they do not. Basalt
+        // Monolith, Grim Monolith and Mana Vault all carry "doesn't untap
+        // during your untap step", which is the whole reason the Kinnan engine
+        // needs an untap ability to iterate at all.
+        Zone still_tapped;
+        state.tapped.for_each([&](int slot) {
+            const CardEffects& entry = effects.by_slot[static_cast<std::size_t>(slot)];
+            if (entry.has_mana_source && !entry.mana_source.untaps_normally) {
+                still_tapped.set(slot);
+            }
+        });
+        state.tapped = still_tapped;
 
         // Draw. Skipped on turn 1 when on the play - which is itself a declared
         // assumption with a stated bias, since a real pod is on the play 25% of
@@ -127,7 +103,8 @@ GameResult run_game(const CardDb& db, const PatternSet& patterns, const GameConf
         }
 
         // Land drop.
-        std::vector<Source> sources = stub_sources(db, state);
+        std::vector<Source> sources;
+        collect_sources(db, effects, state, config.table, sources);
         const Context land_context{db, patterns, state, sources, observer};
         const int land = policy.choose_land(land_context, result.stats);
         if (land >= 0) {
@@ -135,6 +112,13 @@ GameResult run_game(const CardDb& db, const PatternSet& patterns, const GameConf
             state.battlefield.set(land);
             state.land_played_this_turn = true;
             ++result.stats.lands_played;
+            // A land that enters tapped produces nothing this turn. Getting
+            // this wrong would silently give the deck a turn it did not have.
+            const CardEffects& entry = effects.by_slot[static_cast<std::size_t>(land)];
+            if (entry.has_mana_source &&
+                enters_tapped(entry.mana_source, db, effects, state, config.table)) {
+                state.tapped.set(land);
+            }
             if (observer != nullptr) {
                 observer->played_land(land);
             }
@@ -148,7 +132,7 @@ GameResult run_game(const CardDb& db, const PatternSet& patterns, const GameConf
         // this output exists to make obvious.
         bool announced = false;
         for (;;) {
-            sources = stub_sources(db, state);
+            collect_sources(db, effects, state, config.table, sources);
             if (observer != nullptr && !announced) {
                 observer->mana(sources);
                 announced = true;
@@ -171,11 +155,14 @@ GameResult run_game(const CardDb& db, const PatternSet& patterns, const GameConf
             if (observer != nullptr) {
                 observer->cast_spell(spell, to_tap);
             }
+            // Paying taps sources. Crude - it taps in slot order rather than
+            // solving which sources to spend, which is a policy question and a
+            // later one (section 6.4). Without it mana would be infinite.
             state.battlefield.for_each([&](int slot) {
-                if (to_tap > 0 && !state.tapped.test(slot) &&
-                    has_land_face(db.cards[static_cast<std::size_t>(slot)])) {
+                const CardEffects& source_entry = effects.by_slot[static_cast<std::size_t>(slot)];
+                if (to_tap > 0 && !state.tapped.test(slot) && source_entry.has_mana_source) {
                     state.tapped.set(slot);
-                    --to_tap;
+                    to_tap -= source_entry.mana_source.amount;
                 }
             });
         }
@@ -183,10 +170,20 @@ GameResult run_game(const CardDb& db, const PatternSet& patterns, const GameConf
         ++result.stats.turns;
         result.turns_simulated = turn;
 
-        // Patterns are evaluated once per turn, after the main phase. Checking
-        // after every individual cast would report the same TURN number, since
-        // that is the reported quantity - so per-turn is exact for the metric,
-        // not an approximation of it.
+        // Patterns are evaluated once per turn, after the main phase.
+        //
+        // CORRECTION to an earlier claim in this file: per-turn evaluation is
+        // exact for the TURN NUMBER, but it is NOT exact for WHICH pattern
+        // fires. Any state the policy creates and resolves inside a single turn
+        // is invisible here.
+        //
+        // Observed: `infinite_C_outlet_in_hand` (engine online, outlet still in
+        // hand) went from firing 145 times under the stub to never being
+        // satisfied at all once the authored policy landed - because the policy
+        // casts a rank-88 Thrasios the moment it is affordable, so the outlet
+        // is never still in hand when the check runs. The pattern is dead GIVEN
+        // THIS POLICY, which is a fourth cause of a never-fired pattern beyond
+        // dead, buggy and shadowed.
         if (observer != nullptr) {
             observer->engines_active(active_flags(patterns, state));
         }

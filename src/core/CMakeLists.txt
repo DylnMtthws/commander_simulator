@@ -19,6 +19,7 @@ add_library(cs_core
     mana.cpp
     state.cpp
     pattern.cpp
+    effects.cpp
     policy.cpp
     sim.cpp)
 

@@ -10,6 +10,7 @@
 #include <optional>
 
 #include "core/card.hpp"
+#include "core/effects.hpp"
 #include "core/observer.hpp"
 #include "core/pattern.hpp"
 #include "core/policy.hpp"
@@ -72,6 +73,7 @@ struct GameResult {
 };
 
 struct GameConfig {
+    TableContext table;
     std::uint8_t turn_cap = 12;
     std::uint8_t opening_hand = 7;
     // From the deck file's [table] block (section 2.8). Required there, so it
@@ -80,8 +82,9 @@ struct GameConfig {
 };
 
 // Plays one game. A pure function of (db, config, seed) - INVARIANT S1.
-[[nodiscard]] GameResult run_game(const CardDb& db, const PatternSet& patterns,
-                                  const GameConfig& config, const Policy& policy,
-                                  std::uint64_t seed, Observer* observer = nullptr);
+[[nodiscard]] GameResult run_game(const CardDb& db, const EffectDb& effects,
+                                  const PatternSet& patterns, const GameConfig& config,
+                                  const Policy& policy, std::uint64_t seed,
+                                  Observer* observer = nullptr);
 
 }  // namespace cs
