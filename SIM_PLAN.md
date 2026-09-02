@@ -2983,7 +2983,103 @@ header beside `opponents` and `on_the_play`. `kinnan_basalt` declares
 `activations = 1` explicitly, so the contrast — that loop untaps itself, this one
 does not — is visible in the file rather than inferable.
 
-### 16.8 What is still not established
+### 16.8 The cost-model audit: all four patterns and both engines
+
+Done in full rather than trusting that the two already found were the only ones,
+and **it found a third.** The mechanical check of §16.7 cannot do this — it
+requires `activations` wherever `loop_entry_cost` appears, so a pattern with
+*neither* is invisible to it. Whether a pattern describes an activated ability
+that ought to have a cost is a judgement, and the audit for it is a person
+reading each declaration against the card it claims to describe.
+
+| Declaration | The ability it describes | Its real cost | Cost declared? | Should it be? |
+|---|---|---|---|---|
+| **`kinnan_basalt`** (engine) | *Basalt Monolith* `{3}: Untap this artifact` | `{3}` | `loop_entry_cost = 3`, `activations = 1` | ✅ correct — and one activation genuinely is all of them, because the loop untaps itself |
+| **`kinnan_enduring_vitality`** (engine) | *Enduring Vitality*'s granted `{T}: Add one mana of any color` | **free** — tapping is not a mana cost | none | ✅ **correctly absent.** A static grant is not an activated ability with a price |
+| **`infinite_C_into_thrasios`** | *Thrasios* `{4}: Scry 1…` | `{4}` generic | none | ✅ **correctly absent.** `INFINITE:C` pays `{4}` generic without limit, so one activation implies all of them |
+| **`infinite_C_outlet_in_hand`** | the same, but *Thrasios must first be CAST* | `{G}{U}` **to cast**, then `{4}` | none | ❌ **SHOULD HAVE ONE, and it is the subtle one.** `INFINITE:C` is **colourless**. It cannot pay `{G}{U}`. The pattern fires on unbounded colourless plus Thrasios in hand without checking the deck can produce a green and a blue to cast him |
+| **`wide_colour_into_kinnan_dig`** | *Kinnan* `{5}{G}{U}: Look at the top five…` | 7 | `loop_entry_cost = 7`, `activations = 2` | ✅ fixed in §16.7 |
+| **`wide_colour_into_thrasios`** | *Thrasios* `{4}: Scry 1…` | `{4}` per activation, and `WIDE_COLOUR` is **finite** | none | ❌ **SHOULD HAVE ONE.** Measured below |
+
+**`infinite_C_outlet_in_hand` is the find.** It is §2.6's typed-flag argument
+applied one level further than §2.6 applied it. §2.6 established that a boolean
+`INFINITE_MANA` would wrongly let the colourless engine pay Kinnan's `{5}{G}{U}`,
+and the typed flag prevents that. This pattern then ignores the type it went to
+the trouble of declaring — not for the *activation*, which is generic and fine,
+but for the **cast**, which is `{G}{U}` and is not. It fires in ~1.2% of games,
+so the cost is small; the point is that the audit found it and neither the
+mechanical check nor two rounds of reading had.
+
+### 16.9 Thrasios does not self-fund, and the reason is sharper than the dig's
+
+The question, asked before picking N for `wide_colour_into_thrasios`: *Thrasios
+ramps as well as draws — every activation revealing a land puts it into play,
+which produces mana, which funds further activations.* With ~25 lands in 99 that
+is a quarter of activations paying something back, which is exactly the
+self-funding case a constant N cannot express.
+
+**Verified from the database first**, because a card's text is not something to
+take from a description:
+
+> `{4}`: Scry 1, then reveal the top card of your library. **If it's a land card,
+> put it onto the battlefield tapped.** Otherwise, draw a card.
+
+Measured at the moment the pattern fires, 20,000 firings:
+
+| | `wide_colour_into_thrasios` | `wide_colour_into_kinnan_dig`, for contrast |
+|---|---|---|
+| undrawn library | 85.0 | 83.5 |
+| lands in it | 21.8 (**25.6%**) | 20.5 (24.6%) |
+| mana available | **3.74** | 16.80 |
+| activations affordable at `{4}` | **0.65** | 3.78 |
+
+#### The answer: payback within a turn is exactly ZERO
+
+**The land enters *tapped*.** It cannot be tapped for mana on the turn it
+arrives, so it contributes **nothing** toward the next activation in the same
+chain. A board with *M* mana gets `floor(M/4)` activations and not one more,
+whatever it reveals.
+
+This is a *stronger* result than the dig's, not a similar one. The dig's answer
+was "the return is small" — 21%, a number that could have been larger with a
+different deck. This one is **structural**: the return is zero within the horizon
+where funding matters, because of a word in the card's text. **A constant N is
+the right parameterisation, and it is right for a reason that does not depend on
+this deck's land count at all.**
+
+Across *turns* the ramp is real — 25.6% of activations add a permanent land — but
+that is ramp, not a loop. It does not compound within an activation chain, and
+lands are not multiplied by Kinnan (§4.2's `is_land`), so each is worth 1.
+
+#### The scry cuts the other way, and the model cannot represent it
+
+Scry 1 shows the top card and allows bottoming it, so the reveal is effectively
+two looks: `P(land) ≈ p + (1−p)p ≈ 0.45` if you *want* a land, or `≈ p² ≈ 0.07`
+if you want to avoid one.
+
+**But within a combo turn you do not want the land** — it enters tapped and does
+nothing, while the other branch draws a card. A competent pilot scries lands
+*away*. So scry does not increase payback in the turn that matters; **it lets the
+pilot reduce the land rate from 26% to about 7%,** trading the ramp for cards.
+
+Which way it should be steered is a genuine policy decision — ramp across turns
+versus cards this turn — and that is precisely why it is unrepresentable here:
+
+> **The model cannot express the scry, and this is a STATED APPROXIMATION rather
+> than an oversight.** `SELECT` is in §4.2's closed kind set with two users
+> (*Thrasios*, *Sylvan Library*) and **is not implemented**; both cards are among
+> the four unauthored. Worse than the missing machinery, the decision itself is
+> outside the scorer's vocabulary: it is "a tapped land now versus an unknown
+> card", and the scorer has no way to value an unknown card (§6.3's wall against
+> lookahead is what makes it unable to). §4.3's scope note already says the
+> scorer is thinnest exactly here.
+
+**Direction of the approximation:** modelling neither the ramp nor the card means
+Thrasios's activation is worth *nothing* in the model beyond being a pattern
+term, which **understates** it. That is the conservative direction, and it is the
+one place in this section where the missing machinery does not flatter the deck.
+
+### 16.10 What is still not established
 
 - **Summoning sickness is not modelled, and it is worth about a point.** A
   creature that enters can tap for mana the same turn — from a tutor, a clone, or
