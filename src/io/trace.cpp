@@ -107,6 +107,21 @@ void TraceWriter::paid_with_card(int cost_slot, int given_up_slot) {
                  name_of(cost_slot));
 }
 
+void TraceWriter::selected(int source_slot, std::span<const int> revealed, int kept_slot) {
+    std::fprintf(out_, "     SPIN: %s looks at", name_of(source_slot));
+    for (const int slot : revealed) {
+        std::fprintf(out_, " %s%s", name_of(slot), slot == revealed.back() ? "" : ",");
+    }
+    if (kept_slot < 0) {
+        // A MISS is printed, not skipped. It happens about a quarter of the time
+        // (SIM_PLAN.md 16.7) and a trace showing only the hits would read as a
+        // tutor - which is exactly what this card was mistaken for.
+        std::fprintf(out_, "  -> nothing to keep\n");
+        return;
+    }
+    std::fprintf(out_, "  -> keeps %s\n", name_of(kept_slot));
+}
+
 void TraceWriter::cast_spell(int slot, int paid) {
     std::fprintf(out_, "     CAST: %-28s paying %d\n", name_of(slot), paid);
 }

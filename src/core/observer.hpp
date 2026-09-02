@@ -51,6 +51,10 @@ public:
     virtual void tutored(int /*from_slot*/, int /*to_slot*/, bool /*to_hand*/) {}
     virtual void cloned(int /*clone_slot*/, int /*copied_slot*/) {}
     virtual void paid_with_card(int /*cost_slot*/, int /*given_up_slot*/) {}
+    // The dig RESOLVED, with what it saw and what it kept. A trace that showed
+    // only the result could not tell a miss from a bad choice.
+    virtual void selected(int /*source_slot*/, std::span<const int> /*revealed*/,
+                          int /*kept_slot*/) {}
     virtual void cast_spell(int /*slot*/, int /*paid*/) {}
     virtual void pattern_fired(int /*pattern*/, int /*turn*/) {}
     virtual void engines_active(FlagMask /*flags*/) {}

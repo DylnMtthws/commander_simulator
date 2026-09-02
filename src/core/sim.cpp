@@ -385,6 +385,108 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
             }
         }
 
+        // ACTIVATED ABILITIES, after casting. Kinnan's dig is the only one
+        // authored (§16.7b's R3): pay {5}{G}{U}, look at the top five, keep a
+        // non-Human creature if there is one, bottom the rest.
+        //
+        // ACTIVATE WHENEVER PAYABLE, and that is exact rather than a stand-in.
+        // The primer gives spin-versus-hold-up-interaction an entire chapter and
+        // concludes there is no rule - but with no opponents there is nothing to
+        // hold mana FOR, so the question does not arise (§2.5). The one place
+        // this model's largest limitation makes a decision disappear instead of
+        // making one wrong.
+        for (;;) {
+            collect_sources(db, effects, state, config.table, sources);
+            // NEVER DIG AWAY AN ASSEMBLED GAME. Activating spends mana, and a
+            // declared engine's entry cost is checked against what is available
+            // (§5.3) - so without this the deck could pay seven for a look at
+            // five cards while holding the three that proved an unbounded loop.
+            //
+            // Not a policy decision: §5.4 says first assembly is the answer and
+            // nothing after it is measured, so a board that is already assembled
+            // has nothing to gain. It is the detection model's own semantics
+            // applied one step earlier than the end-of-turn check.
+            if (first_satisfied(patterns, state, sources) >= 0) {
+                break;
+            }
+            int activated = -1;
+            state.battlefield.for_each([&](int slot) {
+                if (activated >= 0) {
+                    return;
+                }
+                const CardEffects& entry =
+                    effects.by_slot[static_cast<std::size_t>(state.effective(slot))];
+                if (!entry.has_select) {
+                    return;
+                }
+                Cost cost;
+                cost.generic = entry.select.cost_generic;
+                cost.pips = entry.select.cost_pips;
+                ++result.stats.can_pay_calls;
+                if (can_pay(cost, sources, 0)) {
+                    activated = slot;
+                }
+            });
+            if (activated < 0) {
+                break;
+            }
+            const CardEffects& entry =
+                effects.by_slot[static_cast<std::size_t>(state.effective(activated))];
+            Cost cost;
+            cost.generic = entry.select.cost_generic;
+            cost.pips = entry.select.cost_pips;
+            const Payment plan = plan_payment(cost, sources, 0);
+            for (std::size_t i = 0; i < sources.size(); ++i) {
+                if (!plan.spends(i) || sources[i].slot < 0) {
+                    continue;
+                }
+                const int slot = sources[i].slot;
+                const CardEffects& source_entry =
+                    effects.by_slot[static_cast<std::size_t>(state.effective(slot))];
+                const bool from_hand =
+                    source_entry.has_ritual && source_entry.ritual.from_zone == RitualZone::Hand;
+                const bool sacrifices = source_entry.has_ritual && !from_hand;
+                if (from_hand) {
+                    state.hand.clear(slot);
+                    state.graveyard.set(slot);
+                } else if (sacrifices) {
+                    state.battlefield.clear(slot);
+                    state.graveyard.set(slot);
+                } else if (!state.tapped.test(slot)) {
+                    state.tapped.set(slot);
+                    state.life -= life_cost_of_tapping(effects, state, slot);
+                }
+            }
+
+            std::vector<int> revealed;
+            peek_n(state, entry.select.look, rng, revealed);
+            std::vector<int> keepable;
+            select_candidates(entry.select, db, revealed, keepable);
+            const Context dig_context{db, patterns, state, sources, observer, &effects};
+            const int kept = policy.choose_select(dig_context, keepable, result.stats);
+            if (observer != nullptr) {
+                observer->selected(activated, revealed, kept);
+            }
+            ++result.stats.selects_used;
+            if (kept >= 0) {
+                take_peeked(state, kept);
+                ++result.stats.selects_hit;
+                if (entry.select.destination == TutorDestination::Hand) {
+                    state.hand.set(kept);
+                } else {
+                    enter_battlefield(db, effects, state, config.table, kept);
+                }
+            }
+            for (const int slot : revealed) {
+                if (slot != kept) {
+                    bottom_peeked(state, slot);
+                }
+            }
+            if (!entry.select.repeatable) {
+                break;
+            }
+        }
+
         ++result.stats.turns;
         result.turns_simulated = turn;
 
@@ -461,6 +563,8 @@ RunSummary simulate_batch(const CardDb& db, const EffectDb& effects, const Patte
         summary.tutors_used += result.stats.tutors_used;
         summary.clones_made += result.stats.clones_made;
         summary.convoked += result.stats.convoked;
+        summary.selects_used += result.stats.selects_used;
+        summary.selects_hit += result.stats.selects_hit;
         summary.digest_xor ^= result.state_digest;
 
         if (result.outcome.censored()) {

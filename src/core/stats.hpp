@@ -80,6 +80,8 @@ struct RunSummary {
     std::uint64_t tutors_used = 0;
     std::uint64_t clones_made = 0;
     std::uint64_t convoked = 0;
+    std::uint64_t selects_used = 0;
+    std::uint64_t selects_hit = 0;
 
     // XOR of every game's state digest. Two runs that played the same games
     // agree here; two that did not, do not. Order-independent on purpose, so a

@@ -42,6 +42,11 @@ struct GameStats {
     std::uint32_t cards_drawn_by_effect = 0;
     std::uint32_t convoked = 0;
     std::uint32_t cards_given_up = 0;
+    // Dig activations, and how many found something. The ratio is the one
+    // internal number in this project with an INDEPENDENTLY MEASURED expected
+    // value to check against (SIM_PLAN.md 16.7b).
+    std::uint32_t selects_used = 0;
+    std::uint32_t selects_hit = 0;
 };
 
 struct GameOutcome {

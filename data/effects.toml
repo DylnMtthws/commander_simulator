@@ -29,8 +29,25 @@ authored_from = "e5200fde30b8b8ca9b11a65c8865acb68e413e913714acde53623d8467d1058
 # permanent produced." ADDITIVE +1 of an already-produced type, not a doubler:
 # Basalt taps for {C}{C}{C} and becomes 4, not 6. And the bonus matches the type
 # produced, so a Birds under Kinnan makes TWO OF ONE COLOUR - not one of each.
-# The {5}{G}{U} dig ability is a TUTOR and is not authored yet.
-effects = [ { kind = "STATIC_MANA_MODIFIER", mode = "multiply", bonus = 1, nonland_only = true } ]
+#
+# THE DIG IS A SELECT, NOT A TUTOR, and this comment said "TUTOR" for eight
+# phases. The difference is not pedantic and it is the whole of R3:
+#
+#   "{5}{G}{U}: Look at the top five cards of your library. You may put a
+#    non-Human creature card from among them onto the battlefield. Put the rest
+#    on the bottom of your library in a random order."
+#
+# A TUTOR searches the whole library and ALWAYS FINDS. This looks at five cards
+# and misses about a quarter of the time - 73.6% hit rate, measured before it was
+# implemented (SIM_PLAN.md 16.7). Authoring it as a tutor would have overstated
+# the deck's primary card-advantage engine by that margin.
+#
+# The cost is carried on the effect because an activated ability's cost is not
+# its card's: Kinnan costs {G}{U} and the dig costs {5}{G}{U}.
+effects = [
+  { kind = "STATIC_MANA_MODIFIER", mode = "multiply", bonus = 1, nonland_only = true },
+  { kind = "SELECT", look = 5, filter = "non_human_creature", destination = "battlefield", cost_generic = 5, cost_pips = ["G", "U"] },
+]
 
 [cards."Enduring Vitality"]
 status = "modeled"

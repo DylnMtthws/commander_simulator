@@ -3,14 +3,14 @@
 namespace cs {
 
 int draw_one(GameState& state, Rng& rng) noexcept {
-    if (state.drawn >= state.library_count) {
+    if (state.drawable() <= 0) {
         return -1;
     }
     // Incremental Fisher-Yates. Choosing uniformly from the undrawn range and
     // swapping into the draw position gives exactly the distribution of a full
     // shuffle followed by sequential draws - the standard argument is that both
     // produce every permutation of the drawn prefix with equal probability.
-    const auto remaining = static_cast<std::uint64_t>(state.library_count - state.drawn);
+    const auto remaining = static_cast<std::uint64_t>(state.drawable());
     const auto offset = static_cast<std::size_t>(rng.below(remaining));
     const std::size_t from = state.drawn + offset;
 
@@ -79,6 +79,59 @@ Zone sample_hand(int deck_slots, int commander_slot, int size, Rng& rng) noexcep
     GameState scratch;
     begin_game(scratch, deck_slots, commander_slot, size, rng);
     return scratch.hand;
+}
+
+void peek_n(GameState& state, int count, Rng& rng, std::vector<int>& out) {
+    out.clear();
+    // The same swap draw_one performs, repeated, but WITHOUT taking the cards.
+    // `drawn` is advanced so a second peek in the same activation cannot reveal
+    // the same card twice, and rewound at the end so the cards are still in the
+    // library - a look is not a draw.
+    const std::uint8_t first = state.drawn;
+    for (int i = 0; i < count; ++i) {
+        if (state.drawable() <= 0) {
+            break;
+        }
+        const auto remaining = static_cast<std::uint64_t>(state.drawable());
+        const auto offset = static_cast<std::size_t>(rng.below(remaining));
+        const std::size_t from = state.drawn + offset;
+        const std::uint8_t slot = state.library[from];
+        state.library[from] = state.library[state.drawn];
+        state.library[state.drawn] = slot;
+        ++state.drawn;
+        out.push_back(slot);
+    }
+    state.drawn = first;  // looked at, not drawn
+}
+
+void take_peeked(GameState& state, int slot) noexcept {
+    // The peeked cards sit at [drawn, drawn + peeked). Swap the taken one to the
+    // draw position and advance past it; it has left the library.
+    for (std::size_t i = state.drawn; i < state.library_count; ++i) {
+        if (state.library[i] == slot) {
+            state.library[i] = state.library[state.drawn];
+            state.library[state.drawn] = static_cast<std::uint8_t>(slot);
+            ++state.drawn;
+            return;
+        }
+    }
+}
+
+void bottom_peeked(GameState& state, int slot) noexcept {
+    // Swap it past the drawable range. The end region is undrawn and unordered,
+    // so "in a random order" needs nothing further.
+    const int last = state.library_count - state.bottomed - 1;
+    if (last < state.drawn) {
+        return;
+    }
+    for (std::size_t i = state.drawn; i <= static_cast<std::size_t>(last); ++i) {
+        if (state.library[i] == slot) {
+            state.library[i] = state.library[static_cast<std::size_t>(last)];
+            state.library[static_cast<std::size_t>(last)] = static_cast<std::uint8_t>(slot);
+            ++state.bottomed;
+            return;
+        }
+    }
 }
 
 }  // namespace cs

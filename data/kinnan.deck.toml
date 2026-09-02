@@ -251,62 +251,29 @@ in_hand     = ["Thrasios, Triton Hero"]
 entry_pips  = ["G", "U"]
 activations = 1
 
-[[win]]
-name = "wide_colour_into_kinnan_dig"
-# "{5}{G}{U}: Look at the top five cards of your library. You may put a
-# non-Human creature card from among them onto the battlefield."
+# RETIRED BY R3, and this is the right kind of loss.
 #
-# READ THE COST SYMBOL. There is NO TAP SYMBOL. Being tapped is irrelevant to
-# this ability and it can be activated as often as the mana allows.
+# This pattern detected "Kinnan is in play with WIDE_COLOUR and could activate
+# his dig twice". The dig is now EXECUTED (SIM_PLAN.md 16.7b) - the deck pays
+# {5}{G}{U}, looks at five cards, keeps a non-Human creature if there is one and
+# bottoms the rest - so there is nothing left to detect. A board that could
+# activate twice HAS activated twice, and what it got is on the battlefield where
+# the other patterns can see it.
 #
-# This carried `untapped = ["Kinnan, Bonder Prodigy"]` for four phases, and the
-# mistake has a name: Kinnan has TWO abilities with DIFFERENT requirements. The
-# static multiplier - "whenever you tap a nonland permanent for mana" - is about
-# tapping OTHER permanents and needs Kinnan only present. The activated dig is
-# about paying mana. The tap-ness in the first got copied onto the second.
+# WHAT WENT WITH IT: `activations = 2`, and the whole R1 decision of 16.7. That
+# judgement was measured, argued, given its own line in the honesty header and a
+# required key in the loader - and it existed ONLY because the ability was
+# detected rather than resolved. Correct mechanism, parameter unnecessary.
 #
-# It was not a small error. It was the only `untapped` term in the file, it sat
-# on the deck's top-firing pattern, and it was silently doing a DIFFERENT job:
-# limiting a pattern that had no cost check at all. Removing it alone took
-# P(assembled by turn 3) from 9.47% to 20.17% - the wrong constraint had been
-# acting as a brake on a missing one.
+# THAT IS THE SECOND TIME. `loop_entry_cost` replaced the `untapped` proxy on
+# kinnan_basalt the same way: a parameter we agonised over disappeared once the
+# model could do the thing properly, rather than becoming better-chosen. Worth
+# recognising on sight - when a judgement call is hard to pin down, it is worth
+# asking whether the thing it parameterises should be modelled instead.
 #
-# So the entry cost, which is what the requirement should have been all along.
-# {5}{G}{U} is seven mana. Same shape as kinnan_basalt's `loop_entry_cost = 3`
-# above and the same lesson as section 5.3's 1095 -> 9 -> 1258 history: a proxy
-# replaced by the actual condition, with the number moving in both directions
-# before it was right.
-#
-# APPROXIMATION, stated with its direction: loop_entry_cost is generic-only, so
-# this asks for seven mana and not for {G} and {U} specifically. That is looser
-# than the real cost and therefore OVERSTATES slightly. It is close here because
-# WIDE_COLOUR requires two creatures and Enduring Vitality makes every creature
-# tap for any colour, so a board that can pay seven can essentially always
-# produce a green and a blue among it.
-#
-# HOW MANY ACTIVATIONS COUNT AS ASSEMBLED - a judgement about Magic, declared
-# here, printed in the honesty header, and worth ~3 points of P(assembled by
-# turn 3) between 1 and 2 (section 16.7). More than every card in this deck
-# except three.
-#
-# Two, on the reading that ONE dig looks at five cards and puts one non-Human
-# creature onto the battlefield - a good turn, not an assembled combo (section
-# 5.4) - and the second is what converts it into Thrasios plus a board.
-#
-# UNLIKE kinnan_basalt, this does not self-sustain, and that was measured rather
-# than assumed before the number was fixed. At the moment this pattern fires the
-# undrawn library averages 84.6 cards holding 19.4 non-Human creatures, so the
-# dig hits in 73.6% of activations. Every hit is worth exactly 2 mana - Enduring
-# Vitality grants "{T}: add one mana of any colour" uniformly and Kinnan doubles
-# it - so the expected return is 1.47 mana against a 7-mana cost. **A hit funds
-# 21% of the next activation**, and 0% within the same turn in real Magic, since
-# a creature that just entered has summoning sickness. The engine does not pay
-# for itself, so a constant N is the right parameterisation.
-[win.requires]
-flag            = "WIDE_COLOUR"
-in_play         = ["Kinnan, Bonder Prodigy"]
-loop_entry_cost = 7
-activations     = 2
+# `activations` stays in the vocabulary because kinnan_basalt still declares it,
+# and its declaration there now carries the whole weight of the distinction: that
+# loop untaps itself so one activation is all of them.
 
 [[win]]
 name = "wide_colour_into_thrasios"

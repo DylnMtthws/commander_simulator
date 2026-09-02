@@ -56,6 +56,17 @@ public:
     [[nodiscard]] virtual int choose_clone(const Context& context, std::span<const int> candidates,
                                            GameStats& stats) const = 0;
 
+    // Which of the REVEALED cards a SELECT keeps, or -1 to keep none.
+    //
+    // The same scorer over a candidate set of five. §6.3's wall against lookahead
+    // does not apply: the five cards have been LOOKED AT, so they are current
+    // information exactly like a tutor's candidates, and scoring them evaluates
+    // no hypothetical future position. This is the one decision in the interface
+    // the existing scorer fits without stretching.
+    [[nodiscard]] virtual int choose_select(const Context& context,
+                                            std::span<const int> revealed,
+                                            GameStats& stats) const = 0;
+
     // Which card in hand to GIVE UP to a CARD_COST, or -1 if none is legal.
     //
     // The only decision in the interface where the right answer is the LOWEST
@@ -108,6 +119,8 @@ public:
                                    GameStats& stats) const override;
     [[nodiscard]] int choose_card_cost(const Context& context, std::span<const int> candidates,
                                        GameStats& stats) const override;
+    [[nodiscard]] int choose_select(const Context& context, std::span<const int> revealed,
+                                    GameStats& stats) const override;
     [[nodiscard]] const char* name() const override {
         return "StubPolicyDoNotUseForResults (plays the lowest-indexed legal thing)";
     }
@@ -172,6 +185,8 @@ public:
                                    GameStats& stats) const override;
     [[nodiscard]] int choose_card_cost(const Context& context, std::span<const int> candidates,
                                        GameStats& stats) const override;
+    [[nodiscard]] int choose_select(const Context& context, std::span<const int> revealed,
+                                    GameStats& stats) const override;
     [[nodiscard]] const char* name() const override {
         return "AuthoredPolicy (authored ranks plus state-dependent terms)";
     }

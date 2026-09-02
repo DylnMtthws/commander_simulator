@@ -361,6 +361,17 @@ void print_header(const cs::CardDb& db, const cs::io::DeckFile& deck, const cs::
 void print_report(const cs::CardDb& db, const cs::io::DeckFile& deck, const cs::RunSummary& run,
                   const cs::GameConfig& config, const cs::Policy& policy) {
     std::printf("\npolicy: %s\n", policy.name());
+    if (run.selects_used > 0) {
+        // THE HIT RATE, printed because it is the one number here with an
+        // INDEPENDENTLY MEASURED expected value: 73.6%, measured from the
+        // library composition at the moment the old detection fired, BEFORE the
+        // ability was implemented (SIM_PLAN.md 16.7b). Every other assertion in
+        // this project checks the code against a number the same code produced.
+        std::printf("  dig: %.2f activations/game, %.1f%% found a non-Human creature\n",
+                    static_cast<double>(run.selects_used) / run.games,
+                    100.0 * static_cast<double>(run.selects_hit) /
+                        static_cast<double>(run.selects_used));
+    }
     std::printf("  can_pay calls/game %.1f   cards drawn/game %.1f (%.1f of them by an effect)\n",
                 static_cast<double>(run.can_pay_calls) / run.games,
                 static_cast<double>(run.cards_drawn) / run.games,

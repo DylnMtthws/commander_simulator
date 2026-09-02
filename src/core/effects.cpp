@@ -184,6 +184,33 @@ void tutor_candidates(const TutorEffect& tutor, const CardDb& db, const GameStat
     }
 }
 
+void select_candidates(const SelectEffect& select, const CardDb& db,
+                       std::span<const int> revealed, std::vector<int>& out) {
+    out.clear();
+    for (const int slot : revealed) {
+        const Card& card = db.cards[static_cast<std::size_t>(slot)];
+        // The FRONT FACE, for the same reason tutor_candidates reads it: these
+        // cards are in the library, and a card in the library has only its front
+        // face's characteristics.
+        const std::string& line = card.faces.empty() ? card.name : card.faces.front().type_line;
+        const bool creature = line.find("Creature") != std::string::npos;
+        const bool human = line.find("Human") != std::string::npos;
+        const bool artifact = line.find("Artifact") != std::string::npos;
+        const bool land = line.find("Land") != std::string::npos;
+        bool matches = false;
+        switch (select.filter) {
+            case TutorFilter::Any: matches = true; break;
+            case TutorFilter::Creature: matches = creature; break;
+            case TutorFilter::NonHumanCreature: matches = creature && !human; break;
+            case TutorFilter::Artifact: matches = artifact; break;
+            case TutorFilter::Land: matches = land; break;
+        }
+        if (matches) {
+            out.push_back(slot);
+        }
+    }
+}
+
 void clone_candidates(const CloneEffect& clone, const CardDb& db, const GameState& state,
                       int mana_available, std::vector<int>& out) {
     out.clear();

@@ -11,6 +11,7 @@
 #include <array>
 #include <bit>
 #include <cstdint>
+#include <vector>
 
 #include "core/rng.hpp"
 
@@ -116,6 +117,18 @@ struct GameState {
     std::uint8_t library_count = 0;
     std::uint8_t drawn = 0;
 
+    // Cards put on the BOTTOM, held at the end of the array and excluded from
+    // drawing. Kinnan's dig puts four of every five looked at "on the bottom of
+    // your library in a random order", and over a twelve-turn game the bottom is
+    // effectively unreachable - so this is exact for the horizon measured, where
+    // returning them to the pool would let the same card be seen twice.
+    std::uint8_t bottomed = 0;
+
+    // The range a draw may still choose from.
+    [[nodiscard]] constexpr int drawable() const noexcept {
+        return library_count - drawn - bottomed;
+    }
+
     // Which slot each permanent is a COPY of, or -1. A clone is genuinely a
     // second copy of another card, so this is state rather than a policy
     // notion: a Copy Artifact on Basalt Monolith taps for {C}{C}{C} and is
@@ -177,6 +190,25 @@ struct GameState {
 
 // Draws the top card, returning its slot, or -1 if the library is empty.
 [[nodiscard]] int draw_one(GameState& state, Rng& rng) noexcept;
+
+// LOOKS AT the top `count` cards without drawing them.
+//
+// The verb Kinnan's dig needs and the only genuinely new one in R3 (§16.7b):
+// "look at the top five cards of your library". The cards are revealed - they
+// become CURRENT information, which is why §6.3's wall against lookahead does not
+// apply to choosing among them. They stay in the library until something moves
+// them.
+//
+// Advances the same incremental Fisher-Yates a draw does, so peeking five and
+// then drawing is distributed exactly as shuffling and dealing six.
+void peek_n(GameState& state, int count, Rng& rng, std::vector<int>& out);
+
+// Takes a peeked card OUT of the library. The caller decides where it goes.
+void take_peeked(GameState& state, int slot) noexcept;
+
+// Puts a peeked card on the BOTTOM: swapped to the end of the array and excluded
+// from every later draw.
+void bottom_peeked(GameState& state, int slot) noexcept;
 
 // Sets up a game: library from the deck's non-commander slots, opening hand of
 // `hand_size`, commander in the command zone.

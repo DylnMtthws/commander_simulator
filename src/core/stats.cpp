@@ -143,6 +143,8 @@ void merge(RunSummary& into, const RunSummary& other) {
     into.tutors_used += other.tutors_used;
     into.clones_made += other.clones_made;
     into.convoked += other.convoked;
+    into.selects_used += other.selects_used;
+    into.selects_hit += other.selects_hit;
     // XOR, so a parallel run and a serial one agree regardless of merge order.
     into.digest_xor ^= other.digest_xor;
 }

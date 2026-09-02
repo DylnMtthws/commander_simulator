@@ -108,6 +108,11 @@ int StubPolicyDoNotUseForResults::choose_card_cost(const Context&,
     return candidates.empty() ? -1 : candidates.front();
 }
 
+int StubPolicyDoNotUseForResults::choose_select(const Context&, std::span<const int> revealed,
+                                                GameStats&) const {
+    return revealed.empty() ? -1 : revealed.front();
+}
+
 // ---------------------------------------------------------------------------
 // Authored
 // ---------------------------------------------------------------------------
@@ -368,6 +373,31 @@ int AuthoredPolicy::choose_card_cost(const Context& context, std::span<const int
         }
     }
     return worst;
+}
+
+int AuthoredPolicy::choose_select(const Context& context, std::span<const int> revealed,
+                                  GameStats& stats) const {
+    // choose_tutor's body over five cards instead of the library. The candidate
+    // set is smaller and the cards are random rather than chosen, and that is the
+    // ONLY difference - which is why R3 needed no new scorer term (§16.7b).
+    std::vector<Consideration> scored;
+    scored.reserve(revealed.size());
+    for (const int slot : revealed) {
+        scored.push_back(score_arrival(context, slot, /*to_hand=*/false, stats));
+    }
+    if (context.observer != nullptr) {
+        context.observer->considering(scored, "dig: keep which of the five");
+    }
+    int best = -1;
+    int best_score = 0;
+    for (const Consideration& candidate : scored) {
+        if (best < 0 || candidate.score > best_score ||
+            (candidate.score == best_score && candidate.slot < best)) {
+            best = candidate.slot;
+            best_score = candidate.score;
+        }
+    }
+    return best;
 }
 
 }  // namespace cs

@@ -28,6 +28,7 @@ public:
     void tutored(int from_slot, int to_slot, bool to_hand) override;
     void cloned(int clone_slot, int copied_slot) override;
     void paid_with_card(int cost_slot, int given_up_slot) override;
+    void selected(int source_slot, std::span<const int> revealed, int kept_slot) override;
     void cast_spell(int slot, int paid) override;
     void pattern_fired(int pattern, int turn) override;
     void engines_active(FlagMask flags) override;

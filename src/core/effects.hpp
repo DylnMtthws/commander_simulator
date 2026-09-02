@@ -7,6 +7,7 @@
 // other effect is measured through.
 
 #include <cstdint>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -156,6 +157,39 @@ struct CloneEffect {
     bool max_from_x = false;  // Mockingbird: mana value <= mana spent
 };
 
+// SELECT: look at N cards, choose K by a policy decision, dispose of the rest.
+//
+// §4.2's kind 7, declared in the closed set from the start and unimplemented
+// until R3 (§16.7b). Kinnan's dig is its first implementation and its third user.
+//
+// AND KINNAN'S DIG IS NOT A TUTOR, which is what data/effects.toml called it for
+// eight phases. The difference is not pedantic: a TUTOR searches the whole
+// library and always finds; this looks at five cards and **misses 26% of the
+// time** (§16.7's measurement). Modelling it as a tutor would have overstated
+// the deck's primary card-advantage engine by exactly that margin, and would
+// have made a hand holding Kinnan look like a hand holding a tutor.
+//
+// The cost is carried here rather than inferred, because an activated ability's
+// cost is not its card's mana cost - Kinnan costs {G}{U} and his dig costs
+// {5}{G}{U}.
+struct SelectEffect {
+    int look = 5;                  // cards revealed
+    // NO `take` FIELD. It was written, loaded, and never read - Kinnan's dig
+    // keeps at most one and no other SELECT is authored. The every-field-has-a-
+    // reader check (scripts/check_effects_are_read.sh) caught it in the same
+    // session that added it, which is the first time that check has fired on
+    // anything but a deliberate test. A field with no user is speculation
+    // (§4.2), and Sylvan Library's "draw two, keep both or bottom them" can add
+    // it when Sylvan Library is authored.
+    TutorFilter filter = TutorFilter::Any;
+    TutorDestination destination = TutorDestination::Battlefield;
+    std::uint8_t cost_generic = 0;
+    std::array<std::uint8_t, kColourCount> cost_pips{};
+    // Activatable as often as the mana allows. Kinnan's dig has no tap symbol
+    // (§16.7) and no once-per-turn clause.
+    bool repeatable = true;
+};
+
 // DRAW: put N cards from the library into hand, on resolution.
 //
 // The kind arrived for BORNE UPON A WIND, and how it arrived is the point. The
@@ -197,6 +231,8 @@ struct CardEffects {
     CloneEffect clone;
     bool has_draw = false;
     DrawEffect draw;
+    bool has_select = false;
+    SelectEffect select;
 
     // CONVOKE is a property of the COST, not an effect, which is why it is a
     // card-level flag and not a member of the closed kind set. Section 4.2's
@@ -291,6 +327,11 @@ void fetch_candidates(const FetchEffect& fetch, const CardDb& db, const GameStat
 // Library slots this tutor could find, given the mana actually available.
 void tutor_candidates(const TutorEffect& tutor, const CardDb& db, const GameState& state,
                       int mana_available, std::vector<int>& out);
+
+// Which of the revealed cards a SELECT may keep. Filters by the same predicate
+// a tutor uses, over a candidate set of five instead of the whole library.
+void select_candidates(const SelectEffect& select, const CardDb& db,
+                       std::span<const int> revealed, std::vector<int>& out);
 
 // Battlefield slots this clone could copy.
 void clone_candidates(const CloneEffect& clone, const CardDb& db, const GameState& state,

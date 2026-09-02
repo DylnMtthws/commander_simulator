@@ -188,6 +188,41 @@ labelled as *goldfish speed*, never as *deck strength*, and it argues against
 ever letting the ablation output be read as a card-quality ranking without that
 caveat attached. §9.5's header is where that caveat lives.
 
+#### The one place the no-opponent model SIMPLIFIES rather than costs
+
+Everything else in this section is a cost. This is not, and it is exact rather
+than approximate.
+
+The deck's primer devotes an entire chapter — §8, *When Should I Spin Kinnan?* —
+to the question of **when to activate Kinnan's dig versus holding the mana for
+interaction**, and concludes that there is no rule:
+
+> *"If you have to choose between spinning Kinnan or holding up interaction, it
+> is usually best to hold up your interaction and wait as long as possible to
+> spin … This is where it starts to get very contextual on the game."*
+
+That is the hardest recurring decision in piloting this deck, and §6.2's scorer
+has no way to make it: it compares a known board against an unknown draw, which
+is precisely what §6.3's wall against lookahead forbids.
+
+> **With no opponents, the question does not exist.** There is nothing to hold
+> mana *for*. "Activate whenever the cost is payable" is not a stand-in for a
+> policy — **it is the correct rule**, because the alternative it would be
+> standing in for has no value here.
+
+This matters beyond the one decision. §16.7b costed R3 — executing the dig rather
+than detecting it — and the *policy* half of that cost came out at zero for
+exactly this reason. A limitation that has produced 31 inert cards and an
+unmeasurable interaction gap (§16.9b) also **deleted the single hardest policy
+problem in the deck**, and it deleted it exactly rather than approximately.
+
+Worth stating because it is the only instance. The temptation it creates is to
+look for others; §16.9b is the corrective — the same limitation makes *Consecrated
+Sphinx*, the primer's "greatest form of card advantage", measure at zero.
+
+
+---
+
 ### 2.6 Kinnan + Basalt Monolith makes infinite *colorless* mana
 
 Kinnan reads "Whenever you tap a nonland permanent for mana, add one mana of any
@@ -3472,7 +3507,110 @@ has something to fit.** The two 97% hands were the ones assembling
 `wide_colour_into_thrasios` with no cost check — the defect option B surfaced,
 now priced.
 
-### 16.11 What is still not established
+### 16.11 R3 landed — reported as a diff, because what survived is the point
+
+Kinnan's dig is **executed** now, not detected (§16.7b). Every number in this
+section was taken with it detected, so the useful report is which findings
+survived the rewrite and which did not — **a finding that survives three rewrites
+of the model is worth more than one measured once.**
+
+| | before R3 | after R3 |
+|---|---|---|
+| P(assembled by turn 3) | 1.85% | **1.41%** |
+| P(assembled by turn 6) | 28.84% | **20.86%** |
+| P(assembled by turn 12) | 66.01% | **76.82%** |
+| measured null | −0.125% | −0.090% |
+| band | ±0.048 | **±0.037** |
+
+#### SURVIVED
+
+- **§16.0, an ablation measures your implementation.** Not merely survived —
+  **R3 is its largest instance.** "The dig is worth N" was a fact about a
+  detection, and executing it moved turn 12 by eleven points. The rule now has
+  three instances: convoke, the clone targeting probe, and this.
+- **§16.1 / §16.5, the clones.** *Strengthened.* Where seven of eight were inside
+  the band and *Copy Artifact* sat on its edge, **all eight are now inside a
+  tighter band** (±0.037), the largest at +0.033. Three rewrites of the mana
+  system, two pattern cost models and an executed dig later, the clones are still
+  indistinguishable from cards declared to do nothing.
+- **§16.6, a declared simplification is not a bounded one.** R3 is the largest
+  instance to date: `SELECT` was in §4.2's closed set from the start, declared
+  and unimplemented, and implementing it moved the headline by eleven points.
+- **§16.9b, the interaction gap.** *Consecrated Sphinx* −0.007, *Rhystic Study*
+  −0.027 against the primer's "greatest form of card advantage". Unchanged in
+  substance.
+- **§17's cross-check, weakened but intact.** The unresolved set grew from 10 to
+  16 as the band tightened, and the pilot cut **7 of 16 (44%)** against a 29%
+  base rate — down from 6 of 10 (60%). Still above chance, less strikingly.
+  *Mockingbird*, one of the two real disagreements, fell inside the band and
+  became agreement; **the count of genuine disagreements is now one** — *Gene
+  Pollinator* — with seven of eight trusted cuts still being lands.
+
+#### DID NOT SURVIVE
+
+- **§16.7's `activations = 2`, and all of R1.** Retired with the pattern it
+  parameterised. See below.
+- **§16.4, "sensitive at turn 3 and numb at turn 12" — CONTRADICTED.** Every
+  previous fix moved the front and left the tail alone. R3 moved turn 3 by
+  −0.44 and **turn 12 by +10.81**, the opposite shape and the largest tail
+  movement in the project.
+
+  The claim was over-general and the corrected version is more useful:
+
+  > **A defect in what "assembled" MEANS moves the front. A missing MECHANIC
+  > moves the tail.** The payment bug, the two pattern cost models and the
+  > `untapped` misread were all the first kind — they changed when a detection
+  > fired, and detections fire early or not at all. R3 is the second kind: a
+  > card-advantage engine whose value compounds over turns, so it barely touches
+  > turn 3 and dominates turn 12.
+
+  §4.1's objective decision is unaffected — an early-turn objective is still what
+  separates opening hands — but its *justification* narrows. It is the sensitive
+  end for assembly-criterion errors, not for everything.
+
+#### RE-RANKED, again
+
+| `vs blank` at turn 3 | before R3 | after R3 |
+|---|---|---|
+| Thrasios, Triton Hero | +1.247 | **+1.473** |
+| Basalt Monolith | +1.143 | +1.143 |
+| **Enduring Vitality** | +0.520 | **+0.043** — inside the band |
+| Chrome Mox | +0.520 | +0.320 |
+
+*Enduring Vitality* falls out of the measurable set at turn 3 and is **+7.09 at
+turn 6 and +32.9 at turn 12** — §4.1's blind-spot example, now sharper still.
+*Thrasios* is **+76.5 at turn 12**: with the dig resolving, he is what it finds
+and what converts the find into a win.
+
+Convoke, re-measured at 100,000 games: **+0.08 / +0.34 / +0.18**. Smaller again
+than §16.3's +0.67, and for the third time the answer to "what is convoke worth"
+has changed because something *else* was fixed. That is §16.0 restated: the
+number was never about convoke.
+
+#### A parameter disappearing is the RIGHT kind of loss, and it has happened twice
+
+`activations = 2` was measured, argued, given a line in the honesty header and a
+required key in the loader. It is gone, because the dig is resolved rather than
+detected and there is nothing left to count.
+
+**That is the second time**, and the shape is worth recognising:
+
+| The parameter | What replaced it |
+|---|---|
+| `untapped = [Basalt Monolith]` — a proxy for "loopable" | `loop_entry_cost = 3`, the actual condition |
+| `activations = 2` — a judgement about when a line counts | executing the ability |
+
+> **Twice now, a judgement call we agonised over disappeared once the model could
+> do the thing properly — rather than becoming better-chosen.** Worth recognising
+> on sight: when a parameter is genuinely hard to pin down and every value seems
+> defensible, that is evidence the thing it parameterises should be *modelled*
+> instead of tuned. The difficulty was a symptom, not a feature of the domain.
+
+`activations` stays in the vocabulary because `kinnan_basalt` still declares it,
+and its declaration there now carries the whole distinction on its own: that loop
+untaps itself, so one activation is all of them.
+
+### 16.12 What is still not established
 
 - **Summoning sickness is not modelled, and it is worth about a point.** A
   creature that enters can tap for mana the same turn — from a tutor, a clone, or

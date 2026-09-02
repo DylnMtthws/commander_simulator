@@ -271,6 +271,50 @@ EffectDb load_effects(const std::filesystem::path& path, const CardDb& db) {
                 clone.max_from_x = (*effect)["max_from_x"].value_or<bool>(false);
                 target.has_clone = true;
                 target.clone = clone;
+            } else if (kind == "SELECT") {
+                SelectEffect select;
+                if ((*effect)["take"]) {
+                    fail(context + ": `take` is not implemented. Kinnan's dig keeps at most "
+                                   "one and no other SELECT is authored; a field with no user "
+                                   "is speculation (SIM_PLAN.md section 4.2).");
+                }
+                select.look = static_cast<int>((*effect)["look"].value_or<int64_t>(0));
+                if (select.look < 1) {
+                    fail(context + ": a SELECT needs `look`, how many cards are revealed. It is "
+                                   "the whole difference from a TUTOR, which searches the entire "
+                                   "library and always finds.");
+                }
+                const auto filter = (*effect)["filter"].value_or<std::string>("any");
+                if (filter == "any") select.filter = TutorFilter::Any;
+                else if (filter == "creature") select.filter = TutorFilter::Creature;
+                else if (filter == "non_human_creature")
+                    select.filter = TutorFilter::NonHumanCreature;
+                else if (filter == "artifact") select.filter = TutorFilter::Artifact;
+                else if (filter == "land") select.filter = TutorFilter::Land;
+                else fail(context + ": unknown select filter '" + filter + "'");
+
+                const auto destination = (*effect)["destination"].value_or<std::string>("");
+                if (destination == "battlefield") select.destination = TutorDestination::Battlefield;
+                else if (destination == "hand") select.destination = TutorDestination::Hand;
+                else fail(context + ": a SELECT must state its destination explicitly.");
+
+                // The ACTIVATION cost, which is not the card's mana cost: Kinnan
+                // costs {G}{U} and his dig costs {5}{G}{U}.
+                select.cost_generic =
+                    static_cast<std::uint8_t>((*effect)["cost_generic"].value_or<int64_t>(0));
+                if (const auto* pips = (*effect)["cost_pips"].as_array()) {
+                    for (const toml::node& pip : *pips) {
+                        const auto letter = pip.value<std::string>();
+                        static constexpr std::string_view kOrder = "WUBRG";
+                        const auto at = letter ? kOrder.find(*letter) : std::string_view::npos;
+                        if (!letter || at == std::string_view::npos) {
+                            fail(context + ": unknown colour in cost_pips");
+                        }
+                        ++select.cost_pips[at];
+                    }
+                }
+                target.has_select = true;
+                target.select = select;
             } else if (kind == "DRAW") {
                 DrawEffect draw;
                 draw.cards = static_cast<int>((*effect)["cards"].value_or<int64_t>(1));
