@@ -355,6 +355,52 @@ This model **cannot express**, and will not try to:
 It **can express** exactly the archetypes in §4.2 and nothing else. A card that
 is not one of those is `inert` or the build fails (§4.4).
 
+#### The recommended default objective: P(assembled by turn 3)
+
+This model is a *value function* (§1), so something has to choose which number
+out of §10's output is the value. **That choice is now made, on evidence, rather
+than left to whoever wires up the solver.**
+
+> **The default objective is an early-turn CDF point — `P(assembled by turn 3)`
+> for this deck — not turn 12, not the censored fraction, and not a mean.**
+
+The reasoning is §16.4, measured rather than assumed. Fixing the mana payment
+bug moved the curve like this:
+
+| | turn 3 | turn 4 | turn 6 | turn 12 |
+|---|---|---|---|---|
+| before | 18.27% | 26.87% | 39.72% | 67.25% |
+| after | 8.71% | 19.59% | 37.01% | 66.65% |
+
+**Turn 3 halved. Turn 12 moved by six-tenths of a point.** A bug that handed the
+deck unlimited free mana was nearly invisible at the tail, because by turn 12
+this deck has enough real mana anyway and free mana only changes *when*. The
+tail is not a weaker signal — **it is a different question**, and mostly asks
+"does this deck ever get there", which almost every keepable hand answers yes to.
+
+Three consequences for the solver, and they are the point of stating this here
+rather than in §10:
+
+1. **A keep/mull chart is a chart of whatever objective it was given.** Scored on
+   turn 12, most seven-card hands look alike and the chart says keep almost
+   everything — not because that is right, but because the objective cannot
+   distinguish them. Scored on turn 3 the same hands separate, because turn 3 is
+   what an opening hand actually determines.
+2. **Sensitivity to the model's own errors follows the same curve.** An objective
+   at turn 3 is the one that moves when the model is wrong, which cuts both
+   ways: it is the honest place to read a difference, and the place a modelling
+   bug does the most damage. Both are arguments for reading it, not for
+   avoiding it.
+3. **The turn is a per-deck parameter, not a constant.** Three is right for a
+   list whose turn-3 assembly rate is ~9% and whose curve is steepest at turns
+   3–5. A slower deck's discriminating turn is later. Pick it by looking at
+   where the CDF is steepest, and **say which turn the number is**, since
+   "P(assembled)" without a turn is not a quantity.
+
+A mean is excluded outright and for a separate reason: with a third of games
+censored, the mean over the games that finished is not the mean of anything
+(§10.3), and it biases optimistically.
+
 ### 4.2 The effect kinds — a closed, enumerated set
 
 **This list is closed.** It is derived from reading all 99 oracle texts, not
@@ -2096,9 +2142,44 @@ short: most of what a simulator produces confirms what its author already
 believed, and the entries worth writing down are the ones that did not.
 
 **All figures: 20,000 games, seed 1, `P(assembled by turn N)`, measured by
-declaring the cards in question `inert` and re-running.** The intervals are not
-here yet — Phase 6 — and the smallest two findings below are the reason that
-matters rather than a formality.
+declaring the cards in question `inert` and re-running.**
+
+### 16.0 The best result so far is about the author, not the deck
+
+The authoring order was a judgment call, made deliberately and stated in the
+effect file at the time: **convoke last, because it was the hardest cost in the
+deck** — the only one that reads the battlefield, the only one that interacts
+with Kinnan, the one held back and given its own comment block. Tutors were
+authored ahead of clones on similar reasoning.
+
+| Authored | Effort | Worth (P(assembled by turn 12)) |
+|---|---|---|
+| Chord of Calling, as a tutor | one line of TOML | **+7.66** |
+| Convoke, its cost | a new predicate, a source-augmentation path in the scorer, three tests | **−0.02** |
+
+**Roughly 300:1 against the ordering, and the sign of the smaller one is not
+established.** The thing most care went into was worth nothing measurable.
+
+The mechanism is not mysterious once measured — this deck's creatures are almost
+all mana dorks, a mana dork under Kinnan taps for two where convoking it pays
+one, so convoke may only use the creatures that do nothing else, and those are
+rarely on the battlefield when Chord is castable. The point is that **none of
+that was visible from the card text**, which is what the ordering was made from.
+
+> **Implementation complexity is close to uncorrelated with contribution, and it
+> is not weakly correlated — it was actively misleading here.** The ordering
+> ranked by *how hard this is to model*, which is a property of the modeller.
+> Contribution is a property of the deck. Nothing connects them, and the
+> intuition that they travel together is exactly what produced a 300:1 miss.
+
+This generalises past this project in a way the other findings do not. It is an
+argument for measuring effect sizes **before** deciding what to build carefully,
+not after — and, more uncomfortably, for treating "this is the subtle part" as a
+statement about the author's attention rather than about the system.
+
+It is also why §16.1 through §16.3 are recorded with their measurement method
+attached. A finding that contradicts the person who built the model is only
+worth anything if the reader can check it.
 
 ### 16.1 Clones matter less than their count suggests
 
@@ -2117,12 +2198,11 @@ third of a point.
 **The reason is specific and is the finding, not the number.** In a Kinnan shell
 a clone's job is copying a mana source. Copying a mana source only pays when
 mana is the binding constraint — and for this deck it usually is not. What binds
-is *finding Thrasios*, which is a tutor's job and not a clone's. A clone of a
-Sol Ring is more mana on a board that already had enough.
+is *finding Thrasios*, which is a tutor's job and not a clone's.
 
-This is the first result in the project that is about the DECK rather than about
-the model. Everything before it — the seeding, the pattern proxies, the mana
-payment — was the simulator being wrong and then being less wrong.
+This was the first result in the project that was about the DECK rather than
+about the model. Everything before it — the seeding, the pattern proxies, the
+mana payment — was the simulator being wrong and then being less wrong.
 
 ### 16.2 One tutor is worth twenty-five clones
 
@@ -2138,7 +2218,7 @@ effect and not of the newer code. §16.1's explanation predicts this: an X-cost
 creature tutor straight to the battlefield finds Thrasios, and finding Thrasios
 is what the deck is short of.
 
-### 16.3 Convoke — the elaborate half of the card — is worth nothing
+### 16.3 Convoke — the elaborate half of that card — is worth nothing
 
 | | turn 3 | turn 6 | turn 12 |
 |---|---|---|---|
@@ -2146,23 +2226,16 @@ is what the deck is short of.
 | baseline | 8.71% | 37.01% | 66.65% |
 | **convoke is worth** | **+0.24** | **+0.38** | **−0.02** |
 
-Convoke is the only cost in the deck that reads the battlefield, it is why Chord
-was authored last and separately, and it is the single most intricate piece of
-the effect model. It is worth a fraction of a point early and, at turn 12, a
+The measurement behind §16.0. A fraction of a point early and, at turn 12, a
 number whose sign is not established.
-
-The reason is that this deck's creatures are almost all mana dorks, and a mana
-dork under Kinnan taps for two where convoking it pays one — so the creatures
-convoke is *allowed* to use are the few that do nothing else, and those are
-rarely on the battlefield when Chord is castable. **Effort spent on a mechanism
-is not evidence about its importance**, and the ratio here is roughly 300:1
-against the intuition that put convoke last in the authoring order.
 
 ### 16.4 The metric is sensitive at turn 3 and numb at turn 12
 
-Not a deck finding — a finding about reading the other three. Fixing the mana
-payment bug (see the commit; free mana from Enduring Vitality, from clones and
-from Elvish Spirit Guide) moved the curve like this:
+Not a deck finding — a finding about how to read the other three, and it has
+since been promoted into a decision (§4.1: the default objective is an
+early-turn CDF point). Fixing the mana payment bug — free mana from Enduring
+Vitality, from clones and from Elvish Spirit Guide, §11.0's twelfth rule
+upstream — moved the curve like this:
 
 | | turn 3 | turn 4 | turn 6 | turn 12 |
 |---|---|---|---|---|
@@ -2183,9 +2256,10 @@ points and a 95% interval is about ±0.65 either side. They are *paired* — eve
 ablation reuses seed 1 and the same game indices, so the two runs draw the same
 cards until the decks diverge — and common random numbers is exactly the reason
 §10.4 asks for it. But the pairing has not been exploited in the reporting, and
-**until §10.2's intervals exist, "+0.29" and "0" are not distinguished here.**
+**until §10.2's intervals exist over the paired difference, "+0.29" and "0" are
+not distinguished here.**
 
-The finding in §16.1 does not rest on the interval — 8 cards at a third of a
-point versus 1 card at seven and a half points is not a close call at any
-plausible width — but its *precise* value is not yet a claim this document
+The findings in §16.0 and §16.1 do not rest on the interval — 8 cards at a third
+of a point against 1 card at seven and a half is not a close call at any
+plausible width — but their *precise* values are not yet claims this document
 makes.

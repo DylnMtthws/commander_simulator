@@ -75,9 +75,49 @@ struct Card {
     std::vector<int> castable_cmcs;
     std::vector<std::string> all_types;
     ColourMask colour_identity = 0;
+
+    // UPSTREAM'S COLUMN, AND IT DOES NOT MEAN "IS A LAND".
+    //
+    // mtg_v1.has_land_face is true only for a MULTI-FACED card one of whose
+    // faces is a land - Sink into Stupor // Soporific Springs. Forest is
+    // `false`, and so is every other single-faced land: 24 of this deck's 25.
+    //
+    // It is kept because it is real data and the trap is worth documenting in
+    // the place someone reaches for it. Ask plays_as_land() instead.
     bool has_land_face = false;
+
     bool is_commander = false;
     std::vector<Face> faces;
+
+    // Can this card be put onto the battlefield as a land drop?
+    //
+    // THE definition, and the only one. It used to be a free function in
+    // policy.cpp that walked the faces, sitting beside a loaded field of almost
+    // the same name that answered a different question and was never read - so
+    // the field was wrong about 24 of 25 lands for three phases and cost
+    // nothing, because every consumer had quietly rebuilt it.
+    [[nodiscard]] bool plays_as_land() const noexcept {
+        for (const Face& face : faces) {
+            if (face.is_land) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // The first castable face, or nullptr. A single-faced card has one face; an
+    // MDFC has a spell face and a land face (section 8.2).
+    //
+    // Also formerly two copies, one in sim.cpp and one in policy.cpp. They
+    // agreed, which is the only reason that one was latent rather than a bug.
+    [[nodiscard]] const Face* castable_face() const noexcept {
+        for (const Face& face : faces) {
+            if (face.is_castable()) {
+                return &face;
+            }
+        }
+        return nullptr;
+    }
 };
 
 // Provenance for a card database. Carried so that a changed number is

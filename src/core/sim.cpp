@@ -8,17 +8,6 @@
 namespace cs {
 namespace {
 
-// The first castable face of a card, or nullptr. A single-faced card has one
-// face; an MDFC has a spell face and a land face (SIM_PLAN.md section 8.2).
-const Face* castable_face(const Card& card) noexcept {
-    for (const Face& face : card.faces) {
-        if (face.is_castable()) {
-            return &face;
-        }
-    }
-    return nullptr;
-}
-
 // FNV-1a over the parts of the state that define what actually happened.
 // Not cryptographic and does not need to be: it is a comparison key for "did
 // these two runs play the same game", where the alternative is comparing
@@ -205,7 +194,7 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
             // "CAST: Nature's Rhythm" - the effect before the cause. Fifth
             // output-ordering issue in this project, all five found by reading
             // output and none by a test (upstream PLAN.md 11.0).
-            const Face* cast_face = castable_face(db.cards[static_cast<std::size_t>(spell)]);
+            const Face* cast_face = db.cards[static_cast<std::size_t>(spell)].castable_face();
             int to_tap = cast_face != nullptr ? cast_face->cost->mana_value_at_x_zero() : 0;
             if (observer != nullptr) {
                 observer->cast_spell(spell, to_tap);

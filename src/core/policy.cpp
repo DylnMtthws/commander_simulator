@@ -7,28 +7,10 @@
 namespace cs {
 namespace {
 
-const Face* castable_face_of(const Card& card) noexcept {
-    for (const Face& face : card.faces) {
-        if (face.is_castable()) {
-            return &face;
-        }
-    }
-    return nullptr;
-}
-
-bool card_has_land_face(const Card& card) noexcept {
-    for (const Face& face : card.faces) {
-        if (face.is_land) {
-            return true;
-        }
-    }
-    return false;
-}
-
 int lands_on_board(const Context& context) noexcept {
     int count = 0;
     context.state.battlefield.for_each([&](int slot) {
-        count += card_has_land_face(context.db.cards[static_cast<std::size_t>(slot)]) ? 1 : 0;
+        count += context.db.cards[static_cast<std::size_t>(slot)].plays_as_land() ? 1 : 0;
     });
     return count;
 }
@@ -78,7 +60,7 @@ int pattern_completion(const Context& context, int slot, const PolicyWeights& we
 int StubPolicyDoNotUseForResults::choose_land(const Context& context, GameStats&) const {
     int chosen = -1;
     context.state.hand.for_each([&](int slot) {
-        if (chosen == -1 && card_has_land_face(context.db.cards[static_cast<std::size_t>(slot)])) {
+        if (chosen == -1 && context.db.cards[static_cast<std::size_t>(slot)].plays_as_land()) {
             chosen = slot;
         }
     });
@@ -93,7 +75,7 @@ int StubPolicyDoNotUseForResults::choose_spell(const Context& context, GameStats
             return;
         }
         const Card& card = context.db.cards[static_cast<std::size_t>(slot)];
-        const Face* face = castable_face_of(card);
+        const Face* face = card.castable_face();
         if (face == nullptr) {
             return;
         }
@@ -144,7 +126,7 @@ Consideration AuthoredPolicy::score(const Context& context, int slot, bool as_la
         }
         result.pattern_term = pattern_completion(context, slot, weights_);
     } else {
-        const Face* face = castable_face_of(card);
+        const Face* face = card.castable_face();
         if (face != nullptr) {
             // CONVOKE changes what may pay for THIS card and nothing else, so
             // the extra sources are built here and thrown away. Merging them
@@ -310,7 +292,7 @@ int AuthoredPolicy::choose_fetch(const Context& context, std::span<const int> ca
 int AuthoredPolicy::choose_land(const Context& context, GameStats& stats) const {
     std::vector<Consideration> candidates;
     context.state.hand.for_each([&](int slot) {
-        if (card_has_land_face(context.db.cards[static_cast<std::size_t>(slot)])) {
+        if (context.db.cards[static_cast<std::size_t>(slot)].plays_as_land()) {
             candidates.push_back(score(context, slot, /*as_land=*/true, stats));
         }
     });
@@ -326,7 +308,7 @@ int AuthoredPolicy::choose_spell(const Context& context, GameStats& stats) const
     std::vector<Consideration> candidates;
     const Zone castable_from = context.state.hand | context.state.command_zone;
     castable_from.for_each([&](int slot) {
-        if (castable_face_of(context.db.cards[static_cast<std::size_t>(slot)]) != nullptr) {
+        if (context.db.cards[static_cast<std::size_t>(slot)].castable_face() != nullptr) {
             candidates.push_back(score(context, slot, /*as_land=*/false, stats));
         }
     });

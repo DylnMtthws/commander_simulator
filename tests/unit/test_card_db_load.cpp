@@ -239,3 +239,39 @@ TEST_CASE("refuses an unknown colour letter", "[load]") {
     REQUIRE_THROWS_MATCHES(cs::io::load_card_db(file.path()), cs::io::LoadError,
                            Catch::Matchers::MessageMatches(ContainsSubstring("unknown colour 'Z'")));
 }
+
+TEST_CASE("has_land_face and plays_as_land are different questions", "[load][one-definition]") {
+    // Pinned, because the names are one word apart and the answers differ on 24
+    // of this deck's 25 lands.
+    //
+    // mtg_v1.has_land_face asks "is one of this card's FACES a land", which is
+    // only ever true for a multi-faced card. Forest is a land and has no faces
+    // in the face table, so upstream says false - correctly, for the question it
+    // is answering.
+    //
+    // The land drop wants a different question, and for three phases asked it
+    // with a private copy in policy.cpp while this field sat loaded, validated
+    // as required, and never read. Nothing failed: the wrong definition was the
+    // unused one. Had a consumer reached for the obvious field instead, the deck
+    // would have played zero lands.
+    const cs::CardDb db = cs::io::load_card_db(kFixture);
+    const auto find = [&](const char* listed) -> const cs::Card& {
+        for (const cs::Card& card : db.cards) {
+            if (card.listed_name == listed) return card;
+        }
+        FAIL("fixture is missing " << listed);
+        return db.cards.front();
+    };
+
+    const cs::Card& forest = find("Forest");
+    REQUIRE(forest.plays_as_land());
+    REQUIRE_FALSE(forest.has_land_face);  // and upstream is right about that
+
+    const cs::Card& mdfc = find("Sink into Stupor");
+    REQUIRE(mdfc.plays_as_land());
+    REQUIRE(mdfc.has_land_face);  // the only shape where the two agree
+
+    const cs::Card& ring = find("Sol Ring");
+    REQUIRE_FALSE(ring.plays_as_land());
+    REQUIRE_FALSE(ring.has_land_face);
+}
