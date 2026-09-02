@@ -644,8 +644,14 @@ int sweep(const std::filesystem::path& path, const std::filesystem::path& deck_p
         inert_low = result.paired.delta < inert_low ? result.paired.delta : inert_low;
         inert_high = result.paired.delta > inert_high ? result.paired.delta : inert_high;
     }
-    const double null_delta = inert_count > 0 ? inert_total / inert_count : 0.0;
-    if (inert_count > 0) {
+    // Fewer than a handful of inert cards is not a null, it is a coincidence.
+    // With --ablate <one card> there are usually zero, and a `vs blank` column
+    // computed from a null of 0.0 would print the raw delta under a heading
+    // saying it was something else - the ninth rule's shape again, in a column
+    // header this time.
+    const bool have_null = inert_count >= 5;
+    const double null_delta = have_null ? inert_total / inert_count : 0.0;
+    if (have_null) {
         std::printf("\nTHE MEASURED NULL, from the %d inert cards\n", inert_count);
         std::printf("  mean delta of a card declared to do nothing  %+.3f%%\n",
                     100.0 * null_delta);
@@ -669,21 +675,33 @@ int sweep(const std::filesystem::path& path, const std::filesystem::path& deck_p
     }
 
     std::printf("\ngoldfish_turn_to_assembly_delta at turn %d, paired 95%%\n", turn);
+    if (!have_null) {
+        std::printf("  No `vs blank` column: it needs the inert cards as a null and this run\n");
+        std::printf("  ablated %d card%s. Run --sweep for it. The delta below is against %s,\n",
+                    static_cast<int>(results.size()), results.size() == 1 ? "" : "s",
+                    deck.ablation_replacement.c_str());
+        std::printf("  which is worth roughly 0.4 points over a blank card at turn 3.\n");
+    }
     std::printf("  the column is named for the metric on purpose: a sorted table headed\n");
     std::printf("  'score' IS a card-quality ranking whatever the banner said (section 9.5).\n\n");
     // b and c printed separately, not summed: the Wald interval above rests on
     // the discordant pairs being numerous enough for the normal approximation,
     // and a reader cannot check that from a total. It is also where a suspicious
     // result shows itself - a delta built from b=3, c=0 is not a measurement.
-    std::printf("  %-28s %9s %9s  %-18s %7s %7s\n", "card", "delta", "vs blank",
-                "95% interval", "b", "c");
+    std::printf("  %-28s %9s %9s  %-18s %7s %7s\n", "card", "delta",
+                have_null ? "vs blank" : "", "95% interval", "b", "c");
     for (const AblationResult& result : results) {
         const bool excludes_zero = result.paired.low > 0.0 || result.paired.high < 0.0;
-        std::printf("  %-28s %+8.3f%% %+8.3f%%  [%+6.3f, %+6.3f] %7d %7d%s%s\n",
-                    result.card.c_str(), 100.0 * result.paired.delta,
-                    100.0 * (result.paired.delta - null_delta), 100.0 * result.paired.low,
-                    100.0 * result.paired.high, result.baseline_only, result.ablated_only,
-                    excludes_zero ? "  *" : "", result.inert ? "  (inert)" : "");
+        char centred[16] = "        -";
+        if (have_null) {
+            std::snprintf(centred, sizeof(centred), "%+8.3f%%",
+                          100.0 * (result.paired.delta - null_delta));
+        }
+        std::printf("  %-28s %+8.3f%% %9s  [%+6.3f, %+6.3f] %7d %7d%s%s\n",
+                    result.card.c_str(), 100.0 * result.paired.delta, centred,
+                    100.0 * result.paired.low, 100.0 * result.paired.high, result.baseline_only,
+                    result.ablated_only, excludes_zero ? "  *" : "",
+                    result.inert ? "  (inert)" : "");
     }
     std::printf("\n  * interval excludes zero. NOT a significance verdict: at %zu comparisons\n",
                 results.size());
