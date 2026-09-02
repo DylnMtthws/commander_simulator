@@ -2302,6 +2302,70 @@ validated against: if a decision list over declared terms reproduces the grid,
 the grid is real; if it cannot, the grid was fitting noise. C is not on the table
 while §9.5's auditability discipline holds.
 
+#### B IS BUILT, and the answer is emphatic
+
+`cs --hands N`. 60 sampled hands, 4,000 games each, every hand kept, all on the
+same game-index range so the comparison between two rows is paired for free.
+
+| | |
+|---|---|
+| best hand | **97.2%** |
+| worst hand | **0.0%** |
+| spread | **97.2 points** |
+| one hand's own 95% interval | **1.4 points** |
+
+**Hands separate by seventy times a single hand's interval.** A is not gridding
+noise, and it has a great deal to fit.
+
+**And `land count` alone is a poor feature**, which is worth knowing before
+designing the grid:
+
+| lands in hand | n | mean value |
+|---|---|---|
+| 0 | 5 | 0.00% |
+| 1 | 17 | 4.65% |
+| 2 | 24 | 6.37% |
+| 3 | 11 | **12.85%** |
+| 4 | 2 | 4.60% |
+| 5 | 1 | 0.20% |
+
+The curve has the shape a Magic player would predict — nothing at zero, a peak
+around three, flooding after — but at n = 60 it explains very little of a
+97-point spread. The three best hands each contain **a creature tutor that goes
+to the battlefield** (*Nature's Rhythm*, *Chord of Calling*, *Finale of
+Devastation*), which is a far stronger signal than land count and is the first
+candidate feature for A.
+
+**This is deliberately as far as B goes.** It is a list, not a chart; it does not
+compute a keep/mull decision, because that is a comparison against the
+expectation over mulliganing and needs the recursion above. What it was for was
+deciding whether A is worth building, and it decided that.
+
+#### What B surfaced that no aggregate had
+
+The output carries **which pattern each hand mostly assembles**, added after a
+97% hand turned out to be a claim nobody could check. That column immediately
+exposed a defect:
+
+> **`wide_colour_into_thrasios` has no cost model at all.** It fires on
+> `WIDE_COLOUR` + *Thrasios* in play, with no check that Thrasios's `{4}`
+> activation is payable even once — the exact defect §16.7 just fixed in
+> `wide_colour_into_kinnan_dig`, sitting in the sibling pattern, and it is what
+> both 97% hands assemble.
+
+`infinite_C_into_thrasios` needs no such check and is correct as written, because
+unbounded `{C}` pays `{4}` forever — which is §2.6's typed flags earning their
+keep again. `WIDE_COLOUR` is *finite* coloured mana, so N activations cost 4N and
+the pattern should say so.
+
+**Not fixed here, deliberately.** It needs the same `activations` judgement §16.7
+required, and picking N unilaterally is the mistake that produced the wrong
+requirement in the first place. The mechanical check added in §16.7 does not
+catch it either — it requires `activations` wherever `loop_entry_cost` appears,
+and this pattern has neither. **"Does this pattern describe an activated ability
+that should have a cost?" is a judgement, and the audit for it has to be a
+human reading the four patterns against the four cards.**
+
 ---
 
 ## 14. Definition of done for v1
@@ -2317,7 +2381,18 @@ while §9.5's auditability discipline holds.
    (§4.4), authored ranks, ≥ 6 win patterns, and engines. `effects.toml` carries
    `authored_from` hashes and the exporter warns on drift. The run prints the
    inert set **grouped by category**, not as a count (§9.5).
-4. **NOT DONE, and it reads as done.** `simulate_batch` is implemented and
+4. **DONE, after seven phases of reading as done.** `simulate_batch` is
+   implemented, `core/` links only the standard library, and **§7.1's signature
+   now exists**: `run_game` and `simulate_batch` take an optional
+   `const Zone* opening_hand`, `begin_game_with_hand` deals it exactly (the
+   hand's cards are removed from the library rather than drawn from it), and
+   `sample_hand` draws one through the same machinery so "an opening hand of this
+   deck" has one definition. Tested for exactness and for S1 under a fixed hand.
+
+   The account of why it sat unnoticed is kept below, because it is the point.
+
+   *Previously:* **NOT DONE, and it reads as done.** `simulate_batch` is
+   implemented and
    `core/` links only the standard library, provably. But **§7.1's signature
    does not exist**: both entry points deal their own random opening hand.
    `begin_game` shuffles and draws seven, and there is no way to hand the core a
@@ -2910,13 +2985,17 @@ does not — is visible in the file rather than inferable.
 
 ### 16.8 What is still not established
 
-- **Summoning sickness is not modelled.** A creature that enters the battlefield
-  can tap for mana on the same turn — from a tutor, from a clone, or from
+- **Summoning sickness is not modelled, and it is worth about a point.** A
+  creature that enters can tap for mana the same turn — from a tutor, a clone, or
   Kinnan's dig. Under *Enduring Vitality* that is 2 mana per creature, arriving a
-  full turn early. It **overstates**, it is on the deck's main line, and it is
-  unmeasured. Found while measuring §16.7's self-funding question, where it is
-  the difference between "a hit funds 21% of the next activation" and "0% within
-  the same turn".
+  full turn early. **Measured with a probe: 5.10% → 4.07% at turn 3 and 31.34% →
+  28.03% at turn 6.** It overstates, it is on the deck's main line, and it is
+  larger than 90 of the 98 cards in the sweep.
+
+  Worth recording alongside it: this was measured because a hand valued at 97%
+  looked like it must depend on it, and **it does not** — the top hands survive
+  the probe almost unchanged. The hypothesis was wrong and the measurement was
+  still worth having, which is §16.0's rule pointing the other way.
 - **The legend rule is not modelled.** A clone of *Kinnan* or *Thrasios* should
   die. §16.5's trace reading found it; the value happens to come out about right,
   which is why it is here rather than in a fix.

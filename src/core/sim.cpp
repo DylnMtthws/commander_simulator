@@ -47,7 +47,7 @@ std::uint64_t digest_state(const GameState& state) noexcept {
 
 GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet& patterns,
                     const GameConfig& config, const Policy& policy, std::uint64_t seed,
-                    Observer* observer) {
+                    Observer* observer, const Zone* opening_hand) {
     Rng rng(seed);
     GameState state;
 
@@ -57,7 +57,12 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
             commander_slot = card.export_index;
         }
     }
-    begin_game(state, static_cast<int>(db.size()), commander_slot, config.opening_hand, rng);
+    if (opening_hand != nullptr) {
+        begin_game_with_hand(state, static_cast<int>(db.size()), commander_slot, *opening_hand,
+                             rng);
+    } else {
+        begin_game(state, static_cast<int>(db.size()), commander_slot, config.opening_hand, rng);
+    }
 
     GameResult result;
     result.stats.cards_drawn = config.opening_hand;
@@ -435,7 +440,7 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
 
 RunSummary simulate_batch(const CardDb& db, const EffectDb& effects, const PatternSet& patterns,
                           const GameConfig& config, const Policy& policy, std::uint64_t base_seed,
-                          int first_game, int games) {
+                          int first_game, int games, const Zone* opening_hand) {
     RunSummary summary;
     summary.assembled_on.assign(static_cast<std::size_t>(config.turn_cap) + 1, 0);
     summary.fired.assign(patterns.patterns.size(), 0);
@@ -444,7 +449,8 @@ RunSummary simulate_batch(const CardDb& db, const EffectDb& effects, const Patte
     for (int i = 0; i < games; ++i) {
         const auto index = static_cast<std::uint64_t>(first_game + i);
         const GameResult result =
-            run_game(db, effects, patterns, config, policy, seed_for_game(base_seed, index));
+            run_game(db, effects, patterns, config, policy, seed_for_game(base_seed, index),
+                     nullptr, opening_hand);
 
         ++summary.games;
         summary.can_pay_calls += result.stats.can_pay_calls;

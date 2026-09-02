@@ -736,6 +736,149 @@ int sweep(const std::filesystem::path& path, const std::filesystem::path& deck_p
     return 0;
 }
 
+// OPTION B (SIM_PLAN.md §13.1): sampled hands, reported raw.
+//
+// Deliberately NOT a chart. It is a list of sampled opening hands with a value
+// each, and its entire purpose is to answer the question that decides whether
+// option A is worth building: **does anything separate at all?** If the values
+// of randomly sampled hands are indistinguishable from each other, a feature
+// grid over them is a grid of noise and the feature design was wasted.
+//
+// So it prints the hands and gets out of the way. Any structure a reader sees
+// here is structure that exists; any they do not see is not there to be gridded.
+int hands(const std::filesystem::path& path, const std::filesystem::path& deck_path,
+          const std::filesystem::path& effects_path, int sample, int games,
+          std::uint64_t base_seed, int threads, int turn) {
+    cs::CardDb db;
+    cs::io::DeckFile deck;
+    cs::EffectDb effects;
+    try {
+        db = cs::io::load_card_db(path);
+        deck = cs::io::load_deck(deck_path, db);
+        effects = cs::io::load_effects(effects_path, db);
+    } catch (const std::runtime_error& error) {
+        std::fflush(stdout);
+        std::fprintf(stderr, "error: %s\n", error.what());
+        return 1;
+    }
+    const cs::AuthoredPolicy policy(deck.weights);
+    const cs::GameConfig config = make_config(deck);
+
+    print_header(db, deck, effects, deck_path, games, base_seed);
+    std::printf("\nSAMPLED OPENING HANDS - raw, not a chart (section 13.1, option B)\n");
+    std::printf("  %d hands, %d games each, keeping every hand. The question this answers\n",
+                sample, games);
+    std::printf("  is whether anything separates: if these values are all alike, a feature\n");
+    std::printf("  grid over them would be a grid of noise.\n");
+    std::printf("  value = P(assembled by turn %d | this hand), Wilson 95%%.\n", turn);
+    std::printf("\n  NOT a keep/mull recommendation. A mulligan decision compares a hand\n");
+    std::printf("  against the EXPECTATION OVER MULLIGANING, which is a different number\n");
+    std::printf("  and is not computed here (section 13.1).\n");
+
+    int commander = -1;
+    for (const cs::Card& card : db.cards) {
+        if (card.is_commander) {
+            commander = card.export_index;
+        }
+    }
+
+    // Hands are sampled from a stream INDEPENDENT of the per-game stream, so
+    // hand h is the same hand whatever `games` is set to. Without that, changing
+    // the games-per-hand would silently resample the hands and two runs would
+    // not be comparable.
+    cs::Rng hand_rng(cs::seed_for_game(base_seed, 0xADDED0ULL));
+    struct Sampled {
+        cs::Zone hand;
+        int lands = 0;
+        int reached = 0;
+        int games = 0;
+        std::string pattern;  // the one that fired most for this hand
+    };
+    std::vector<Sampled> results;
+    results.reserve(static_cast<std::size_t>(sample));
+
+    for (int h = 0; h < sample; ++h) {
+        Sampled row;
+        row.hand = cs::sample_hand(static_cast<int>(db.size()), commander,
+                                   config.opening_hand, hand_rng);
+        row.hand.for_each([&](int slot) {
+            row.lands += db.cards[static_cast<std::size_t>(slot)].plays_as_land() ? 1 : 0;
+        });
+        // Every hand gets the SAME game-index range, so the library shuffles are
+        // common random numbers across hands and the comparison between two rows
+        // is paired for free (section 10.4).
+        const cs::Zone fixed = row.hand;
+        const cs::RunSummary run =
+            drive<cs::RunSummary>(games, threads, [&](int first, int count) {
+                return cs::simulate_batch(db, effects, deck.patterns, config, policy, base_seed,
+                                          first, count, &fixed);
+            });
+        row.reached = cs::cumulative(run, turn);
+        row.games = run.games;
+        // WHICH pattern, not just how often. A hand at 97% is a claim worth
+        // being able to check, and "it assembles" does not say what it
+        // assembled - which is the difference between a fast hand and a
+        // modelling bug.
+        int most = -1;
+        for (std::size_t p = 0; p < run.fired.size(); ++p) {
+            if (most < 0 || run.fired[p] > run.fired[static_cast<std::size_t>(most)]) {
+                most = static_cast<int>(p);
+            }
+        }
+        row.pattern = most >= 0 && run.fired[static_cast<std::size_t>(most)] > 0
+                          ? deck.patterns.patterns[static_cast<std::size_t>(most)].name
+                          : "-";
+        results.push_back(row);
+    }
+
+    std::sort(results.begin(), results.end(), [](const Sampled& a, const Sampled& b) {
+        return static_cast<double>(a.reached) / a.games > static_cast<double>(b.reached) / b.games;
+    });
+
+    std::printf("\n  %5s %6s  %-14s %-28s %s\n", "value", "lands", "95% interval",
+                "mostly assembles", "hand");
+    for (const Sampled& row : results) {
+        const cs::Interval interval = cs::wilson(row.reached, row.games);
+        std::printf("  %5.1f%% %6d  [%4.1f, %4.1f] %-28s ", 100.0 * row.reached / row.games,
+                    row.lands, 100.0 * interval.low, 100.0 * interval.high,
+                    row.pattern.c_str());
+        bool first = true;
+        row.hand.for_each([&](int slot) {
+            std::printf("%s%s", first ? "" : ", ",
+                        db.cards[static_cast<std::size_t>(slot)].listed_name.c_str());
+            first = false;
+        });
+        std::printf("\n");
+    }
+
+    // The separation question, answered numerically rather than left to the eye.
+    double best = 0.0;
+    double worst = 1.0;
+    double total = 0.0;
+    for (const Sampled& row : results) {
+        const double value = static_cast<double>(row.reached) / row.games;
+        best = value > best ? value : best;
+        worst = value < worst ? value : worst;
+        total += value;
+    }
+    const double mean = total / static_cast<double>(results.size());
+    const cs::Interval typical = cs::wilson(static_cast<int>(mean * games), games);
+    std::printf("\n  DOES ANYTHING SEPARATE?\n");
+    std::printf("    best hand      %5.1f%%\n", 100.0 * best);
+    std::printf("    worst hand     %5.1f%%\n", 100.0 * worst);
+    std::printf("    spread         %5.1f points\n", 100.0 * (best - worst));
+    std::printf("    one hand's own 95%% interval is about %.1f points wide\n",
+                100.0 * (typical.high - typical.low));
+    if ((best - worst) > 3.0 * (typical.high - typical.low)) {
+        std::printf("    -> the spread is several times a single hand's interval, so hands\n");
+        std::printf("       DO separate and a feature grid (option A) has something to fit.\n");
+    } else {
+        std::printf("    -> the spread is comparable to one hand's interval, so this sample\n");
+        std::printf("       shows NO separation and option A would be gridding noise.\n");
+    }
+    return 0;
+}
+
 int main(int argc, char** argv) {
     const auto v = cs::version();
     const auto flavour = cs::build_flavour();
@@ -752,6 +895,7 @@ int main(int argc, char** argv) {
     long long trace_seed = -1;
     std::uint64_t seed = 1;
     bool do_sweep = false;
+    int sampled_hands = 0;
     std::string only;
     // Section 4.1: the default objective is an early-turn CDF point, because the
     // tail cannot separate opening hands and this tool is a mulligan solver's
@@ -770,6 +914,8 @@ int main(int argc, char** argv) {
             effects_path = argv[++i];
         } else if (std::strcmp(argv[i], "--seed") == 0 && i + 1 < argc) {
             seed = std::strtoull(argv[++i], nullptr, 10);
+        } else if (std::strcmp(argv[i], "--hands") == 0 && i + 1 < argc) {
+            sampled_hands = std::atoi(argv[++i]);
         } else if (std::strcmp(argv[i], "--sweep") == 0) {
             do_sweep = true;
         } else if (std::strcmp(argv[i], "--ablate") == 0 && i + 1 < argc) {
@@ -790,6 +936,10 @@ int main(int argc, char** argv) {
     // face, 76 castable" and only then said what was being measured.
     if (trace_seed >= 0) {
         return trace_one(path, deck_path, effects_path, static_cast<std::uint64_t>(trace_seed));
+    }
+    if (sampled_hands > 0) {
+        return hands(path, deck_path, effects_path, sampled_hands, games > 0 ? games : 4000, seed,
+                     threads, objective_turn);
     }
     if (do_sweep) {
         return sweep(path, deck_path, effects_path, games > 0 ? games : 20000, seed, threads,

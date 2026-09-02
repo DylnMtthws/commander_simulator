@@ -183,4 +183,25 @@ struct GameState {
 void begin_game(GameState& state, int deck_slots, int commander_slot, int hand_size,
                 Rng& rng) noexcept;
 
+// Sets up a game with a SPECIFIED opening hand.
+//
+// SIM_PLAN.md §1: "its interface takes a specific opening hand and returns a
+// value". §7.1 wrote the signature. Nothing implemented it, for seven phases,
+// because the only caller that needs it is the mulligan solver and the solver
+// had not been written - so §14 item 4 read as done while the single thing the
+// library exists for was missing. It is listed there as NOT DONE.
+//
+// The hand's cards are removed from the library rather than drawn from it, so
+// the remaining shuffle is over the other 92 slots and the hand is exact rather
+// than conditioned-on.
+void begin_game_with_hand(GameState& state, int deck_slots, int commander_slot,
+                          const Zone& hand, Rng& rng) noexcept;
+
+// A uniformly random opening hand of `size` cards, as a Zone.
+//
+// Sampling lives here rather than in the caller so that the hand a solver
+// evaluates is drawn the same way the turn loop would have drawn it, from the
+// same RNG - one definition of "an opening hand of this deck".
+[[nodiscard]] Zone sample_hand(int deck_slots, int commander_slot, int size, Rng& rng) noexcept;
+
 }  // namespace cs

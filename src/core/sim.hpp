@@ -93,10 +93,14 @@ struct GameConfig {
 };
 
 // Plays one game. A pure function of (db, config, seed) - INVARIANT S1.
+// `opening_hand`, when non-null, is dealt instead of a random one - which is
+// what makes this a value function for a mulligan solver rather than a deck
+// simulator (section 1). Null keeps the old behaviour exactly.
 [[nodiscard]] GameResult run_game(const CardDb& db, const EffectDb& effects,
                                   const PatternSet& patterns, const GameConfig& config,
                                   const Policy& policy, std::uint64_t seed,
-                                  Observer* observer = nullptr);
+                                  Observer* observer = nullptr,
+                                  const Zone* opening_hand = nullptr);
 
 // Plays games [first_game, first_game + games) and accumulates them.
 //
@@ -112,6 +116,7 @@ struct GameConfig {
 [[nodiscard]] RunSummary simulate_batch(const CardDb& db, const EffectDb& effects,
                                         const PatternSet& patterns, const GameConfig& config,
                                         const Policy& policy, std::uint64_t base_seed,
-                                        int first_game, int games);
+                                        int first_game, int games,
+                                        const Zone* opening_hand = nullptr);
 
 }  // namespace cs

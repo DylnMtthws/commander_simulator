@@ -19,9 +19,14 @@ and a half.
 ./build/release/src/cli/cs --ablate "Sol Ring"     # just one
 ```
 
+```bash
+./build/release/src/cli/cs --hands 60 --games 4000   # sampled opening hands, raw
+```
+
 `--turn N` sets the objective (default 3, see SIM_PLAN.md §4.1). The sweep
 reports effect sizes with paired intervals and a measured null taken from the
-deck's own inert cards — never a significance verdict.
+deck's own inert cards — never a significance verdict. `--hands` is deliberately
+a list rather than a chart (§13.1).
 
 ## Build
 

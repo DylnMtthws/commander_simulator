@@ -50,4 +50,35 @@ void begin_game(GameState& state, int deck_slots, int commander_slot, int hand_s
     }
 }
 
+void begin_game_with_hand(GameState& state, int deck_slots, int commander_slot,
+                          const Zone& hand, Rng& rng) noexcept {
+    state = GameState{};
+    state.copy_of.fill(-1);
+    state.commander_slot = commander_slot;
+    if (commander_slot >= 0) {
+        state.command_zone.set(commander_slot);
+    }
+    // Everything that is neither the commander nor in the given hand. Ascending
+    // order, for the same reason begin_game uses it: the starting arrangement
+    // must depend on nothing but the deck.
+    for (int slot = 0; slot < deck_slots; ++slot) {
+        if (slot == commander_slot || hand.test(slot)) {
+            continue;
+        }
+        state.library[state.library_count++] = static_cast<std::uint8_t>(slot);
+    }
+    state.hand = hand;
+    static_cast<void>(rng);  // the library shuffles lazily, in draw_one
+}
+
+Zone sample_hand(int deck_slots, int commander_slot, int size, Rng& rng) noexcept {
+    // Drawn through the ordinary machinery rather than by a second sampler, so
+    // "an opening hand of this deck" has one definition. A hand sampled a
+    // different way from the way the turn loop draws is a different
+    // distribution, and the difference would be invisible.
+    GameState scratch;
+    begin_game(scratch, deck_slots, commander_slot, size, rng);
+    return scratch.hand;
+}
+
 }  // namespace cs

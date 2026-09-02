@@ -445,3 +445,48 @@ TEST_CASE("a paired run decomposes across threads like a batch does",
         }
     }
 }
+
+TEST_CASE("a specified opening hand is dealt exactly, and S1 still holds",
+          "[seeding][S1][hand]") {
+    // SIM_PLAN.md section 1 says the interface takes a SPECIFIC opening hand.
+    // Section 7.1 wrote the signature; nothing implemented it for seven phases,
+    // because the only caller that needs it is the mulligan solver. Section 14
+    // item 4 read as done throughout.
+    cs::Rng rng(kBaseSeed);
+    const cs::Zone hand = cs::sample_hand(static_cast<int>(fixture().cards.size()), -1, 3, rng);
+    REQUIRE(hand.count() == 3);
+
+    SECTION("the hand is exact, not conditioned-on") {
+        cs::GameState state;
+        cs::Rng fresh(kBaseSeed);
+        cs::begin_game_with_hand(state, static_cast<int>(fixture().cards.size()), -1, hand, fresh);
+        REQUIRE(state.hand.count() == 3);
+        hand.for_each([&](int slot) { REQUIRE(state.hand.test(slot)); });
+        // And its cards are NOT still in the library, or they could be drawn twice.
+        for (std::size_t i = 0; i < state.library_count; ++i) {
+            REQUIRE_FALSE(hand.test(state.library[i]));
+        }
+        REQUIRE(state.library_count == fixture().cards.size() - 3);
+    }
+    SECTION("game i is still a pure function of (hand, seed, i)") {
+        const cs::StubPolicyDoNotUseForResults policy;
+        cs::GameConfig config;
+        const cs::RunSummary once =
+            cs::simulate_batch(fixture(), simple_effects(), no_patterns(), config, policy,
+                               kBaseSeed, 0, 20, &hand);
+        const cs::RunSummary twice =
+            cs::simulate_batch(fixture(), simple_effects(), no_patterns(), config, policy,
+                               kBaseSeed, 0, 20, &hand);
+        REQUIRE(once.digest_xor == twice.digest_xor);
+        // And a DIFFERENT hand gives a different game, so the parameter is read.
+        cs::Rng other_rng(kBaseSeed ^ 0xFFFF);
+        const cs::Zone other =
+            cs::sample_hand(static_cast<int>(fixture().cards.size()), -1, 3, other_rng);
+        if (other.count() == 3) {
+            const cs::RunSummary elsewhere =
+                cs::simulate_batch(fixture(), simple_effects(), no_patterns(), config, policy,
+                                   kBaseSeed, 0, 20, &other);
+            REQUIRE(elsewhere.digest_xor != once.digest_xor);
+        }
+    }
+}
