@@ -195,24 +195,32 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
             // output-ordering issue in this project, all five found by reading
             // output and none by a test (upstream PLAN.md 11.0).
             const Face* cast_face = db.cards[static_cast<std::size_t>(spell)].castable_face();
-            int to_tap = cast_face != nullptr ? cast_face->cost->mana_value_at_x_zero() : 0;
+            const int cost_announced =
+                cast_face != nullptr ? cast_face->cost->mana_value_at_x_zero() : 0;
             if (observer != nullptr) {
-                observer->cast_spell(spell, to_tap);
+                observer->cast_spell(spell, cost_announced);
             }
 
             const CardEffects& cast_entry = effects.by_slot[static_cast<std::size_t>(spell)];
 
-            // CONVOKE, before anything reads the mana available. Each creature
-            // tapped pays {1} or one pip of its colour, and only creatures with
-            // no mana ability of their own are offered - under Kinnan a mana
-            // dork produces two and convoking it produces one, so tapping it
-            // for mana dominates (core/effects.hpp).
-            int convoke_available = 0;
-            std::vector<int> convokable;
+            // CONVOKE joins the payable sources rather than being paid on the
+            // side. Each creature tapped pays {1} or one pip of its colour, and
+            // only creatures with no mana ability of their own are offered -
+            // under Kinnan a mana dork produces two and convoking it produces
+            // one, so tapping it for mana dominates (core/effects.hpp).
+            //
+            // Appending them here means the payment planner chooses between
+            // convoking a body and tapping a land by the same rule it uses for
+            // everything else, instead of a separate loop deciding first.
+            std::vector<Source> payable(sources.begin(), sources.end());
+            const std::size_t convoke_begin = payable.size();
             if (cast_entry.convoke) {
+                std::vector<int> convokable;
                 convoke_slots(db, effects, state, convokable);
-                convoke_available = static_cast<int>(convokable.size());
+                convoke_sources(db, effects, state, payable);
+                static_cast<void>(convokable);
             }
+            const int convoke_available = static_cast<int>(payable.size() - convoke_begin);
 
             if (cast_entry.has_clone) {
                 std::vector<int> targets;
@@ -291,79 +299,53 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
                 ++result.stats.mass_untaps;
             }
 
-            // Convoke is paid FIRST, because a convoked creature is not a
-            // source and cannot be spent twice. Slot order, like the rest of
-            // payment - the set was already filtered to creatures whose tap is
-            // worth nothing else.
-            for (const int convoked : convokable) {
-                if (to_tap <= 0) {
-                    break;
-                }
-                if (!state.tapped.test(convoked)) {
-                    state.tapped.set(convoked);
-                    --to_tap;
-                    ++result.stats.convoked;
-                }
-            }
-
-            // Paying SPENDS THE SOURCES collect_sources produced.
+            // PAYING SPENDS THE PLAN THE MANA SYSTEM MADE.
             //
-            // It used to walk the battlefield and re-derive what a source was,
-            // and re-derived it differently: it required `has_mana_source`, so
-            // a creature that is a source only because Enduring Vitality grants
-            // it one was never tapped, and a clone was looked up by its own slot
-            // rather than the card it copies, so it was never tapped either.
-            // It also subtracted the UNMULTIPLIED amount, ignoring Kinnan. Mana
-            // from Vitality, from every clone, and from Elvish Spirit Guide in
-            // hand was therefore free and unlimited - the deck could spend
-            // twenty-four mana off a board of two lands, which is what reading
-            // one trace showed and no counter did.
+            // plan_payment runs the same colour matching can_pay ran and then
+            // says which sources it committed. Before this, the matching was
+            // computed, discarded, and rebuilt here in slot order - the twelfth
+            // rule in the ingestion repo's PLAN.md 11.0, and measured at 1.33
+            // points of P(assembled by turn 3) against a 0.34 interval, because
+            // an arbitrary tie-break is still a decision.
             //
-            // One function decides what a source is; this one spends what that
-            // function returned. Any future disagreement between them is now
-            // impossible rather than unlikely.
-            //
-            // Still crude in the DECLARED way (section 6.4): it spends in a
-            // fixed order rather than solving which sources to keep. The order
-            // is cheapest resource first - tap a permanent, then sacrifice one,
-            // then exile a card from hand - so Elvish Spirit Guide is the last
-            // thing spent rather than the first.
-            const auto spend = [&](const Source& source, int pass) {
-                if (to_tap <= 0 || source.slot < 0) {
-                    return;
+            // The plan is made against `payable`, which is `sources` plus this
+            // card's convoke bodies, so a convoked creature and a land compete
+            // under one rule.
+            // choose_spell only offers a card with a castable face, so this is
+            // never null in practice - but the mana layer is not the place to
+            // find that out by dereferencing.
+            const Payment plan =
+                cast_face != nullptr ? plan_payment(*cast_face->cost, payable, 0) : Payment{};
+            for (std::size_t i = 0; i < payable.size(); ++i) {
+                if (!plan.spends(i)) {
+                    continue;
                 }
-                const auto index = static_cast<std::size_t>(source.slot);
+                const int slot = payable[i].slot;
+                if (slot < 0) {
+                    continue;
+                }
+                if (i >= convoke_begin) {
+                    // A convoked body taps and produces nothing; it paid a cost.
+                    if (!state.tapped.test(slot)) {
+                        state.tapped.set(slot);
+                        ++result.stats.convoked;
+                    }
+                    continue;
+                }
                 const CardEffects& source_entry =
-                    effects.by_slot[static_cast<std::size_t>(state.effective(source.slot))];
+                    effects.by_slot[static_cast<std::size_t>(state.effective(slot))];
                 const bool from_hand =
                     source_entry.has_ritual && source_entry.ritual.from_zone == RitualZone::Hand;
                 const bool sacrifices = source_entry.has_ritual && !from_hand;
-                const int want = from_hand ? 2 : (sacrifices ? 1 : 0);
-                if (want != pass) {
-                    return;
-                }
                 if (from_hand) {
-                    state.hand.clear(source.slot);
-                } else {
-                    if (state.tapped.test(source.slot)) {
-                        return;
-                    }
-                    if (sacrifices) {
-                        state.battlefield.clear(source.slot);
-                    } else {
-                        state.tapped.set(source.slot);
-                        state.life -= life_cost_of_tapping(effects, state, source.slot);
-                    }
-                }
-                if (from_hand || sacrifices) {
-                    state.graveyard.set(source.slot);
-                }
-                static_cast<void>(index);
-                to_tap -= source.amount;
-            };
-            for (int pass = 0; pass < 3 && to_tap > 0; ++pass) {
-                for (const Source& source : sources) {
-                    spend(source, pass);
+                    state.hand.clear(slot);
+                    state.graveyard.set(slot);
+                } else if (sacrifices) {
+                    state.battlefield.clear(slot);
+                    state.graveyard.set(slot);
+                } else if (!state.tapped.test(slot)) {
+                    state.tapped.set(slot);
+                    state.life -= life_cost_of_tapping(effects, state, slot);
                 }
             }
 

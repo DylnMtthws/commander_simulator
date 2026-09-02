@@ -1228,6 +1228,64 @@ every turn. Budget ~200–500 ns; well within §2.4's envelope.
 **Which land to play** stays a scorer decision (§6.2), not a matching decision —
 it is a choice about future turns, and the scorer's colour-need term handles it.
 
+#### BUILT, Phase 7 — and step 4 was the part nobody had done
+
+Steps 1–3 shipped in Phase 2. **Step 4 did not, and for three phases nothing
+noticed, because step 3's answer was being thrown away.**
+
+`can_pay` ran the matching, committed specific sources to specific colours, and
+returned a **bool**. The turn loop then decided which sources to tap by walking
+the battlefield in slot order. Two functions independently deriving "which
+sources pay this cost" — the twelfth rule in the ingestion repo's `PLAN.md`
+§11.0 — with the second one crude, different, and invisible.
+
+**It was measured before it was fixed**, by swapping the turn loop's arbitrary
+tie-break for an equally arbitrary one:
+
+| payment rule | turn 3 | turn 6 | turn 12 |
+|---|---|---|---|
+| slot order (what shipped) | 8.67% | 36.96% | 66.61% |
+| lands first (a probe, equally defensible) | 10.00% | 37.36% | 66.48% |
+| **the actual assignment** | **9.47%** | **38.74%** | **67.19%** |
+
+Against a 95% interval of ±0.34 at turn 3, the two crude rules differ by **1.33
+points** — an uncontrolled term four times the stated uncertainty, at the
+objective §4.1 selects, and larger than all but eight of the 98 cards in §16.5's
+sweep.
+
+**Two things in that table are worth reading carefully.** At turn 3 the real
+assignment lands *between* the two crude rules, which is the confirmation you
+would hope for. At turns 6 and 12 it lands **above both** — because minimising
+overpayment leaves more mana untapped, and more mana untapped compounds into
+more spells cast in the same turn. Neither crude rule was a bound on it.
+
+`plan_payment` now returns the assignment and the turn loop spends exactly it.
+The generic remainder is filled **best fit** — the largest source that does not
+exceed what is owed, then the smallest that covers it — which minimises
+overpayment. That is a dominance argument, not a preference: mana left untapped
+is weakly better than mana wasted.
+
+#### What is still deferred, and it now has a name
+
+The one thing the assignment deliberately does **not** do is prefer to keep a
+*particular* source untapped.
+
+That is not a gap in the matching; it is a genuine policy question, and the
+measurement above shows it has teeth. `lands first` beat the real assignment at
+turn 3 — the only place it did — because it never taps *Kinnan*, and
+`wide_colour_into_kinnan_dig` requires Kinnan **untapped**. So:
+
+> **Minimising overpayment is not the same as maximising assembly.** When a
+> pattern term names a specific permanent as untapped, *which* source stays
+> untapped matters and not merely how much mana is left. The mana layer cannot
+> see that — it has no patterns — and putting the preference there would hide a
+> decision where the scorer cannot weigh it.
+
+The right home is §6.2's scorer, as a term over "sources this turn's patterns
+need untapped", and it is not built. Until it is, the model is biased *against*
+lines that need a specific untapped permanent, which is the conservative
+direction and is stated here rather than discovered later.
+
 ### 6.5 Determinism under the policy
 
 Non-negotiable, and the failure mode is nasty: a tiebreak resolved by container
@@ -2142,6 +2200,60 @@ through it, and the CLI links `cs_io` alone since `cs_core` arrives transitively
   measures, and the v1 numbers should be read as an upper bound until they
   exist.
 
+### 13.1 OPEN QUESTION — what a keep/mull chart is a chart *of*
+
+**Unresolved, and it must be resolved before the mulligan solver starts, because
+it decides what the solver computes rather than how.** Written up here with the
+options and their costs; no option is chosen.
+
+§1 says the core takes a *specific opening hand* and returns a value, and §7.1's
+signature is `simulate_one(deck, hand, seed)`. That is the right interface and it
+says nothing about what the **output** is. There are C(99,7) ≈ **1.6 × 10¹⁰**
+seven-card hands. A chart cannot be over hands, so it is over something else, and
+the plan has never said what.
+
+**The difficulty is the feature set, not the search.** A chart over the wrong
+features is unreadable; over too many it is uncomputable; and the features are
+what a human has to hold in their head at the table, which is a constraint the
+statistics cannot supply.
+
+Four options, with what each costs and what each gives up:
+
+| Option | What the chart is over | Cost | What it gives up |
+|---|---|---|---|
+| **A. Fixed feature grid** | A hand-authored tuple: land count × mana-source count × has-Kinnan × has-a-tutor, say | Cheapest. Enumerate cells, sample hands matching each, run *n* games per cell | Everything not in the tuple. Two hands in one cell can differ by *Basalt Monolith*, and the cell reports their average as if it were a decision |
+| **B. Sampled hands, reported raw** | Nothing — a list of *N* sampled hands with a value each | Trivial to compute, and it is what the core already does | Readability entirely. This is data, not a chart, and the user has to find the pattern themselves |
+| **C. Learned features** | Whatever separates keeps from mulls, fitted | A model, a training set, and a validation story this project does not have | Auditability. Every other number here is traceable to a declared assumption; a fitted feature is not, and §9.5's whole discipline breaks |
+| **D. Decision-list over declared terms** | A short ordered list of rules over §5.2's *existing* pattern vocabulary — `in_hand`, `creature_count`, land count | Moderate: the vocabulary exists and is already validated at load | Expressiveness. It can only say things the pattern language can say, which is the point and also the limit |
+
+**What is actually being asked, stated so the choice can be made against it:** a
+mulligan decision is *keep this 7* versus *mull to 6 and keep the better of what
+comes*. So the chart's cell value is not `P(assembled by turn 3 | this hand)` —
+it is that quantity compared against the **expectation over the mulligan**, which
+is itself a function of the same chart one row down. **The recursion is the
+computation**, and it is cheap only if the feature set is small.
+
+Three things worth deciding at the same time, because they interact:
+
+1. **The features must be observable before the mulligan.** "Has a tutor" is; "is
+   a hand that assembles by turn 3" is not. A feature the player cannot evaluate
+   while holding the cards is not a decision rule.
+2. **Cell counts must be reported.** A grid cell holding four sampled hands is
+   noise with a number on it, and §10.2's intervals apply per cell — most of the
+   sweep's discipline transfers directly.
+3. **§4.1's blind spot lands here.** The objective cannot see mid-game engine
+   pieces, so a feature like "has *Basalt Monolith*" will show near zero. That is
+   correct for a mulligan decision and will read as wrong to anyone who plays the
+   deck, which is a *presentation* problem the feature set can either mitigate or
+   make worse.
+
+**My read, offered rather than adopted:** A, with the cell counts and intervals
+printed, and with D as the thing A is eventually validated against — if a
+decision list over declared terms reproduces the grid, the grid is real; if it
+cannot, the grid was fitting noise. B is worth building first regardless, because
+it is nearly free and it is what tells you which features separate anything at
+all.
+
 ---
 
 ## 14. Definition of done for v1
@@ -2157,8 +2269,21 @@ through it, and the CLI links `cs_io` alone since `cs_core` arrives transitively
    (§4.4), authored ranks, ≥ 6 win patterns, and engines. `effects.toml` carries
    `authored_from` hashes and the exporter warns on drift. The run prints the
    inert set **grouped by category**, not as a count (§9.5).
-4. `simulate_one` and `simulate_batch` implemented; `core/` links only the
-   standard library, provably (link error otherwise).
+4. **NOT DONE, and it reads as done.** `simulate_batch` is implemented and
+   `core/` links only the standard library, provably. But **§7.1's signature
+   does not exist**: both entry points deal their own random opening hand.
+   `begin_game` shuffles and draws seven, and there is no way to hand the core a
+   *specific* hand — which is the one thing §1 says this library is for. The
+   mulligan solver is the caller that would have discovered it, and it has not
+   been written, so nothing has.
+
+   The work is small: a `begin_game` overload that seeds a given hand and
+   shuffles the rest, and an `OpeningHand` parameter threaded through
+   `run_game`/`simulate_batch`. It is listed here rather than done because it
+   belongs to the solver's boundary, and because a definition-of-done item that
+   quietly reads as satisfied is worse than an open one (§11.0's
+   mechanism-quietly-not-running family — this is the same shape in a
+   checklist).
 5. **INVARIANT S1 holds and is tested** (§7.3): game *i*'s outcome is a pure
    function of `(deck, hand, base_seed, i)` — identical across 1, 4, and 8
    threads, identical whether run in a batch or alone, identical under reversed
@@ -2410,30 +2535,44 @@ blank` is not distinguished from doing nothing.
 
 #### The answer
 
-| Card | delta at turn 3 | vs blank |
-|---|---|---|
-| Enduring Vitality | +7.28% | +7.69% |
-| Thrasios, Triton Hero | +3.08% | +3.49% |
-| Chord of Calling | +1.66% | +2.07% |
-| Copy Artifact | −0.26% | **+0.15%** |
-| Mockingbird | −0.37% | **+0.04%** |
-| Flesh Duplicate | −0.39% | **+0.02%** |
-| Mirrormade | −0.41% | **+0.00%** |
-| Mirage Mirror | −0.41% | **−0.00%** |
-| Flash Photography | −0.43% | **−0.02%** |
-| Copy Enchantment | −0.44% | **−0.03%** |
-| Clever Impersonator | −0.47% | **−0.06%** |
+All figures below are **after** §6.4's payment fix, and the "before" column is
+the same sweep run against the old slot-order payment — because a conclusion
+that only holds under one arbitrary tie-break is not a conclusion.
 
-**Seven of the eight clones sit within ±0.06 of cards declared to do nothing.**
-Only *Copy Artifact* is measurably above a blank, and it is the one that copies
-*Basalt Monolith*. §16.1 said clones matter less than their count suggests; the
-sweep says that at the objective this tool recommends, seven of them are not
-distinguishable from blanks.
+| Card | delta at turn 3 | vs blank (before) | **vs blank (after)** |
+|---|---|---|---|
+| Enduring Vitality | +7.61% | +7.69% | **+8.05%** |
+| Thrasios, Triton Hero | +3.02% | +3.49% | **+3.46%** |
+| Chord of Calling | +2.15% | +2.07% | **+2.59%** |
+| Copy Artifact | −0.29% | +0.15% | **+0.15%** |
+| Copy Enchantment | −0.34% | −0.03% | **+0.10%** |
+| Flesh Duplicate | −0.39% | +0.02% | **+0.05%** |
+| Mockingbird | −0.44% | +0.04% | **+0.00%** |
+| Clever Impersonator | −0.50% | −0.06% | **−0.06%** |
+| Mirrormade | −0.50% | +0.00% | **−0.06%** |
+| Flash Photography | −0.50% | −0.02% | **−0.06%** |
+| Mirage Mirror | −0.51% | −0.00% | **−0.07%** |
+
+The measured null moved slightly (−0.411% → −0.441%, spread 0.34 → 0.30 points,
+so the not-distinguished band is now ±0.148). **Every clone stays inside it, and
+the ranking of the whole table is unchanged at the top.** The conclusion does not
+depend on the payment rule.
+
+> **All eight clones are inside the band where they cannot be distinguished from
+> a card declared to do nothing.** *Copy Artifact* sits exactly on its edge at
+> +0.148 — it is the one that can copy *Basalt Monolith* — and everything else
+> is well within.
+
+**A correction to an earlier reading of this table.** It previously said "only
+*Copy Artifact* is measurably above a blank". That was wrong by this section's
+own stated rule: at the time the band was ±0.17 and Copy Artifact was at +0.154,
+which is inside it. It is the one clone that *might* be above zero, and the data
+does not say it is.
 
 That answers what §16.1 could not: the question was never "+0.29 or 0" against
 zero, it was against the wrong reference point. Measured against a blank rather
-than against a Forest, the clones are at zero, and the interval is tight enough
-to say so.
+than against a Forest, the clones are at zero, and the band is tight enough to
+say so.
 
 #### The ranking is objective-dependent, and strongly
 
@@ -2443,6 +2582,12 @@ to say so.
 | Basalt Monolith | **−0.61%** | +1.09% | **+5.58%** |
 | Thrasios, Triton Hero | +3.08% | +3.04% | +5.69% |
 | Force of Will (inert) | −0.63% | −1.23% | −0.31% |
+
+(Measured under the old payment rule. §6.4's fix moves *Basalt Monolith* to
+−0.47% at turn 3, or −0.03% against the null — the crude rule had been tapping a
+permanent that does not untap for generic mana when a land would have done, and
+charging the card for it. The blind spot below survives the correction: Basalt is
+still at zero by turn 3.)
 
 *Basalt Monolith* is half the deck's primary engine and reads **negative** at
 turn 3 — it is colourless, does not untap, and a turn-3 cast buys nothing that
@@ -2456,7 +2601,32 @@ changing the objective is not a presentational choice**; the honest form names
 the turn every time, which is why the column is `goldfish_turn_to_assembly_delta
 at turn N` and never `score`.
 
-### 16.6 What is still not established
+### 16.6 The payment rule was worth more than 90 of the 98 cards
+
+Recorded as a finding rather than as a bug note, because the magnitude is the
+point. Two equally defensible crude payment rules — spend in slot order, spend
+lands first — differ by **1.33 points** of `P(assembled by turn 3)`, against a
+95% interval of ±0.34.
+
+Eight cards in the §16.5 sweep are worth more than 1.33 points. **Ninety are
+worth less.** For three phases the largest single term in the model at the
+chosen objective was an arbitrary iteration order, and nothing in the output
+distinguished it from the deck.
+
+Two things generalise:
+
+1. **A declared simplification is not a bounded one.** §6.4 said mana sequencing
+   was a constraint problem and deferred step 4 explicitly, in writing, as a
+   known crudeness. Declaring it made it honest and did nothing to make it
+   small. **The declaration and the measurement are different acts**, and only
+   the second one tells you whether the simplification mattered.
+2. **Measure a simplification by perturbing it, not by reasoning about it.**
+   Swapping one arbitrary rule for another arbitrary rule costs ten minutes and
+   bounds the term from below. Nothing about reading the code suggested 1.33
+   points; the comment beside it said "crude" and "a policy question and a later
+   one", both true and neither a magnitude.
+
+### 16.7 What is still not established
 
 - The paired interval is **Wald on the discordant pairs**, not a score interval.
   §10.2 insists on Wilson for proportions because the normal approximation fails

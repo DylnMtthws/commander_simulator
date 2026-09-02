@@ -235,3 +235,87 @@ TEST_CASE("an empty board pays only a free spell", "[mana]") {
     REQUIRE(payable(cost_of(0, {}), {}));
     REQUIRE_FALSE(payable(cost_of(1, {}), {}));
 }
+
+TEST_CASE("plan_payment agrees with can_pay, always", "[mana][payment][one-definition]") {
+    // The whole reason plan_payment exists is that the assignment was being
+    // computed and discarded, so the first thing to pin is that the two entry
+    // points cannot come to disagree about payability. They share the
+    // requirement and the colour matching; only the generic selection is extra.
+    const std::vector<cs::Source> board{
+        cs::Source{.produces = 0x10, .amount = 1, .slot = 0},  // {G}
+        cs::Source{.produces = 0x02, .amount = 1, .slot = 1},  // {U}
+        cs::Source{.produces = 0x00, .amount = 2, .slot = 2},  // {C}{C}
+        cs::Source{.produces = 0x12, .amount = 1, .slot = 3},  // {G} or {U}
+    };
+    for (std::uint8_t generic = 0; generic <= 6; ++generic) {
+        for (std::uint8_t green = 0; green <= 3; ++green) {
+            for (std::uint8_t blue = 0; blue <= 3; ++blue) {
+                cs::Cost cost;
+                cost.generic = generic;
+                cost.pips[static_cast<std::size_t>(cs::Colour::Green)] = green;
+                cost.pips[static_cast<std::size_t>(cs::Colour::Blue)] = blue;
+                REQUIRE(cs::plan_payment(cost, board).payable == cs::can_pay(cost, board));
+            }
+        }
+    }
+}
+
+TEST_CASE("a payment plan covers what it owes", "[mana][payment]") {
+    const std::vector<cs::Source> board{
+        cs::Source{.produces = 0x10, .amount = 1, .slot = 0},  // {G}
+        cs::Source{.produces = 0x02, .amount = 1, .slot = 1},  // {U}
+        cs::Source{.produces = 0x00, .amount = 3, .slot = 2},  // {C}{C}{C}
+        cs::Source{.produces = 0x00, .amount = 1, .slot = 3},  // {C}
+    };
+    cs::Cost cost;  // {2}{G}{U}
+    cost.generic = 2;
+    cost.pips[static_cast<std::size_t>(cs::Colour::Green)] = 1;
+    cost.pips[static_cast<std::size_t>(cs::Colour::Blue)] = 1;
+
+    const cs::Payment plan = cs::plan_payment(cost, board);
+    REQUIRE(plan.payable);
+    REQUIRE(plan.spent >= 4);
+    // The only green and the only blue source must both be in it: there is no
+    // other way to make those pips, so the matching had no choice.
+    REQUIRE(plan.spends(0));
+    REQUIRE(plan.spends(1));
+}
+
+TEST_CASE("a payment plan minimises overpayment", "[mana][payment]") {
+    // The stated rule (core/mana.hpp): best fit for the generic remainder -
+    // largest source that does not exceed what is owed, then the smallest that
+    // covers it. The alternative that this rules out is "take them in order",
+    // which is exactly what the turn loop used to do and what cost 1.33 points
+    // of P(assembled by turn 3).
+    const std::vector<cs::Source> board{
+        cs::Source{.produces = 0x00, .amount = 1, .slot = 0},
+        cs::Source{.produces = 0x00, .amount = 1, .slot = 1},
+        cs::Source{.produces = 0x00, .amount = 4, .slot = 2},
+    };
+    cs::Cost cost;
+    cost.generic = 4;
+
+    const cs::Payment plan = cs::plan_payment(cost, board);
+    REQUIRE(plan.payable);
+    // The 4 covers it exactly. Taking sources in index order would spend
+    // 1 + 1 + 4 = 6 for a cost of 4, wasting two mana and tapping two more
+    // permanents.
+    REQUIRE(plan.spent == 4);
+    REQUIRE(plan.spends(2));
+    REQUIRE_FALSE(plan.spends(0));
+    REQUIRE_FALSE(plan.spends(1));
+}
+
+TEST_CASE("a source with no slot is planned but cannot be spent", "[mana][payment]") {
+    // Tests build abstract mana that came from nowhere. The planner may pick
+    // it; the turn loop skips any source whose slot is -1 rather than tapping
+    // card zero, which is the eleventh rule's hazard in the one place a Source
+    // legitimately has no origin.
+    const std::vector<cs::Source> anonymous{cs::Source{.produces = 0x1F, .amount = 3}};
+    cs::Cost cost;
+    cost.generic = 2;
+    const cs::Payment plan = cs::plan_payment(cost, anonymous);
+    REQUIRE(plan.payable);
+    REQUIRE(plan.spends(0));
+    REQUIRE(anonymous[0].slot == -1);
+}

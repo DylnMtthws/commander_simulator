@@ -63,6 +63,58 @@ struct ManaMultiplier {
 
 [[nodiscard]] Source with_multiplier(Source source, const ManaMultiplier& multiplier) noexcept;
 
+// WHICH sources pay a cost, not merely whether it can be paid.
+//
+// This exists because the answer was being computed and thrown away. The
+// coloured-pip search commits specific sources to specific colours - it has to,
+// since a source produces one colour and payability is a matching, not a sum -
+// and `can_pay` returned a bool and discarded the matching. The turn loop then
+// re-derived "which sources do I tap" in slot order, crudely and differently.
+//
+// That is the twelfth rule in the ingestion repo's PLAN.md 11.0 - two functions
+// independently deriving one concept - and its cost here was MEASURED before
+// this was written: swapping the turn loop's arbitrary tie-break from slot order
+// to lands-first moved P(assembled by turn 3) by 1.33 points, against a 95%
+// interval of 0.34. An uncontrolled term four times the size of the stated
+// uncertainty, at the objective section 4.1 selects.
+//
+// `spend` is a bitmask over INDICES INTO THE SOURCES SPAN, not over deck slots:
+// this type knows nothing about zones, and the caller maps an index back to
+// whatever it has to tap, sacrifice or exile.
+struct Payment {
+    bool payable = false;
+    std::uint64_t spend[2] = {0, 0};
+    // Total mana the chosen sources produce. >= the cost; the excess is the
+    // overpayment the selection below tries to minimise.
+    int spent = 0;
+
+    [[nodiscard]] constexpr bool spends(std::size_t index) const noexcept {
+        return index < 128 && (spend[index / 64] & (std::uint64_t{1} << (index % 64))) != 0;
+    }
+};
+
+// Plans a payment: the colour matching, plus enough further sources to cover
+// generic.
+//
+// THE SELECTION RULE FOR GENERIC IS STATED, because there is no free answer and
+// an unstated one is how an arbitrary tie-break became worth 1.33 points:
+//
+//   Sources committed by the colour matching are spent - they are required.
+//   The remaining generic is then filled BEST FIT: repeatedly take the largest
+//   uncommitted source that does not exceed what is still owed, and when none
+//   fits, the smallest source that covers it. Ties by index, ascending.
+//
+// That minimises overpayment, which is a dominance argument rather than a
+// preference: mana left untapped is weakly better than mana wasted, because it
+// can pay for the next spell this turn.
+//
+// What it deliberately does NOT do is prefer to keep any PARTICULAR source
+// untapped. "Do not tap Kinnan, a pattern needs it untapped" is a policy
+// judgement, section 6.4's constraint problem proper, and inventing one here
+// would put a decision in the mana layer where the scorer could not see it.
+[[nodiscard]] Payment plan_payment(const Cost& cost, std::span<const Source> sources,
+                                   int x = 0) noexcept;
+
 // Can this cost be paid from these sources, with {X} set to `x`?
 //
 // `x` is a parameter rather than something inferred, because choosing X is a
