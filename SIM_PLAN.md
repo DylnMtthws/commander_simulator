@@ -2384,6 +2384,81 @@ compute a keep/mull decision, because that is a comparison against the
 expectation over mulliganing and needs the recursion above. What it was for was
 deciding whether A is worth building, and it decided that.
 
+#### A IS BUILT, on the primer's features rather than invented ones
+
+`cs --grid N`. §13.1 says the feature set is the whole difficulty, so the
+features are taken from the deck's **published primer**, in its own words:
+
+> *"our number 1 priority is definitely mana production"* … *"preferably ramp
+> that we can play on turn 1"* … *"this is NOT a deck where you want to keep the
+> 'all interaction hand'"* … *"we love a hand that gives a game plan — a creature
+> tutor, a threat to ramp into, or a tutor for Basalt Monolith."*
+
+| Feature | Definition | Why this one |
+|---|---|---|
+| `src` | mana sources in hand: lands, rocks, dorks, rituals | the primer's first priority |
+| `t1` | a **nonland** source castable on turn one | *"preferably ramp we can play on turn 1"* |
+| `GU` | the hand's own sources can pay `{G}{U}`, asked through `can_pay` | four of the primer's eight bad hands are bad for colour |
+| `pay` | a tutor, or a card **named by a declared pattern or engine** | *"a hand that gives a game plan"* |
+
+Two design choices worth defending. **`GU` goes through `can_pay`**, not a
+colour count, so §2.6's rule that a source produces `amount` mana all of one
+colour reaches the feature — one dual is not `{G}{U}` and a shortcut would say it
+is. And **`pay` uses declared pattern membership, not authored rank**: a feature
+built from `[policy.rank]` would make the grid a picture of the scorer rather
+than of the deck.
+
+**THE PRIMER'S EIGHT WORKED HANDS ARE HELD OUT.** They come with stated
+reasoning and they are the only external validation set this project will ever
+get. Fitting a grid with them in view and then scoring them answers nothing.
+They are also from version C (§15A), so each needs checking against A's 99 first.
+
+#### The chart carries §4.1's warnings, and then demonstrates why
+
+Every cell prints its turn, its hand count, a Wilson interval, and a **second
+turn as context** — the arrangement §13.1 settled on: the decision is computed on
+one objective, the second is displayed as a guard against misreading rather than
+as an input.
+
+It earned that on the first run:
+
+| `src` | `t1` | `GU` | `pay` | hands | **turn 3** | **turn 12** |
+|---|---|---|---|---|---|---|
+| 5+ | yes | yes | — | 244 | **1.0%** | **52.3%** |
+| 2 | — | — | yes | 130 | **0.3%** | **80.1%** |
+
+**The turn-3 ordering and the turn-12 ordering are inverted for these two
+cells**, and by a wide margin in both directions. A grid printed on turn 3 alone
+would rank a five-source hand with no payoff *above* a two-source hand with one,
+and be wrong about every game that goes past turn six. This is §4.1's blind spot
+appearing not as a caveat but as **two adjacent rows of the chart disagreeing**,
+which is what putting the warnings on the chart was for.
+
+#### Where the grid contradicts the primer, and the model is the one that is wrong
+
+Three of the primer's four heuristics are confirmed: source count is monotone at
+turn 3, turn-one ramp helps at every source count, and the all-interaction hand
+is real — **every `pay = —` cell is at 0.0–1.0% by turn 3 and caps around 50% by
+turn 12**, against ~78% for hands with a payoff.
+
+The fourth is contradicted:
+
+> *"One of the BEST things about playing Kinnan is we are able and happy to keep
+> the 'all mana hand'. This is because Kinnan can properly utilize that mana to
+> give us card advantage by cheating threats into play."*
+
+The grid rates the all-mana hand (`5+ / yes / yes / —`) at **52.3% by turn 12**,
+below a two-source hand with a payoff at 80.1%. **The primer's claim rests on a
+mechanism the model does not have.** Kinnan's dig is a *pattern term* — the model
+detects the state and stops; it never resolves an activation, never puts a
+creature into play, never converts mana into cards (§16.7, R3). So a hand whose
+whole plan is "make mana, then spin" registers as a hand with no plan.
+
+> **The model systematically undervalues mana-only hands, by exactly the amount
+> Kinnan's ability is worth, which it does not model.** That is a stated limit on
+> the grid rather than a finding about the deck, and it is the single largest
+> caveat on reading it.
+
 #### What B surfaced that no aggregate had
 
 The output carries **which pattern each hand mostly assembles**, added after a

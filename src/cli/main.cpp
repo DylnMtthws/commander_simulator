@@ -924,6 +924,217 @@ int hands(const std::filesystem::path& path, const std::filesystem::path& deck_p
     return 0;
 }
 
+// OPTION A (SIM_PLAN.md §13.1): the keep/mull feature grid.
+//
+// THE FEATURES ARE THE PRIMER'S, NOT MINE. §13.1 says the feature set is the
+// whole difficulty and that a chart over the wrong features is unreadable. The
+// deck's published primer states its own mulligan heuristics in plain language,
+// and using them means the grid answers a question its readers already ask,
+// rather than one the model found convenient:
+//
+//   "our number 1 priority is definitely mana production"
+//   "preferably ramp that we can play on turn 1"
+//   "we are a deck focused around producing 7 mana quickly"
+//   "this is NOT a deck where you want to keep the 'all interaction hand'"
+//   "we love a hand that gives a game plan ... a creature tutor, a threat to
+//    ramp into, or a tutor for Basalt Monolith"
+//
+// Four features, each observable BEFORE the mulligan (§13.1's first condition -
+// a feature a player cannot evaluate while holding the cards is not a decision
+// rule), and each derived from declared data rather than from authored ranks:
+//
+//   sources     mana sources in hand: lands, rocks, dorks, rituals
+//   t1_ramp     a NONLAND source castable on turn one (mana value <= 1)
+//   colour      the hand's own sources can pay {G}{U} - asked through can_pay,
+//               so "can this hand cast the commander" has one definition
+//   payoff      a tutor, or a card named by a declared pattern or engine
+//
+// THE HANDS FROM THE PRIMER ARE HELD OUT. They are worked examples with stated
+// reasoning and they are the only external validation set this project will get;
+// scoring them against a grid fitted with them in view would answer nothing.
+struct HandFeatures {
+    int sources = 0;
+    bool t1_ramp = false;
+    bool colour = false;
+    bool payoff = false;
+
+    [[nodiscard]] int source_bucket() const noexcept {
+        return sources <= 1 ? 0 : (sources >= 5 ? 4 : sources - 1);
+    }
+    [[nodiscard]] std::size_t cell() const noexcept {
+        return static_cast<std::size_t>(((source_bucket() * 2 + (t1_ramp ? 1 : 0)) * 2 +
+                                         (colour ? 1 : 0)) * 2 + (payoff ? 1 : 0));
+    }
+};
+
+HandFeatures features_of(const cs::Zone& hand, const cs::CardDb& db, const cs::EffectDb& effects,
+                         const cs::PatternSet& patterns) {
+    HandFeatures f;
+    // Cards named by any declared pattern or engine. Declared structure, not
+    // policy: using authored ranks here would make the grid a picture of the
+    // scorer rather than of the deck.
+    cs::Zone named;
+    const auto add = [&named](const cs::Requirement& r) {
+        named = named | r.in_play | r.in_hand | r.in_play_or_hand | r.untapped;
+        if (r.has_any_of) {
+            named = named | r.any_of;
+        }
+    };
+    for (const cs::Engine& e : patterns.engines) {
+        add(e.requires_);
+    }
+    for (const cs::WinPattern& w : patterns.patterns) {
+        add(w.requires_);
+    }
+
+    std::vector<cs::Source> from_hand;
+    hand.for_each([&](int slot) {
+        const cs::Card& card = db.cards[static_cast<std::size_t>(slot)];
+        const cs::CardEffects& entry = effects.by_slot[static_cast<std::size_t>(slot)];
+        const bool land = card.plays_as_land();
+        const bool produces = entry.has_mana_source || entry.has_ritual;
+        if (land || produces) {
+            ++f.sources;
+            // What this hand could produce with everything deployed. An
+            // approximation of a real curve - lands need drops - but it is a
+            // property of the HAND, which is what a mulligan decision has.
+            cs::Source source;
+            if (entry.has_ritual) {
+                source.produces = entry.ritual.produces;
+                source.amount = entry.ritual.amount;
+            } else if (entry.has_mana_source) {
+                source.produces = entry.mana_source.colours_from_table ? 0x1F
+                                                                       : entry.mana_source.produces;
+                source.amount = entry.mana_source.amount;
+                source.is_land = entry.mana_source.is_land;
+            }
+            from_hand.push_back(source);
+        }
+        if (produces && !land && card.mana_value <= 1) {
+            f.t1_ramp = true;
+        }
+        if (entry.has_tutor || named.test(slot)) {
+            f.payoff = true;
+        }
+    });
+    // {G}{U} through the deck's own mana system, not a colour-counting shortcut:
+    // a source produces `amount` mana all of ONE colour (§2.6), so one dual is
+    // not {G}{U} and a shortcut would say it is.
+    cs::Cost kinnan;
+    kinnan.pips[static_cast<std::size_t>(cs::Colour::Green)] = 1;
+    kinnan.pips[static_cast<std::size_t>(cs::Colour::Blue)] = 1;
+    f.colour = cs::can_pay(kinnan, from_hand, 0);
+    return f;
+}
+
+int grid(const std::filesystem::path& path, const std::filesystem::path& deck_path,
+         const std::filesystem::path& effects_path, int sample, int games,
+         std::uint64_t base_seed, int threads, int turn) {
+    cs::CardDb db;
+    cs::io::DeckFile deck;
+    cs::EffectDb effects;
+    try {
+        db = cs::io::load_card_db(path);
+        deck = cs::io::load_deck(deck_path, db);
+        effects = cs::io::load_effects(effects_path, db);
+    } catch (const std::runtime_error& error) {
+        std::fflush(stdout);
+        std::fprintf(stderr, "error: %s\n", error.what());
+        return 1;
+    }
+    const cs::AuthoredPolicy policy(deck.weights);
+    const cs::GameConfig config = make_config(deck);
+    print_header(db, deck, effects, deck_path, games, base_seed);
+
+    int commander = -1;
+    for (const cs::Card& card : db.cards) {
+        if (card.is_commander) {
+            commander = card.export_index;
+        }
+    }
+
+    constexpr std::size_t kCells = 5 * 2 * 2 * 2;
+    struct Cell {
+        int hands = 0;
+        int games = 0;
+        int reached = 0;      // by the objective turn
+        int reached_late = 0; // by the turn cap
+    };
+    std::vector<Cell> cells(kCells);
+
+    cs::Rng hand_rng(cs::seed_for_game(base_seed, 0xADDED0ULL));
+    for (int h = 0; h < sample; ++h) {
+        const cs::Zone hand =
+            cs::sample_hand(static_cast<int>(db.size()), commander, config.opening_hand, hand_rng);
+        const HandFeatures f = features_of(hand, db, effects, deck.patterns);
+        const cs::RunSummary run = drive<cs::RunSummary>(games, threads, [&](int first, int count) {
+            return cs::simulate_batch(db, effects, deck.patterns, config, policy, base_seed, first,
+                                      count, &hand);
+        });
+        Cell& cell = cells[f.cell()];
+        ++cell.hands;
+        cell.games += run.games;
+        cell.reached += cs::cumulative(run, turn);
+        cell.reached_late += cs::cumulative(run, config.turn_cap);
+    }
+
+    std::printf("\nKEEP/MULL FEATURE GRID (section 13.1, option A)\n");
+    std::printf("  %d sampled hands, %d games each, features taken from the deck's own primer.\n",
+                sample, games);
+    std::printf("\n  READ THE TURN ON EVERY CELL. A LOW NUMBER MEANS \"DOES NOT ACT BY THAT\n");
+    std::printf("  TURN\", NOT \"IS BAD\". Section 4.1: an early-turn objective is what\n");
+    std::printf("  separates opening hands, and it is structurally unable to see a mid-game\n");
+    std::printf("  engine piece - Enduring Vitality is +0.5 at turn 3 and +29 at turn 12.\n");
+    std::printf("  The second column is printed for exactly that reason. It is CONTEXT, not\n");
+    std::printf("  an input: the ordering is by turn %d alone.\n", turn);
+    std::printf("\n  NOT a keep/mull recommendation. A mulligan decision compares a hand to the\n");
+    std::printf("  EXPECTATION OVER MULLIGANING, which is not computed here (section 13.1).\n");
+
+    std::printf("\n  %-5s %-3s %-3s %-3s %6s %6s   %-16s %8s\n", "src", "t1", "GU", "pay", "hands",
+                "T", "95% interval", "T12");
+    // Ordered by the objective, most valuable first - but the ordering key is
+    // printed in the header so it cannot be mistaken for a ranking of cards.
+    std::vector<std::size_t> order(kCells);
+    for (std::size_t i = 0; i < kCells; ++i) {
+        order[i] = i;
+    }
+    std::sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
+        const double va = cells[a].games > 0
+                              ? static_cast<double>(cells[a].reached) / cells[a].games : -1.0;
+        const double vb = cells[b].games > 0
+                              ? static_cast<double>(cells[b].reached) / cells[b].games : -1.0;
+        return va > vb;
+    });
+    static constexpr const char* kBuckets[] = {"0-1", "2", "3", "4", "5+"};
+    for (const std::size_t i : order) {
+        const Cell& cell = cells[i];
+        if (cell.hands == 0) {
+            continue;
+        }
+        const std::size_t payoff = i % 2;
+        const std::size_t colour = (i / 2) % 2;
+        const std::size_t ramp = (i / 4) % 2;
+        const std::size_t bucket = i / 8;
+        const cs::Interval interval = cs::wilson(cell.reached, cell.games);
+        // CELL COUNTS ARE PRINTED (§13.1's second condition). A cell holding four
+        // sampled hands is noise with a number on it, and a reader cannot tell
+        // that from the value alone.
+        std::printf("  %-5s %-3s %-3s %-3s %6d %5.1f%%   [%5.1f, %5.1f]  %6.1f%%%s\n",
+                    kBuckets[bucket], ramp ? "yes" : "-", colour ? "yes" : "-",
+                    payoff ? "yes" : "-", cell.hands, 100.0 * cell.reached / cell.games,
+                    100.0 * interval.low, 100.0 * interval.high,
+                    100.0 * cell.reached_late / cell.games,
+                    cell.hands < 20 ? "   <- thin" : "");
+    }
+    std::printf("\n  src = mana sources in hand (lands, rocks, dorks, rituals)\n");
+    std::printf("  t1  = a NONLAND source castable turn one\n");
+    std::printf("  GU  = the hand's own sources can pay {G}{U}, asked through can_pay\n");
+    std::printf("  pay = a tutor, or a card named by a declared pattern or engine\n");
+    std::printf("  T   = P(assembled by turn %d | this hand). T12 = by turn %d, for context.\n",
+                turn, config.turn_cap);
+    return 0;
+}
+
 int main(int argc, char** argv) {
     const auto v = cs::version();
     const auto flavour = cs::build_flavour();
@@ -941,6 +1152,7 @@ int main(int argc, char** argv) {
     std::uint64_t seed = 1;
     bool do_sweep = false;
     int sampled_hands = 0;
+    int grid_hands = 0;
     std::string only;
     // Section 4.1: the default objective is an early-turn CDF point, because the
     // tail cannot separate opening hands and this tool is a mulligan solver's
@@ -959,6 +1171,8 @@ int main(int argc, char** argv) {
             effects_path = argv[++i];
         } else if (std::strcmp(argv[i], "--seed") == 0 && i + 1 < argc) {
             seed = std::strtoull(argv[++i], nullptr, 10);
+        } else if (std::strcmp(argv[i], "--grid") == 0 && i + 1 < argc) {
+            grid_hands = std::atoi(argv[++i]);
         } else if (std::strcmp(argv[i], "--hands") == 0 && i + 1 < argc) {
             sampled_hands = std::atoi(argv[++i]);
         } else if (std::strcmp(argv[i], "--sweep") == 0) {
@@ -981,6 +1195,10 @@ int main(int argc, char** argv) {
     // face, 76 castable" and only then said what was being measured.
     if (trace_seed >= 0) {
         return trace_one(path, deck_path, effects_path, static_cast<std::uint64_t>(trace_seed));
+    }
+    if (grid_hands > 0) {
+        return grid(path, deck_path, effects_path, grid_hands, games > 0 ? games : 300,
+                    seed, threads, objective_turn);
     }
     if (sampled_hands > 0) {
         return hands(path, deck_path, effects_path, sampled_hands, games > 0 ? games : 4000, seed,

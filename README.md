@@ -21,6 +21,7 @@ and a half.
 
 ```bash
 ./build/release/src/cli/cs --hands 60 --games 4000   # sampled opening hands, raw
+./build/release/src/cli/cs --grid 3000 --games 300   # the keep/mull feature grid
 ```
 
 `--turn N` sets the objective (default 3, see SIM_PLAN.md §4.1). The sweep
