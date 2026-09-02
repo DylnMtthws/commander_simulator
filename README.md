@@ -78,6 +78,6 @@ exporter connects as `mtg_consumer`, which has no grant on `mtg_internal` at
 all — so a query that reaches past the contract fails immediately instead of
 working until a migration moves a column.
 
-`data/cards.json` **is committed**. It is ~90 KB, diffable, and carries a
+`data/cards.json` **is committed**. It is ~75 KB, diffable, and carries a
 manifest recording the data snapshot it came from, which is what lets a changed
 number be attributed to either the code or the card data.
