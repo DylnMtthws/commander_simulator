@@ -15,7 +15,13 @@ and a half.
 ```bash
 ./build/release/src/cli/cs --games 20000        # the report
 ./build/release/src/cli/cs --trace 12           # one game, turn by turn
+./build/release/src/cli/cs --sweep --games 30000   # 98 ablations, ~45s on 8 cores
+./build/release/src/cli/cs --ablate "Sol Ring"     # just one
 ```
+
+`--turn N` sets the objective (default 3, see SIM_PLAN.md §4.1). The sweep
+reports effect sizes with paired intervals and a measured null taken from the
+deck's own inert cards — never a significance verdict.
 
 ## Build
 

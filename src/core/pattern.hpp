@@ -65,6 +65,20 @@ struct Requirement {
     // most sensitive to, and that is the kind of thing simplified now and
     // tightened never.
     int loop_entry_cost = -1;  // -1 == not required
+
+    // Set when a card this requirement names has been ABLATED out of the deck
+    // (core/ablation.hpp). Requirements compile to SLOT MASKS at load, and a
+    // slot swap silently rebinds them: with Enduring Vitality replaced by a
+    // Forest, `in_play = [Kinnan, <that slot>]` asks for Kinnan and a Forest,
+    // which the deck plays almost every game. The engine then fired far MORE
+    // often without its own key card, and the sweep read Enduring Vitality as
+    // costing the deck 7.6 points.
+    //
+    // Removing the slot from the mask would be worse - it makes the requirement
+    // EASIER. An ablated card's pattern has to become unsatisfiable, which is
+    // what this flag says, and it is a bool rather than a mask trick so that it
+    // is visible in a debugger and in this comment.
+    bool impossible = false;
 };
 
 struct Engine {

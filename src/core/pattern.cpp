@@ -7,6 +7,12 @@ namespace cs {
 bool requirement_holds(const Requirement& requirement, const PatternSet& set,
                        const GameState& state, FlagMask active,
                        std::span<const Source> sources) noexcept {
+    // An ablated card's requirement can never hold. Checked first, because every
+    // term below reads a slot mask that no longer means what it was compiled
+    // to mean (see Requirement::impossible).
+    if (requirement.impossible) {
+        return false;
+    }
     if ((active & requirement.flags) != requirement.flags) {
         return false;
     }

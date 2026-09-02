@@ -1660,6 +1660,34 @@ one ablation both coupled and uncoupled and comparing interval widths; do not
 assume the 10×. Note that §9.4's replacement design helps here: a same-size deck
 keeps the draw sequence far better aligned than a 98-card deck would.
 
+#### MEASURED, Phase 7 item 22 — and the caveat above was wrong in our favour
+
+98 ablations × 30,000 games, coupled and uncoupled:
+
+| | mean standard error |
+|---|---|
+| coupled (common random numbers) | 0.00044 |
+| uncoupled (independent seeds) | 0.00232 |
+| **ratio** | **5.3× on the standard error, 28× on the variance** |
+
+Range across the 98: **1.1× to 24.6×** on the standard error. So the headline
+holds — 28× on variance is past "10× or more" — but the *spread* is the part
+worth carrying forward: for some cards the coupling buys almost nothing, and a
+single measured number would have hidden that.
+
+**The caveat's premise does not apply to this implementation, and that is worth
+correcting rather than leaving as a hedge that sounds careful.** Ablation here is
+a *slot swap*: the ablated deck has the same slots in the same order, so for a
+given seed the shuffle is the **identical permutation of slot indices** and only
+the identity of one slot differs. The draw sequence is not "well aligned", it is
+the same sequence. The two arms diverge only where the policy makes a different
+decision — which is exactly the divergence being measured, and which is why the
+1.1× cases are the cards that change the most decisions.
+
+The variance reduction is why §16.5's question could be answered at 30,000 games
+per card rather than needing the ~30,000-per-arm-per-point that §10.4's unpaired
+arithmetic implies.
+
 ### 10.5 Also reported
 
 - Pattern mix, zero-count patterns first (§5.3)
@@ -2121,7 +2149,10 @@ Each task ends somewhere runnable.
 21. CLI reporting with the honesty header.
 
 **Phase 7 — closing**
-22. Parallel driver over game index ranges.
+22. Parallel driver over game index ranges. **Done**, and it carried the
+    leave-one-out sweep with it: `--sweep`, `--ablate <card>`, `--threads`,
+    `--turn`. §10.4's variance reduction is measured at 28× and §16.5 is the
+    result. Pairwise (§10.4's 4,851) is still not implemented.
 23. Effect coverage pass: every deck card `modeled` or `inert`, deliberately,
     each inert one categorised (§4.4). **Replace §4.4's and §4.2's provisional
     counts with measured ones**, as §4.5 was — and check RULE K1's standings:
@@ -2204,6 +2235,11 @@ This was the first result in the project that was about the DECK rather than
 about the model. Everything before it — the seeding, the pattern proxies, the
 mana payment — was the simulator being wrong and then being less wrong.
 
+**§16.5 sharpens this and corrects its reference point.** Measured against a
+Forest, "+0.29" was inside the noise. Measured against the deck's own 31
+declared blanks, seven of the eight clones are at **zero**, with intervals tight
+enough to say so.
+
 ### 16.2 One tutor is worth twenty-five clones
 
 | | turn 3 | turn 6 | turn 12 |
@@ -2248,18 +2284,101 @@ that hands it free mana changes only *when*. Anything reported as a single
 summary number should therefore be an early-turn one; §10.1's insistence on the
 whole CDF over a mean is doing more work than it looked like.
 
-### 16.5 What is not yet established
+### 16.5 The sweep, and the answer to what §16.1 could not establish
 
-§16.1 and §16.3 are differences of a few tenths of a point at 20,000 games.
-Unpaired, that is inside the noise: at p ≈ 0.67 the standard error is 0.33
-points and a 95% interval is about ±0.65 either side. They are *paired* — every
-ablation reuses seed 1 and the same game indices, so the two runs draw the same
-cards until the decks diverge — and common random numbers is exactly the reason
-§10.4 asks for it. But the pairing has not been exploited in the reporting, and
-**until §10.2's intervals exist over the paired difference, "+0.29" and "0" are
-not distinguished here.**
+98 leave-one-out ablations, 30,000 games each, paired against the baseline on
+the same seed sequence. §10.4's variance reduction is **28× on the variance**,
+measured, which is what makes a third of a point resolvable at all.
 
-The findings in §16.0 and §16.1 do not rest on the interval — 8 cards at a third
-of a point against 1 card at seven and a half is not a close call at any
-plausible width — but their *precise* values are not yet claims this document
-makes.
+#### The inert cards are a measured null, and that is what makes the table readable
+
+§9.4 says the replacement bias is "inherent in choosing any replacement" and
+"not removable". True — and **not unmeasurable**, because this deck declares 31
+cards that do nothing (§4.4). Ablating an inert card swaps a blank for a Forest,
+so its delta is *exactly* the value of that swap and nothing else.
+
+| | value |
+|---|---|
+| mean delta of the 31 inert cards, turn 3 | **−0.411%** |
+| range across the 31 | −0.627% to −0.287% |
+
+That number **is** §9.4's bias, in the units of the sweep: what a Forest is worth
+over a blank card by turn 3. Without it the table is unreadable — at turn 3 a
+Forest beats most of this deck, so almost every nonland reads negative and
+nothing distinguishes "worse than a land" from "worse than nothing".
+
+**Read the re-centred column against the spread, not against the interval.** The
+31 nulls span 0.34 points, wider than any single paired interval, because a
+cheap blank gets cast and wastes mana where an expensive one never does. "A
+blank card" is not one number, so anything within about ±0.17 of zero on `vs
+blank` is not distinguished from doing nothing.
+
+#### The answer
+
+| Card | delta at turn 3 | vs blank |
+|---|---|---|
+| Enduring Vitality | +7.28% | +7.69% |
+| Thrasios, Triton Hero | +3.08% | +3.49% |
+| Chord of Calling | +1.66% | +2.07% |
+| Copy Artifact | −0.26% | **+0.15%** |
+| Mockingbird | −0.37% | **+0.04%** |
+| Flesh Duplicate | −0.39% | **+0.02%** |
+| Mirrormade | −0.41% | **+0.00%** |
+| Mirage Mirror | −0.41% | **−0.00%** |
+| Flash Photography | −0.43% | **−0.02%** |
+| Copy Enchantment | −0.44% | **−0.03%** |
+| Clever Impersonator | −0.47% | **−0.06%** |
+
+**Seven of the eight clones sit within ±0.06 of cards declared to do nothing.**
+Only *Copy Artifact* is measurably above a blank, and it is the one that copies
+*Basalt Monolith*. §16.1 said clones matter less than their count suggests; the
+sweep says that at the objective this tool recommends, seven of them are not
+distinguishable from blanks.
+
+That answers what §16.1 could not: the question was never "+0.29 or 0" against
+zero, it was against the wrong reference point. Measured against a blank rather
+than against a Forest, the clones are at zero, and the interval is tight enough
+to say so.
+
+#### The ranking is objective-dependent, and strongly
+
+| Card | turn 3 | turn 6 | turn 12 |
+|---|---|---|---|
+| Enduring Vitality | +7.28% | +24.98% | +30.50% |
+| Basalt Monolith | **−0.61%** | +1.09% | **+5.58%** |
+| Thrasios, Triton Hero | +3.08% | +3.04% | +5.69% |
+| Force of Will (inert) | −0.63% | −1.23% | −0.31% |
+
+*Basalt Monolith* is half the deck's primary engine and reads **negative** at
+turn 3 — it is colourless, does not untap, and a turn-3 cast buys nothing that
+turn. By turn 12 it is +5.6.
+
+This is §4.1's choice made concrete, and it cuts both ways. An early-turn
+objective is the one that separates opening hands, which is what a mulligan
+solver needs — and it correctly scores a mid-game engine piece near zero. Those
+are the same fact. **A sweep is a ranking of cards against an objective, and
+changing the objective is not a presentational choice**; the honest form names
+the turn every time, which is why the column is `goldfish_turn_to_assembly_delta
+at turn N` and never `score`.
+
+### 16.6 What is still not established
+
+- The paired interval is **Wald on the discordant pairs**, not a score interval.
+  §10.2 insists on Wilson for proportions because the normal approximation fails
+  near 0 and 1; a *difference* near 0 is not that regime, and the report prints
+  b and c so the asymptotics can be checked rather than trusted. At the top of
+  the table b is in the hundreds or thousands; at the bottom it is single
+  digits, and those rows lean on the total rather than on b alone.
+- **No multiplicity correction is applied**, deliberately (§10.4, decision 1).
+  98 comparisons at α = 0.05 expect ~5 spurious exclusions of zero, and the
+  report says so where the stars are printed. Benjamini–Hochberg is the answer
+  if a threshold is ever needed; a ranked list of "significant" cards is not.
+- **Pairwise ablation is not implemented.** §10.4's 4,851 figure is C(99,2), and
+  nothing here measures two cards removed together. Every number above is
+  leave-*one*-out, which cannot see a card whose whole value is that it makes
+  another card work.
+- **Four cards are still unauthored** (Sylvan Library, The One Ring, Thrasios's
+  own activated ability, Valley Floodcaller). Thrasios appears in the table
+  because it is a *pattern term*, not because its ability is modelled; the +3.08
+  is the value of the outlet being on the battlefield, which is what the pattern
+  detects.

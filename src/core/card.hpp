@@ -105,6 +105,25 @@ struct Card {
         return false;
     }
 
+    // Is this a creature?
+    //
+    // all_types, deliberately, and it is a union over faces: a card on the
+    // BATTLEFIELD is characterised by whichever face is up, and for every card
+    // in this deck that reaches the battlefield all_types is a superset that
+    // agrees. Contrast tutor_candidates, which searches the LIBRARY and must
+    // read the front face - see the comment there.
+    //
+    // One definition because it had four: deck_load's creature_slots,
+    // collect_sources' grant, condition_met's counters, and convoke.
+    [[nodiscard]] bool is_creature() const noexcept {
+        for (const std::string& type : all_types) {
+            if (type == "Creature") {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // The first castable face, or nullptr. A single-faced card has one face; an
     // MDFC has a spell face and a land face (section 8.2).
     //

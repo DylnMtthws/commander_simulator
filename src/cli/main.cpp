@@ -8,14 +8,18 @@
 #include <filesystem>
 #include <string>
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <thread>
 #include <vector>
 
 #include "core/card.hpp"
 #include "core/rng.hpp"
 #include "core/sim.hpp"
+#include "core/ablation.hpp"
 #include "core/stats.hpp"
+#include "core/sweep.hpp"
 #include "core/version.hpp"
 #include "io/card_db_load.hpp"
 #include "io/deck_load.hpp"
@@ -395,6 +399,100 @@ void print_report(const cs::CardDb& db, const cs::io::DeckFile& deck, const cs::
     static_cast<void>(db);
 }
 
+// The parallel driver (SIM_PLAN.md section 15, item 22).
+//
+// Hands each worker a DISJOINT RANGE OF GAME INDICES and merges the summaries.
+// That is the whole of it, and it works only because of INVARIANT S1: game i is
+// a pure function of (deck, config, base_seed, i), so which thread runs it and
+// in what order cannot matter. Tested directly in tests/unit/test_seeding.cpp
+// against both simulate_batch and run_paired, because S1 breaking would not
+// error - it would just make these results depend on the machine.
+//
+// It lives in cli/ rather than core/ because it is orchestration: core stays a
+// set of pure functions over ranges, which is what keeps it callable from
+// Python later without dragging a thread pool along.
+template <typename Run, typename Work>
+Run drive(int games, int threads, Work work) {
+    if (threads <= 1 || games < threads) {
+        return work(0, games);
+    }
+    std::vector<Run> parts(static_cast<std::size_t>(threads));
+    std::vector<std::thread> workers;
+    workers.reserve(static_cast<std::size_t>(threads));
+    int first = 0;
+    for (int t = 0; t < threads; ++t) {
+        // The remainder is spread over the first few workers rather than piled
+        // on the last one, so no worker ever has more than one extra game.
+        const int count = games / threads + (t < games % threads ? 1 : 0);
+        workers.emplace_back([&parts, &work, t, first, count] {
+            parts[static_cast<std::size_t>(t)] = work(first, count);
+        });
+        first += count;
+    }
+    for (std::thread& worker : workers) {
+        worker.join();
+    }
+    Run merged;
+    for (const Run& part : parts) {
+        cs::merge(merged, part);
+    }
+    return merged;
+}
+
+// One ablation, measured both ways (section 10.4).
+//
+// The coupled arm reuses the baseline's seed sequence; the uncoupled one is
+// given a different base seed, so the two runs are independent. Comparing the
+// two standard errors is the realised variance reduction - the number section
+// 10.4 explicitly refuses to let anyone assume.
+struct AblationResult {
+    std::string card;
+    bool inert = false;
+    cs::Difference paired;
+    cs::Difference unpaired;
+    int baseline_only = 0;   // b: baseline assembled by turn N, ablated did not
+    int ablated_only = 0;    // c: the reverse
+    double baseline_p = 0.0;
+    double ablated_p = 0.0;
+};
+
+AblationResult measure_ablation(const cs::CardDb& db, const cs::EffectDb& effects,
+                                const cs::io::DeckFile& deck, const cs::GameConfig& config,
+                                int slot, int replacement, int games, int threads,
+                                std::uint64_t base_seed, int turn) {
+    const cs::AblatedDeck arm =
+        cs::ablate(db, effects, deck.weights, deck.patterns, slot, replacement);
+
+    const cs::PairedRun coupled = drive<cs::PairedRun>(games, threads, [&](int first, int count) {
+        return cs::run_paired(db, effects, deck.weights, arm, deck.patterns, config, base_seed,
+                              first, count);
+    });
+
+    AblationResult result;
+    result.card = db.cards[static_cast<std::size_t>(slot)].listed_name;
+    result.inert = effects.by_slot[static_cast<std::size_t>(slot)].status == cs::AuthorStatus::Inert;
+    const cs::PairedCounts& cell = coupled.by_turn[static_cast<std::size_t>(turn)];
+    result.paired = cs::paired_difference(cell);
+    result.baseline_only = cell.baseline_only;
+    result.ablated_only = cell.ablated_only;
+    const auto n = static_cast<double>(coupled.games);
+    result.baseline_p = (cell.both + cell.baseline_only) / n;
+    result.ablated_p = (cell.both + cell.ablated_only) / n;
+
+    // The uncoupled arm: same deck, DIFFERENT seed sequence. Nothing else
+    // changes, so the only difference between the two intervals below is the
+    // coupling.
+    const cs::AuthoredPolicy ablated_policy(arm.weights);
+    const cs::RunSummary independent =
+        drive<cs::RunSummary>(games, threads, [&](int first, int count) {
+            return cs::simulate_batch(arm.db, arm.effects, arm.patterns, config, ablated_policy,
+                                      base_seed ^ 0x9E3779B97F4A7C15ULL, first, count);
+        });
+    result.unpaired = cs::unpaired_difference(cell.both + cell.baseline_only, coupled.games,
+                                              cs::cumulative(independent, turn), independent.games);
+    return result;
+}
+
 int simulate(const std::filesystem::path& path, const std::filesystem::path& deck_path,
              const std::filesystem::path& effects_path, int games, std::uint64_t base_seed) {
     cs::CardDb db;
@@ -420,6 +518,181 @@ int simulate(const std::filesystem::path& path, const std::filesystem::path& dec
     return 0;
 }
 
+// The leave-one-out sweep, and the CRN measurement section 10.4 requires.
+int sweep(const std::filesystem::path& path, const std::filesystem::path& deck_path,
+          const std::filesystem::path& effects_path, int games, std::uint64_t base_seed,
+          int threads, int turn, const std::string& only) {
+    cs::CardDb db;
+    cs::io::DeckFile deck;
+    cs::EffectDb effects;
+    try {
+        db = cs::io::load_card_db(path);
+        deck = cs::io::load_deck(deck_path, db);
+        effects = cs::io::load_effects(effects_path, db);
+    } catch (const std::runtime_error& error) {
+        std::fflush(stdout);
+        std::fprintf(stderr, "error: %s\n", error.what());
+        return 1;
+    }
+
+    const int replacement = cs::slot_of_listed(db, deck.ablation_replacement);
+    if (replacement < 0) {
+        std::fprintf(stderr, "error: replacement '%s' is not in the deck\n",
+                     deck.ablation_replacement.c_str());
+        return 1;
+    }
+    const cs::GameConfig config = make_config(deck);
+
+    print_header(db, deck, effects, deck_path, games, base_seed);
+    std::printf("\nABLATION SWEEP, leave-one-out against %s\n", deck.ablation_replacement.c_str());
+    std::printf("  objective: P(assembled by turn %d)  -  section 4.1's default, because the\n",
+                turn);
+    std::printf("  curve is steepest here and the tail cannot separate opening hands.\n");
+    std::printf("  %d games per card, %d threads, common random numbers.\n", games, threads);
+
+    std::vector<int> targets;
+    for (const cs::Card& card : db.cards) {
+        if (card.is_commander || card.export_index == replacement) {
+            continue;  // both refused by ablate(), for reasons it states
+        }
+        if (!only.empty() && card.listed_name != only) {
+            continue;
+        }
+        targets.push_back(card.export_index);
+    }
+    if (targets.empty()) {
+        std::fprintf(stderr, "error: nothing to ablate%s\n",
+                     only.empty() ? "" : (" matching '" + only + "'").c_str());
+        return 1;
+    }
+
+    std::vector<AblationResult> results;
+    results.reserve(targets.size());
+    for (const int slot : targets) {
+        results.push_back(measure_ablation(db, effects, deck, config, slot, replacement, games,
+                                           threads, base_seed, turn));
+    }
+
+    // THE VARIANCE-REDUCTION MEASUREMENT (section 10.4), reported before the
+    // table, because it is what says whether the intervals in that table are
+    // worth reading. 10.4 predicts "often 10x or more" and then says to measure
+    // it rather than assume it, so this is the measurement.
+    double paired_total = 0.0;
+    double unpaired_total = 0.0;
+    double worst_ratio = 1e18;
+    double best_ratio = 0.0;
+    for (const AblationResult& result : results) {
+        paired_total += result.paired.standard_error;
+        unpaired_total += result.unpaired.standard_error;
+        if (result.paired.standard_error > 0.0) {
+            const double ratio = result.unpaired.standard_error / result.paired.standard_error;
+            worst_ratio = ratio < worst_ratio ? ratio : worst_ratio;
+            best_ratio = ratio > best_ratio ? ratio : best_ratio;
+        }
+    }
+    const auto measured = static_cast<double>(results.size());
+    std::printf("\nREALISED VARIANCE REDUCTION from common random numbers\n");
+    std::printf("  mean standard error, coupled    %.5f\n", paired_total / measured);
+    std::printf("  mean standard error, uncoupled  %.5f\n", unpaired_total / measured);
+    if (paired_total > 0.0) {
+        std::printf("  ratio of standard errors        %.2fx   (variance %.1fx)\n",
+                    unpaired_total / paired_total,
+                    (unpaired_total / paired_total) * (unpaired_total / paired_total));
+    }
+    if (results.size() > 1) {
+        std::printf("  range across %zu ablations       %.2fx to %.2fx\n", results.size(),
+                    worst_ratio, best_ratio);
+    }
+    std::printf("  A ratio of 1.0 would mean the coupling bought nothing. Getting this\n");
+    std::printf("  number at all requires INVARIANT S1, which fails silently.\n");
+
+    // Effect sizes with intervals, never a significance verdict (section 10.4,
+    // decision 1). A ranked list of "significant" findings at this many
+    // comparisons is mostly false positives dressed as discoveries, in a format
+    // that hides which is which. An interval carries its own uncertainty.
+    std::sort(results.begin(), results.end(),
+              [](const AblationResult& a, const AblationResult& b) {
+                  if (a.paired.delta != b.paired.delta) {
+                      return a.paired.delta > b.paired.delta;
+                  }
+                  return a.card < b.card;
+              });
+
+    // THE MEASURED NULL, and it is measurable only because this deck declares 31
+    // cards that do nothing (section 4.4).
+    //
+    // Section 9.4 says the replacement bias is "inherent in choosing any
+    // replacement" and "not removable", and that is true - but it is not
+    // unmeasurable. Ablating an INERT card swaps a card that does nothing for a
+    // Forest, so its delta is exactly the value of that swap and nothing else.
+    // The inert set is therefore a control group of 31, and its mean is the
+    // baseline bias in the units of the table below.
+    //
+    // Without it the table is unreadable: at turn 3 a Forest beats most of this
+    // deck, so nearly every nonland reads negative and a reader has no way to
+    // tell "worse than a land" from "worse than nothing".
+    double inert_total = 0.0;
+    int inert_count = 0;
+    double inert_low = 1e18;
+    double inert_high = -1e18;
+    for (const AblationResult& result : results) {
+        if (!result.inert) {
+            continue;
+        }
+        ++inert_count;
+        inert_total += result.paired.delta;
+        inert_low = result.paired.delta < inert_low ? result.paired.delta : inert_low;
+        inert_high = result.paired.delta > inert_high ? result.paired.delta : inert_high;
+    }
+    const double null_delta = inert_count > 0 ? inert_total / inert_count : 0.0;
+    if (inert_count > 0) {
+        std::printf("\nTHE MEASURED NULL, from the %d inert cards\n", inert_count);
+        std::printf("  mean delta of a card declared to do nothing  %+.3f%%\n",
+                    100.0 * null_delta);
+        std::printf("  range across those %d                        %+.3f%% to %+.3f%%\n",
+                    inert_count, 100.0 * inert_low, 100.0 * inert_high);
+        std::printf("  This IS section 9.4's replacement bias, in the units below: what a\n");
+        std::printf("  %s is worth over a blank card at turn %d. The `vs blank` column\n",
+                    deck.ablation_replacement.c_str(), turn);
+        std::printf("  subtracts it, and a card sitting at 0.000 there is doing nothing this\n");
+        std::printf("  deck can measure by turn %d.\n", turn);
+        // The spread matters more than the mean's own precision, and saying so
+        // is what stops the re-centred column reading as exact.
+        std::printf("\n  READ `vs blank` WITH THAT RANGE, NOT WITH THE INTERVAL. The 31 nulls\n");
+        std::printf("  spread %.3f points, which is wider than any single interval below:\n",
+                    100.0 * (inert_high - inert_low));
+        std::printf("  a cheap blank gets cast and wastes mana, an expensive one never does,\n");
+        std::printf("  so \"a blank card\" is not one number. The interval is on `delta`.\n");
+        std::printf("  Treat anything inside +/-%.3f of zero on `vs blank` as not\n",
+                    100.0 * (inert_high - inert_low) / 2.0);
+        std::printf("  distinguished from doing nothing.\n");
+    }
+
+    std::printf("\ngoldfish_turn_to_assembly_delta at turn %d, paired 95%%\n", turn);
+    std::printf("  the column is named for the metric on purpose: a sorted table headed\n");
+    std::printf("  'score' IS a card-quality ranking whatever the banner said (section 9.5).\n\n");
+    // b and c printed separately, not summed: the Wald interval above rests on
+    // the discordant pairs being numerous enough for the normal approximation,
+    // and a reader cannot check that from a total. It is also where a suspicious
+    // result shows itself - a delta built from b=3, c=0 is not a measurement.
+    std::printf("  %-28s %9s %9s  %-18s %7s %7s\n", "card", "delta", "vs blank",
+                "95% interval", "b", "c");
+    for (const AblationResult& result : results) {
+        const bool excludes_zero = result.paired.low > 0.0 || result.paired.high < 0.0;
+        std::printf("  %-28s %+8.3f%% %+8.3f%%  [%+6.3f, %+6.3f] %7d %7d%s%s\n",
+                    result.card.c_str(), 100.0 * result.paired.delta,
+                    100.0 * (result.paired.delta - null_delta), 100.0 * result.paired.low,
+                    100.0 * result.paired.high, result.baseline_only, result.ablated_only,
+                    excludes_zero ? "  *" : "", result.inert ? "  (inert)" : "");
+    }
+    std::printf("\n  * interval excludes zero. NOT a significance verdict: at %zu comparisons\n",
+                results.size());
+    std::printf("  some of these are noise, and section 10.4 says Benjamini-Hochberg if a\n");
+    std::printf("  threshold is ever needed. The intervals are the output; the star is a\n");
+    std::printf("  reading aid.\n");
+    return 0;
+}
+
 int main(int argc, char** argv) {
     const auto v = cs::version();
     const auto flavour = cs::build_flavour();
@@ -435,6 +708,14 @@ int main(int argc, char** argv) {
     int games = 0;
     long long trace_seed = -1;
     std::uint64_t seed = 1;
+    bool do_sweep = false;
+    std::string only;
+    // Section 4.1: the default objective is an early-turn CDF point, because the
+    // tail cannot separate opening hands and this tool is a mulligan solver's
+    // value function.
+    int objective_turn = 3;
+    int threads = static_cast<int>(std::thread::hardware_concurrency());
+    threads = threads > 0 ? threads : 1;
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--games") == 0 && i + 1 < argc) {
             games = std::atoi(argv[++i]);
@@ -446,6 +727,15 @@ int main(int argc, char** argv) {
             effects_path = argv[++i];
         } else if (std::strcmp(argv[i], "--seed") == 0 && i + 1 < argc) {
             seed = std::strtoull(argv[++i], nullptr, 10);
+        } else if (std::strcmp(argv[i], "--sweep") == 0) {
+            do_sweep = true;
+        } else if (std::strcmp(argv[i], "--ablate") == 0 && i + 1 < argc) {
+            do_sweep = true;
+            only = argv[++i];
+        } else if (std::strcmp(argv[i], "--threads") == 0 && i + 1 < argc) {
+            threads = std::atoi(argv[++i]);
+        } else if (std::strcmp(argv[i], "--turn") == 0 && i + 1 < argc) {
+            objective_turn = std::atoi(argv[++i]);
         } else {
             path = argv[i];
         }
@@ -457,6 +747,10 @@ int main(int argc, char** argv) {
     // face, 76 castable" and only then said what was being measured.
     if (trace_seed >= 0) {
         return trace_one(path, deck_path, effects_path, static_cast<std::uint64_t>(trace_seed));
+    }
+    if (do_sweep) {
+        return sweep(path, deck_path, effects_path, games > 0 ? games : 20000, seed, threads,
+                     objective_turn, only);
     }
     if (games > 0) {
         return simulate(path, deck_path, effects_path, games, seed);

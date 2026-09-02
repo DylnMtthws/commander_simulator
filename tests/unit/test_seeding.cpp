@@ -16,7 +16,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include "core/ablation.hpp"
 #include "core/rng.hpp"
+#include "core/sweep.hpp"
 #include "core/sim.hpp"
 #include "io/card_db_load.hpp"
 #include "core/policy.hpp"
@@ -353,5 +355,93 @@ TEST_CASE("a batch run in parallel equals the same batch run serially",
         REQUIRE(merged.games == serial.games);
         REQUIRE(merged.assembled_on == serial.assembled_on);
         REQUIRE(merged.digest_xor == serial.digest_xor);
+    }
+}
+
+TEST_CASE("a paired run is coupled, and coupling is what CRN is", "[seeding][S1][crn]") {
+    // Section 10.4's mechanism, asserted rather than assumed: game i is played
+    // in BOTH arms with the same seed. When the two arms are the same deck, the
+    // two games must be identical - every pair concordant, no discordant pairs
+    // at any turn. If S1 ever broke, this is where it would show, and CRN's
+    // failure mode is otherwise silent.
+    cs::GameConfig config;
+    cs::PolicyWeights weights;
+    weights.rank.assign(fixture().cards.size(), 10);
+
+    cs::AblatedDeck same;
+    same.db = fixture();
+    same.effects = simple_effects();
+    same.weights = weights;
+    same.patterns = no_patterns();
+
+    const cs::PairedRun run = cs::run_paired(fixture(), simple_effects(), weights, same,
+                                             no_patterns(), config, kBaseSeed, 0, 50);
+    REQUIRE(run.games == 50);
+    for (const cs::PairedCounts& cell : run.by_turn) {
+        REQUIRE(cell.baseline_only == 0);
+        REQUIRE(cell.ablated_only == 0);
+    }
+    // And the paired standard error of a zero difference is zero, which is the
+    // limiting case of the variance reduction the sweep reports.
+    const cs::Difference difference =
+        cs::paired_difference(run.by_turn[static_cast<std::size_t>(config.turn_cap)]);
+    REQUIRE(difference.delta == 0.0);
+    REQUIRE(difference.standard_error == 0.0);
+}
+
+TEST_CASE("a paired run decomposes across threads like a batch does",
+          "[seeding][S1][crn][batch]") {
+    cs::GameConfig config;
+    cs::PolicyWeights weights;
+    weights.rank.assign(fixture().cards.size(), 10);
+    const int forest = [] {
+        for (const cs::Card& card : fixture().cards) {
+            if (card.listed_name == "Forest") return card.export_index;
+        }
+        return -1;
+    }();
+    const int ring = [] {
+        for (const cs::Card& card : fixture().cards) {
+            if (card.listed_name == "Sol Ring") return card.export_index;
+        }
+        return -1;
+    }();
+    const cs::AblatedDeck arm =
+        cs::ablate(fixture(), simple_effects(), weights, no_patterns(), ring, forest);
+
+    const cs::PairedRun whole = cs::run_paired(fixture(), simple_effects(), weights, arm,
+                                               no_patterns(), config, kBaseSeed, 0, 60);
+    for (const int threads : {2, 4, 8}) {
+        std::vector<cs::PairedRun> parts(static_cast<std::size_t>(threads));
+        std::vector<std::thread> workers;
+        // The remainder is spread over the first workers, exactly as the CLI
+        // driver does it. Dividing 60 by 8 and multiplying back drops four
+        // games - which this test did on its first run, and which is the same
+        // arithmetic slip that would silently shorten a real sweep.
+        int first = 0;
+        for (int t = 0; t < threads; ++t) {
+            const int count = 60 / threads + (t < 60 % threads ? 1 : 0);
+            workers.emplace_back([&, t, first, count] {
+                parts[static_cast<std::size_t>(t)] =
+                    cs::run_paired(fixture(), simple_effects(), weights, arm, no_patterns(),
+                                   config, kBaseSeed, first, count);
+            });
+            first += count;
+        }
+        for (std::thread& worker : workers) {
+            worker.join();
+        }
+        cs::PairedRun merged;
+        for (const cs::PairedRun& part : parts) {
+            cs::merge(merged, part);
+        }
+        REQUIRE(first == 60);
+        REQUIRE(merged.games == whole.games);
+        for (std::size_t turn = 0; turn < whole.by_turn.size(); ++turn) {
+            REQUIRE(merged.by_turn[turn].both == whole.by_turn[turn].both);
+            REQUIRE(merged.by_turn[turn].baseline_only == whole.by_turn[turn].baseline_only);
+            REQUIRE(merged.by_turn[turn].ablated_only == whole.by_turn[turn].ablated_only);
+            REQUIRE(merged.by_turn[turn].neither == whole.by_turn[turn].neither);
+        }
     }
 }

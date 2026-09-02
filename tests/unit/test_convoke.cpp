@@ -10,6 +10,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include "core/ablation.hpp"
 #include "core/effects.hpp"
 #include "core/policy.hpp"
 #include "core/sim.hpp"
@@ -151,4 +152,74 @@ TEST_CASE("an instant does not stay on the battlefield", "[permanent]") {
     // ETB is authored and the permanent is discarded.
     REQUIRE_FALSE(
         cs::is_permanent(db().cards[static_cast<std::size_t>(slot_of("Invasion of Ikoria"))]));
+}
+
+TEST_CASE("ablating a card named by a pattern makes the pattern impossible", "[ablation]") {
+    // The bug that inverted the largest result in the sweep. Requirements
+    // compile to SLOT MASKS at load, so swapping a slot silently rebinds them:
+    // with the pattern's card replaced by a Forest, `in_play = [that slot]`
+    // asked for a Forest, which the deck plays almost every game. The engine
+    // then fired MORE often without its key card, and Enduring Vitality - an
+    // engine piece - measured as costing the deck 7.6 points. Fixed, it is
+    // worth +7.3.
+    //
+    // Note the direction that would be wrong in the tempting way: REMOVING the
+    // slot from the mask makes the requirement easier, not impossible.
+    const int ring = slot_of("Sol Ring");
+    const int forest = slot_of("Forest");
+
+    cs::PatternSet set;
+    cs::WinPattern pattern;
+    pattern.name = "needs_sol_ring";
+    pattern.requires_.in_play.set(ring);
+    set.patterns.push_back(pattern);
+
+    const cs::EffectDb effects = blank();
+    cs::PolicyWeights weights;
+    weights.rank.assign(db().cards.size(), 10);
+
+    cs::GameState state;
+    state.battlefield.set(ring);
+    const std::vector<cs::Source> none;
+    REQUIRE(cs::first_satisfied(set, state, none) == 0);
+
+    const cs::AblatedDeck arm = cs::ablate(db(), effects, weights, set, ring, forest);
+    SECTION("the slot now holds the replacement") {
+        REQUIRE(arm.db.cards[static_cast<std::size_t>(ring)].listed_name == "Forest");
+        REQUIRE(arm.db.cards[static_cast<std::size_t>(ring)].export_index == ring);
+    }
+    SECTION("and the pattern can no longer be satisfied, by anything") {
+        REQUIRE(arm.patterns.patterns[0].requires_.impossible);
+        REQUIRE(cs::first_satisfied(arm.patterns, state, none) < 0);
+        // Not even with the whole board in play, which is what a
+        // removed-from-the-mask requirement would happily accept.
+        cs::GameState everything;
+        for (std::size_t i = 0; i < db().cards.size(); ++i) {
+            everything.battlefield.set(static_cast<int>(i));
+        }
+        REQUIRE(cs::first_satisfied(arm.patterns, everything, none) < 0);
+    }
+}
+
+TEST_CASE("ablation refuses the two decks it cannot make", "[ablation]") {
+    const cs::EffectDb effects = blank();
+    cs::PolicyWeights weights;
+    weights.rank.assign(db().cards.size(), 10);
+    const cs::PatternSet set;
+    const int forest = slot_of("Forest");
+
+    // Section 9.4: the two arms would be the same deck, and zero would read as
+    // a measurement rather than as a malformed question.
+    REQUIRE_THROWS_AS(cs::ablate(db(), effects, weights, set, forest, forest),
+                      cs::AblationError);
+
+    // The commander starts in the command zone and the policy only plays lands
+    // from HAND, so a replacement there is stuck - a 99-card deck, which is the
+    // conflation the replacement design exists to prevent.
+    cs::CardDb with_commander = db();
+    with_commander.cards[static_cast<std::size_t>(slot_of("Kinnan, Bonder Prodigy"))]
+        .is_commander = true;
+    REQUIRE_THROWS_AS(cs::ablate(with_commander, effects, weights, set,
+                                 slot_of("Kinnan, Bonder Prodigy"), forest),
+                      cs::AblationError);
 }

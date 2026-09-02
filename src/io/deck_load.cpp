@@ -219,8 +219,7 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db) {
 
     PatternSet& set = deck.patterns;
     for (const Card& card : db.cards) {
-        if (std::find(card.all_types.begin(), card.all_types.end(), "Creature") !=
-            card.all_types.end()) {
+        if (card.is_creature()) {
             set.creature_slots.set(card.export_index);
         }
     }
