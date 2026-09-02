@@ -65,6 +65,39 @@ struct FetchEffect {
     int life_cost = 0;
 };
 
+// TUTOR: search the library by a predicate, move the result to a named zone.
+//
+// DESTINATION IS NOT COSMETIC. A tutor to the battlefield puts a permanent into
+// play now; a tutor to hand puts a card you must still cast, next turn, for its
+// mana cost. Scoring both as "this card arrives" would make Trophy Mage look
+// like Finale of Devastation.
+//
+// The scorer handles it by building the hypothetical state in the RIGHT ZONE:
+// a to-hand tutor's candidate is scored with the card in hand, so it can only
+// complete a pattern with an `in_hand` term, and a to-battlefield tutor's is
+// scored on the battlefield. No lookahead is added - the scorer still sees only
+// the current state plus one card - and the turn of delay is simply not
+// credited, which is an approximation in the CONSERVATIVE direction.
+enum class TutorDestination : std::uint8_t { Battlefield = 0, Hand };
+
+// What a tutor may find.
+enum class TutorFilter : std::uint8_t {
+    Any = 0,
+    Creature,
+    NonHumanCreature,  // Invasion of Ikoria, and Kinnan's own dig
+    Artifact,
+    Land,
+};
+
+struct TutorEffect {
+    TutorFilter filter = TutorFilter::Any;
+    TutorDestination destination = TutorDestination::Battlefield;
+    // -1 == no limit. Trophy Mage is exactly 3; Finale is "X or less", which
+    // makes the cap a function of the mana spent rather than a constant.
+    int max_mana_value = -1;
+    bool max_from_x = false;
+};
+
 // CARD_COST: paid in cards from hand, not mana.
 enum class CardFilter : std::uint8_t { Any = 0, Land, Nonland };
 
@@ -113,6 +146,8 @@ struct CardEffects {
     RitualEffect ritual;
     bool has_mass_untap = false;
     MassUntapEffect mass_untap;
+    bool has_tutor = false;
+    TutorEffect tutor;
     std::string reason_category;
 };
 
@@ -162,6 +197,10 @@ void collect_sources(const CardDb& db, const EffectDb& effects, const GameState&
 // which is a real outcome worth seeing rather than an error.
 void fetch_candidates(const FetchEffect& fetch, const CardDb& db, const GameState& state,
                       std::vector<int>& out);
+
+// Library slots this tutor could find, given the mana actually available.
+void tutor_candidates(const TutorEffect& tutor, const CardDb& db, const GameState& state,
+                      int mana_available, std::vector<int>& out);
 
 // Does this land enter tapped, given the board and the declared table context?
 [[nodiscard]] bool enters_tapped(const ManaSourceEffect& effect, const CardDb& db,

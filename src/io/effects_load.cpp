@@ -212,6 +212,27 @@ EffectDb load_effects(const std::filesystem::path& path, const CardDb& db) {
                     zone_from((*effect)["from_zone"].value_or<std::string>(""), context);
                 target.has_ritual = true;
                 target.ritual = ritual;
+            } else if (kind == "TUTOR") {
+                TutorEffect tutor;
+                const auto filter = (*effect)["filter"].value_or<std::string>("any");
+                if (filter == "any") tutor.filter = TutorFilter::Any;
+                else if (filter == "creature") tutor.filter = TutorFilter::Creature;
+                else if (filter == "non_human_creature") tutor.filter = TutorFilter::NonHumanCreature;
+                else if (filter == "artifact") tutor.filter = TutorFilter::Artifact;
+                else if (filter == "land") tutor.filter = TutorFilter::Land;
+                else fail(context + ": unknown tutor filter '" + filter + "'");
+
+                const auto destination = (*effect)["destination"].value_or<std::string>("");
+                if (destination == "battlefield") tutor.destination = TutorDestination::Battlefield;
+                else if (destination == "hand") tutor.destination = TutorDestination::Hand;
+                else fail(context + ": a TUTOR must state its destination explicitly - "
+                                    "'battlefield' or 'hand'. They are different cards.");
+
+                tutor.max_mana_value =
+                    static_cast<int>((*effect)["max_mana_value"].value_or<int64_t>(-1));
+                tutor.max_from_x = (*effect)["max_from_x"].value_or<bool>(false);
+                target.has_tutor = true;
+                target.tutor = tutor;
             } else if (kind == "MASS_UNTAP") {
                 MassUntapEffect untap;
                 untap.nonland_only = (*effect)["nonland_only"].value_or<bool>(true);

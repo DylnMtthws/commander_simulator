@@ -85,6 +85,46 @@ void fetch_candidates(const FetchEffect& fetch, const CardDb& db, const GameStat
     }
 }
 
+void tutor_candidates(const TutorEffect& tutor, const CardDb& db, const GameState& state,
+                      int mana_available, std::vector<int>& out) {
+    out.clear();
+    for (std::size_t i = state.drawn; i < state.library_count; ++i) {
+        const int slot = state.library[i];
+        const Card& card = db.cards[static_cast<std::size_t>(slot)];
+
+        bool creature = false;
+        bool human = false;
+        bool artifact = false;
+        bool land = false;
+        for (const std::string& type : card.all_types) {
+            creature = creature || type == "Creature";
+            human = human || type == "Human";
+            artifact = artifact || type == "Artifact";
+            land = land || type == "Land";
+        }
+        bool matches = false;
+        switch (tutor.filter) {
+            case TutorFilter::Any: matches = true; break;
+            case TutorFilter::Creature: matches = creature; break;
+            case TutorFilter::NonHumanCreature: matches = creature && !human; break;
+            case TutorFilter::Artifact: matches = artifact; break;
+            case TutorFilter::Land: matches = land; break;
+        }
+        if (!matches) {
+            continue;
+        }
+        // The mana-value cap. For an X tutor the cap is what the mana can pay
+        // for, which is why this takes mana_available rather than reading a
+        // constant - Finale of Devastation for X=0 finds a creature with mana
+        // value 0, and there are none (SIM_PLAN.md section 2.2).
+        const int cap = tutor.max_from_x ? mana_available : tutor.max_mana_value;
+        if (cap >= 0 && card.mana_value > cap) {
+            continue;
+        }
+        out.push_back(slot);
+    }
+}
+
 void collect_sources(const CardDb& db, const EffectDb& effects, const GameState& state,
                      const TableContext& table, std::vector<Source>& out) {
     out.clear();

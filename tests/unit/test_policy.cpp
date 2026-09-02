@@ -157,6 +157,39 @@ TEST_CASE("land drops stop at the ceiling", "[policy]") {
     }
 }
 
+TEST_CASE("tutor targets go through the same scorer", "[policy][tutor][rule8]") {
+    // §6.3's claim under test: tutors and selection are the same problem, so a
+    // tutor uses the SAME scorer with a different candidate set - the library
+    // rather than the hand. Larger, unseen, identical in kind.
+    const cs::PatternSet patterns = two_card_engine();
+    const cs::AuthoredPolicy policy(weights_with(/*sol_ring=*/20, /*finale=*/90));
+
+    cs::GameState state;
+    state.battlefield.set(slot_of("Kinnan, Bonder Prodigy"));  // one piece short
+
+    const auto sources = rich_board();
+    const cs::Context context{db(), patterns, state, sources, nullptr};
+    cs::GameStats stats;
+    const std::vector<int> candidates{slot_of("Sol Ring"), slot_of("Finale of Devastation")};
+
+    SECTION("to the battlefield, completing the engine beats rank") {
+        // A rank-only tutor picks Finale at 90. Sol Ring finishes the engine.
+        REQUIRE(policy.choose_tutor(context, candidates, /*to_hand=*/false, stats) ==
+                slot_of("Sol Ring"));
+    }
+    SECTION("to hand, it does NOT - the card still has to be cast") {
+        // THE destination case. A destination-blind implementation reuses the
+        // battlefield hypothetical and picks Sol Ring here too, crediting a
+        // board state the tutor did not create. Trophy Mage is not Finale of
+        // Devastation and the scorer has to see that.
+        REQUIRE(policy.choose_tutor(context, candidates, /*to_hand=*/true, stats) ==
+                slot_of("Finale of Devastation"));
+    }
+    SECTION("an empty candidate set finds nothing rather than asserting") {
+        REQUIRE(policy.choose_tutor(context, {}, false, stats) == -1);
+    }
+}
+
 TEST_CASE("ties resolve by export_index, not by iteration accident", "[policy]") {
     // Section 6.5: a tie broken by container order is a reproducibility bug
     // that looks like variance. Two identically-ranked lands must always give

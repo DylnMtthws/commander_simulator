@@ -417,6 +417,80 @@ reason_category = "no_object_in_model"
 authored_from = "6e8197cacb7af86be4205da63672d2e8447a8f95756e4e611513e64523beb84d"
 reason = "channel returns from the graveyard or bounces; neither zone is meaningful here"
 
+# ===========================================================================
+# TUTOR - nine of them, and the deck's real card selection.
+#
+# DESTINATION MATTERS AND IS NOT AN AFTERTHOUGHT. A tutor to the battlefield
+# puts a permanent into play now; a tutor to hand puts a card you must still
+# cast, next turn, for its mana cost. The scorer builds its hypothetical in the
+# right zone, so a to-hand target can only complete a pattern with an `in_hand`
+# term - and the turn of delay is simply not credited, an approximation in the
+# CONSERVATIVE direction.
+#
+# NOTE ON WHAT IS ABSENT: no Vampiric Tutor, no Imperial Seal, no Mystical or
+# Worldly Tutor - all black or white, and this deck is Simic. Nothing here puts
+# a card on TOP of the library, so the "value depends on next turn" problem that
+# would defeat a lookahead-free scorer does not arise in this deck at all. It
+# would in a deck that ran them.
+#
+# Chord of Calling is authored LAST and separately: convoke pays part of its
+# cost by tapping creatures, which reads the battlefield and interacts with
+# Kinnan, and it is the most complex cost in the deck.
+# ===========================================================================
+
+[cards."Finale of Devastation"]
+status = "modeled"
+authored_from = "503a2f5340776ad9d333be12f987ba0c213955a4ef5fd108b9381405dc699050"
+# {X}{G}{G}: creature with mana value X or less, onto the battlefield. The cap
+# is what the mana can pay for, not a constant - at X=0 it finds a creature of
+# mana value 0, and there are none (section 2.2).
+effects = [ { kind = "TUTOR", filter = "creature", destination = "battlefield", max_from_x = true } ]
+
+[cards."Nature's Rhythm"]
+status = "modeled"
+authored_from = "b652f08301a753ab4a12343f9a7f8d15b44f233dfb41f402570ef31e4c417aa4"
+# Harmonize (cast from graveyard) is not modelled; the graveyard is not a zone
+# the policy plays from.
+effects = [ { kind = "TUTOR", filter = "creature", destination = "battlefield", max_from_x = true } ]
+
+[cards."Invasion of Ikoria"]
+status = "modeled"
+authored_from = "efa5d1510900dfa088fd0442b3c8f72d35f813cdea1fd9c20089195070b0af6a"
+# The card whose modelling both of us guessed wrong (section 4.6). Its ETB is a
+# creature tutor to the battlefield with Kinnan's own non-Human restriction. No
+# Battle type: a Siege flips by being attacked and this model has no combat, so
+# Zilortha is unreachable by construction and the permanent is discarded.
+effects = [ { kind = "TUTOR", filter = "non_human_creature", destination = "battlefield", max_from_x = true } ]
+
+[cards."Transmute Artifact"]
+status = "modeled"
+authored_from = "3047b9cb21241ac8698d7b6598bfb198624aca62f0fcac93e7d62f42cf48e7b6"
+# Sacrificing an artifact is a real cost and is NOT modelled, which overstates
+# it. The mana-value comparison against the sacrificed artifact is likewise not
+# modelled: treated as an unrestricted artifact tutor to the battlefield.
+effects = [ { kind = "TUTOR", filter = "artifact", destination = "battlefield" } ]
+
+[cards."Trophy Mage"]
+status = "modeled"
+authored_from = "dc585d233c1a0a487fc2555bd0f766a8f0668753ff74d09d5bc068b29b1929ba"
+# Exactly mana value 3, and to HAND. A different card from the ones above and
+# the scorer now sees that.
+effects = [ { kind = "TUTOR", filter = "artifact", destination = "hand", max_mana_value = 3 } ]
+
+[cards."Drift of Phantasms"]
+status = "modeled"
+authored_from = "3c2093535a27a6e3ab4e224af87e5c38b9482f3c5288ed1a9f406f2e4c832420"
+# Transmute {1}{U}{U}: discard this, search for a card of the SAME mana value,
+# which is 3. Modelled as the transmute only - the 0/5 flying defender is
+# irrelevant with no combat.
+effects = [ { kind = "TUTOR", filter = "any", destination = "hand", max_mana_value = 3 } ]
+
+[cards."Dizzy Spell"]
+status = "modeled"
+authored_from = "db4a959eeafe152a037fc6dfa2ed2af2ef719d3b724026eee9053d26114710df"
+# Transmute {1}{U}{U} for a mana value 1 card. Sol Ring, Mana Vault, the dorks.
+effects = [ { kind = "TUTOR", filter = "any", destination = "hand", max_mana_value = 1 } ]
+
 [cards."Dramatic Reversal"]
 status = "modeled"
 authored_from = "52665fc61d5ee36c75b56825526c0e571aac77a4cebecddfcd11404e0d7d5066"

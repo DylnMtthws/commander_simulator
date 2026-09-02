@@ -43,11 +43,19 @@ int lands_on_board(const Context& context) noexcept {
 //
 // Note this looks only at the CURRENT state plus this one card. It does not
 // look a turn ahead, which is what keeps it a scorer rather than a search.
-int pattern_completion(const Context& context, int slot, const PolicyWeights& weights) noexcept {
+int pattern_completion(const Context& context, int slot, const PolicyWeights& weights,
+                       bool to_hand = false) noexcept {
     GameState hypothetical = context.state;
-    hypothetical.hand.clear(slot);
-    hypothetical.command_zone.clear(slot);
-    hypothetical.battlefield.set(slot);
+    if (to_hand) {
+        // The card ARRIVES IN HAND. It can therefore only complete a pattern
+        // with an `in_hand` term, which is exactly right: a tutored card that
+        // still has to be cast has not completed a board state.
+        hypothetical.hand.set(slot);
+    } else {
+        hypothetical.hand.clear(slot);
+        hypothetical.command_zone.clear(slot);
+        hypothetical.battlefield.set(slot);
+    }
 
     if (first_satisfied(context.patterns, hypothetical, context.sources) >= 0 &&
         first_satisfied(context.patterns, context.state, context.sources) < 0) {
@@ -99,6 +107,11 @@ int StubPolicyDoNotUseForResults::choose_spell(const Context& context, GameStats
 
 int StubPolicyDoNotUseForResults::choose_fetch(const Context&, std::span<const int> candidates,
                                                GameStats&) const {
+    return candidates.empty() ? -1 : candidates.front();
+}
+
+int StubPolicyDoNotUseForResults::choose_tutor(const Context&, std::span<const int> candidates,
+                                               bool, GameStats&) const {
     return candidates.empty() ? -1 : candidates.front();
 }
 
@@ -169,6 +182,46 @@ int best_of(std::span<const Consideration> candidates, int floor_score) {
 }
 
 }  // namespace
+
+Consideration AuthoredPolicy::score_arrival(const Context& context, int slot, bool to_hand,
+                                            GameStats& stats) const {
+    Consideration result;
+    result.slot = slot;
+    const auto index = static_cast<std::size_t>(slot);
+    result.rank_term = (index < weights_.rank.size() ? weights_.rank[index] : 0) * 1000;
+    result.castable = true;  // it is being fetched, not cast
+    result.pattern_term = pattern_completion(context, slot, weights_, to_hand);
+    static_cast<void>(stats);
+    result.score = result.rank_term + result.pattern_term;
+    return result;
+}
+
+int AuthoredPolicy::choose_tutor(const Context& context, std::span<const int> candidates,
+                                 bool to_hand, GameStats& stats) const {
+    // §6.3's claim under test: tutors and selection are the same problem, so
+    // this is the SAME scorer with a different candidate set - the library
+    // rather than the hand. The set is larger and the cards are unseen, but the
+    // decision is identical in kind.
+    std::vector<Consideration> scored;
+    scored.reserve(candidates.size());
+    for (const int slot : candidates) {
+        scored.push_back(score_arrival(context, slot, to_hand, stats));
+    }
+    if (context.observer != nullptr) {
+        context.observer->considering(scored, to_hand ? "tutor target (to hand)"
+                                                      : "tutor target (to battlefield)");
+    }
+    int best = -1;
+    int best_score = 0;
+    for (const Consideration& candidate : scored) {
+        if (best < 0 || candidate.score > best_score ||
+            (candidate.score == best_score && candidate.slot < best)) {
+            best = candidate.slot;
+            best_score = candidate.score;
+        }
+    }
+    return best;
+}
 
 int AuthoredPolicy::choose_fetch(const Context& context, std::span<const int> candidates,
                                  GameStats& stats) const {

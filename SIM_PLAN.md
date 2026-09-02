@@ -931,6 +931,26 @@ how you get a pattern that silently succeeds due to a modelling gap.
 > casts a rank-88 Thrasios the moment it is affordable, so the outlet is never
 > still in hand when the check runs.
 >
+> **A worked history: `infinite_C_into_thrasios` fired 1095, then 9, then 1258.**
+> Every move was a proxy being replaced by the actual condition, and only the
+> last number means anything.
+>
+> | Fires | What the engine required | Why it was wrong |
+> |---|---|---|
+> | 1095 | Kinnan + Basalt in play, Basalt untapped — under a **stub mana model** | Every permanent with a land face tapped for any colour; rocks produced nothing |
+> | 9 | the same, under **real mana** | `untaps_normally = false` was now honoured, so Basalt stayed tapped forever and the *untapped* proxy almost never held |
+> | 1258 | Kinnan + Basalt in play, **entry cost `{3}` payable now** | — |
+>
+> The instructive part is the middle. **The number looked stable at 1095 and was
+> wrong twice before it was right**, and the second value was wrong in the
+> opposite direction from the first. Neither move was a bug being fixed; both
+> were a *proxy* — "a land face means mana", "untapped means loopable" — being
+> replaced with the thing it stood in for.
+>
+> A reader seeing only the final figure would have no way to know it had moved
+> two orders of magnitude in both directions. That is the argument for the
+> pattern mix being reported at every phase rather than at the end.
+
 > It is indistinguishable from a dead line in the output, and it is the one
 > cause that a *better* policy makes *more* likely. Worth remembering whenever a
 > pattern describes a transient state rather than a stable one.

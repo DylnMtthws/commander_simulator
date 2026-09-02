@@ -42,6 +42,12 @@ public:
     // Which card to cast next, or -1 to stop casting this turn.
     [[nodiscard]] virtual int choose_spell(const Context& context, GameStats& stats) const = 0;
 
+    // Which card to tutor for, or -1 for none. `to_hand` decides which zone
+    // the hypothetical is built in, which is the whole of how destination is
+    // handled (core/effects.hpp).
+    [[nodiscard]] virtual int choose_tutor(const Context& context, std::span<const int> candidates,
+                                           bool to_hand, GameStats& stats) const = 0;
+
     // Which land to fetch from a set of candidates, or -1 for none.
     //
     // A fetch IS a tutor with a small candidate set, so it goes through the
@@ -78,6 +84,8 @@ public:
     [[nodiscard]] int choose_spell(const Context& context, GameStats& stats) const override;
     [[nodiscard]] int choose_fetch(const Context& context, std::span<const int> candidates,
                                    GameStats& stats) const override;
+    [[nodiscard]] int choose_tutor(const Context& context, std::span<const int> candidates,
+                                   bool to_hand, GameStats& stats) const override;
     [[nodiscard]] const char* name() const override {
         return "StubPolicyDoNotUseForResults (plays the lowest-indexed legal thing)";
     }
@@ -136,6 +144,8 @@ public:
     [[nodiscard]] int choose_spell(const Context& context, GameStats& stats) const override;
     [[nodiscard]] int choose_fetch(const Context& context, std::span<const int> candidates,
                                    GameStats& stats) const override;
+    [[nodiscard]] int choose_tutor(const Context& context, std::span<const int> candidates,
+                                   bool to_hand, GameStats& stats) const override;
     [[nodiscard]] const char* name() const override {
         return "AuthoredPolicy (authored ranks plus state-dependent terms)";
     }
@@ -144,6 +154,11 @@ public:
     // test that can only see the winner cannot tell WHY it won.
     [[nodiscard]] Consideration score(const Context& context, int slot, bool as_land,
                                       GameStats& stats) const;
+
+    // Scores a card as if it arrived in `to_hand ? hand : battlefield`. Used for
+    // tutor targets, where the destination changes what the card is worth.
+    [[nodiscard]] Consideration score_arrival(const Context& context, int slot, bool to_hand,
+                                              GameStats& stats) const;
 
 private:
     PolicyWeights weights_;

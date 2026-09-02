@@ -190,10 +190,54 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
             state.battlefield.set(spell);
             ++result.stats.spells_cast;
 
-            // MASS_UNTAP resolves on cast. Dramatic Reversal untaps all nonland
-            // permanents, which with enough rocks is its own engine - detected
-            // by a pattern, like every other loop here.
+            // Announced BEFORE its consequences. The fetch had this bug and so
+            // did this: a trace read "TUTOR: Nature's Rhythm -> ..." and then
+            // "CAST: Nature's Rhythm" - the effect before the cause. Fifth
+            // output-ordering issue in this project, all five found by reading
+            // output and none by a test (upstream PLAN.md 11.0).
+            const Face* cast_face = castable_face(db.cards[static_cast<std::size_t>(spell)]);
+            int to_tap = cast_face != nullptr ? cast_face->cost->mana_value_at_x_zero() : 0;
+            if (observer != nullptr) {
+                observer->cast_spell(spell, to_tap);
+            }
+
             const CardEffects& cast_entry = effects.by_slot[static_cast<std::size_t>(spell)];
+
+            if (cast_entry.has_tutor) {
+                // The cap for an X tutor is the mana LEFT after paying the
+                // coloured part, approximated as everything currently
+                // available. Generous, and stated as such.
+                std::vector<int> targets;
+                tutor_candidates(cast_entry.tutor, db, state, total_mana(sources), targets);
+                const bool to_hand = cast_entry.tutor.destination == TutorDestination::Hand;
+                const Context tutor_context{db, patterns, state, sources, observer};
+                const int found =
+                    policy.choose_tutor(tutor_context, targets, to_hand, result.stats);
+                if (observer != nullptr) {
+                    observer->tutored(spell, found, to_hand);
+                }
+                if (found >= 0) {
+                    for (std::size_t i = state.drawn; i < state.library_count; ++i) {
+                        if (state.library[i] == found) {
+                            state.library[i] = state.library[state.library_count - 1];
+                            --state.library_count;
+                            break;
+                        }
+                    }
+                    if (to_hand) {
+                        state.hand.set(found);
+                    } else {
+                        state.battlefield.set(found);
+                    }
+                    ++result.stats.tutors_used;
+                }
+                // A tutor spell is not a permanent. Only the ETB tutors are.
+                if (!cast_entry.has_mana_source) {
+                    state.battlefield.clear(spell);
+                    state.graveyard.set(spell);
+                }
+            }
+
             if (cast_entry.has_mass_untap) {
                 Zone keep_tapped;
                 state.tapped.for_each([&](int slot) {
@@ -209,14 +253,6 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
                 ++result.stats.mass_untaps;
             }
 
-            // Paying taps sources. The stub taps as many lands as the cost's
-            // total, which is crude but keeps mana from being infinite - and
-            // without it the loop would cast the whole hand every turn.
-            const Face* face = castable_face(db.cards[static_cast<std::size_t>(spell)]);
-            int to_tap = face != nullptr ? face->cost->mana_value_at_x_zero() : 0;
-            if (observer != nullptr) {
-                observer->cast_spell(spell, to_tap);
-            }
             // Paying taps sources. Crude - it taps in slot order rather than
             // solving which sources to spend, which is a policy question and a
             // later one (section 6.4). Without it mana would be infinite.

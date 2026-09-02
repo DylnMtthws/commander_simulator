@@ -77,6 +77,15 @@ void TraceWriter::fetched(int from_slot, int to_slot) {
     std::fprintf(out_, "     FETCH: %s -> %s\n", name_of(from_slot), name_of(to_slot));
 }
 
+void TraceWriter::tutored(int from_slot, int to_slot, bool to_hand) {
+    if (to_slot < 0) {
+        std::fprintf(out_, "     TUTOR: %s finds nothing\n", name_of(from_slot));
+        return;
+    }
+    std::fprintf(out_, "     TUTOR: %s -> %s (to %s)\n", name_of(from_slot), name_of(to_slot),
+                 to_hand ? "hand" : "battlefield");
+}
+
 void TraceWriter::cast_spell(int slot, int paid) {
     std::fprintf(out_, "     CAST: %-28s paying %d\n", name_of(slot), paid);
 }
