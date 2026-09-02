@@ -5,7 +5,8 @@
 namespace cs {
 
 bool requirement_holds(const Requirement& requirement, const PatternSet& set,
-                       const GameState& state, FlagMask active) noexcept {
+                       const GameState& state, FlagMask active,
+                       std::span<const Source> sources) noexcept {
     if ((active & requirement.flags) != requirement.flags) {
         return false;
     }
@@ -43,39 +44,49 @@ bool requirement_holds(const Requirement& requirement, const PatternSet& set,
         state.library_size() > requirement.library_size_lte) {
         return false;
     }
+    if (requirement.loop_entry_cost >= 0) {
+        Cost entry;
+        entry.generic = static_cast<std::uint8_t>(requirement.loop_entry_cost);
+        if (!can_pay(entry, sources, 0)) {
+            return false;
+        }
+    }
     return true;
 }
 
-FlagMask active_flags(const PatternSet& set, const GameState& state) noexcept {
+FlagMask active_flags(const PatternSet& set, const GameState& state,
+                      std::span<const Source> sources) noexcept {
     FlagMask active = 0;
     // One pass, no fixpoint: an engine may not reference another engine's flag
     // (section 5.1), so a second pass could never set anything new. If engines
     // ever compose, this becomes a loop and needs cycle detection - which is
     // the cost the two-level design is avoiding.
     for (const Engine& engine : set.engines) {
-        if (requirement_holds(engine.requires_, set, state, 0)) {
+        if (requirement_holds(engine.requires_, set, state, 0, sources)) {
             active |= engine.sets;
         }
     }
     return active;
 }
 
-FlagMask all_satisfied(const PatternSet& set, const GameState& state) noexcept {
-    const FlagMask active = active_flags(set, state);
+FlagMask all_satisfied(const PatternSet& set, const GameState& state,
+                       std::span<const Source> sources) noexcept {
+    const FlagMask active = active_flags(set, state, sources);
     FlagMask satisfied = 0;
     const std::size_t limit = std::min(set.patterns.size(), kMaxFlags);
     for (std::size_t i = 0; i < limit; ++i) {
-        if (requirement_holds(set.patterns[i].requires_, set, state, active)) {
+        if (requirement_holds(set.patterns[i].requires_, set, state, active, sources)) {
             satisfied |= FlagMask{1} << i;
         }
     }
     return satisfied;
 }
 
-int first_satisfied(const PatternSet& set, const GameState& state) noexcept {
-    const FlagMask active = active_flags(set, state);
+int first_satisfied(const PatternSet& set, const GameState& state,
+                    std::span<const Source> sources) noexcept {
+    const FlagMask active = active_flags(set, state, sources);
     for (std::size_t i = 0; i < set.patterns.size(); ++i) {
-        if (requirement_holds(set.patterns[i].requires_, set, state, active)) {
+        if (requirement_holds(set.patterns[i].requires_, set, state, active, sources)) {
             return static_cast<int>(i);
         }
     }

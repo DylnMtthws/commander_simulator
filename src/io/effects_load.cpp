@@ -212,6 +212,11 @@ EffectDb load_effects(const std::filesystem::path& path, const CardDb& db) {
                     zone_from((*effect)["from_zone"].value_or<std::string>(""), context);
                 target.has_ritual = true;
                 target.ritual = ritual;
+            } else if (kind == "MASS_UNTAP") {
+                MassUntapEffect untap;
+                untap.nonland_only = (*effect)["nonland_only"].value_or<bool>(true);
+                target.has_mass_untap = true;
+                target.mass_untap = untap;
             } else if (kind == "STATIC_MANA_MODIFIER") {
                 ModifierEffect modifier;
                 const auto mode = (*effect)["mode"].value_or<std::string>("");

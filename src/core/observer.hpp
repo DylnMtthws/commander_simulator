@@ -51,6 +51,10 @@ public:
     virtual void cast_spell(int /*slot*/, int /*paid*/) {}
     virtual void pattern_fired(int /*pattern*/, int /*turn*/) {}
     virtual void engines_active(FlagMask /*flags*/) {}
+    // WHY an engine is available, not just that it is. Unbounded mana here is
+    // DETECTED from a declared engine, never produced by simulation, and a
+    // reader has to be able to see which they are looking at.
+    virtual void loop_available(int /*engine*/, int /*entry_cost*/, int /*mana_available*/) {}
     virtual void game_end(int /*turn*/, bool /*censored*/) {}
 };
 

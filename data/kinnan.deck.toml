@@ -156,8 +156,14 @@ sets = ["INFINITE:C"]
 # colourless per iteration. The mana is COLOURLESS, which is why the outlet
 # below is Thrasios ({4} generic) and not Kinnan's own {5}{G}{U} (section 2.6).
 [engine.requires]
-in_play  = ["Kinnan, Bonder Prodigy", "Basalt Monolith"]
-untapped = ["Basalt Monolith"]
+in_play = ["Kinnan, Bonder Prodigy", "Basalt Monolith"]
+# NOT `untapped = ["Basalt Monolith"]`, which was a proxy and the wrong one.
+# The loop is unbounded if its ENTRY COST is payable now: {3} to untap Basalt.
+# That one check covers both cases without a special case - an untapped Basalt
+# is itself a 4-mana source and pays its own entry, while a tapped one requires
+# the {3} from elsewhere. Presence alone would fire with two mana and a tapped
+# Basalt, which is a loop you cannot enter.
+loop_entry_cost = 3
 
 [[engine]]
 name = "kinnan_enduring_vitality"
@@ -261,6 +267,7 @@ life_floor   = 10    # below this the deck stops paying life for mana (40 to sta
 # Card advantage that actually works with no opponents.
 "The One Ring"            = 50
 "Sylvan Library"          = 45
+"Dramatic Reversal"       = 48
 
 # ---------------------------------------------------------------------------
 # LANDS, ranked deliberately.

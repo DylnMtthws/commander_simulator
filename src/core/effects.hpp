@@ -82,6 +82,13 @@ struct RitualEffect {
     RitualZone from_zone = RitualZone::Battlefield;
 };
 
+// MASS_UNTAP: a one-shot untap of a set of permanents. Dramatic Reversal is
+// the only one here. Straightforward under a detect-not-execute model, because
+// it happens once when it resolves rather than looping.
+struct MassUntapEffect {
+    bool nonland_only = true;
+};
+
 enum class ModifierMode : std::uint8_t { Multiply, GrantCreatureMana };
 
 struct ModifierEffect {
@@ -104,6 +111,8 @@ struct CardEffects {
     CardCostEffect card_cost;
     bool has_ritual = false;
     RitualEffect ritual;
+    bool has_mass_untap = false;
+    MassUntapEffect mass_untap;
     std::string reason_category;
 };
 

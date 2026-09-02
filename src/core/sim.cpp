@@ -190,6 +190,25 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
             state.battlefield.set(spell);
             ++result.stats.spells_cast;
 
+            // MASS_UNTAP resolves on cast. Dramatic Reversal untaps all nonland
+            // permanents, which with enough rocks is its own engine - detected
+            // by a pattern, like every other loop here.
+            const CardEffects& cast_entry = effects.by_slot[static_cast<std::size_t>(spell)];
+            if (cast_entry.has_mass_untap) {
+                Zone keep_tapped;
+                state.tapped.for_each([&](int slot) {
+                    const CardEffects& tapped_entry =
+                        effects.by_slot[static_cast<std::size_t>(slot)];
+                    const bool is_land =
+                        tapped_entry.has_mana_source && tapped_entry.mana_source.is_land;
+                    if (cast_entry.mass_untap.nonland_only && is_land) {
+                        keep_tapped.set(slot);
+                    }
+                });
+                state.tapped = keep_tapped;
+                ++result.stats.mass_untaps;
+            }
+
             // Paying taps sources. The stub taps as many lands as the cost's
             // total, which is crude but keeps mana from being infinite - and
             // without it the loop would cast the whole hand every turn.
@@ -237,14 +256,29 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
         // is never still in hand when the check runs. The pattern is dead GIVEN
         // THIS POLICY, which is a fourth cause of a never-fired pattern beyond
         // dead, buggy and shadowed.
+        // Sources are recomputed for the pattern check, because an engine's
+        // entry cost is checked against what is available RIGHT NOW - after the
+        // turn's casting has tapped things. That is the whole point of
+        // loop_entry_cost: an unbounded engine you cannot pay to enter is not
+        // unbounded.
+        collect_sources(db, effects, state, config.table, sources);
         if (observer != nullptr) {
-            observer->engines_active(active_flags(patterns, state));
+            observer->engines_active(active_flags(patterns, state, sources));
+            for (std::size_t e = 0; e < patterns.engines.size(); ++e) {
+                const Engine& engine = patterns.engines[e];
+                if (engine.requires_.loop_entry_cost >= 0 &&
+                    requirement_holds(engine.requires_, patterns, state, 0, sources)) {
+                    observer->loop_available(static_cast<int>(e),
+                                             engine.requires_.loop_entry_cost,
+                                             total_mana(sources));
+                }
+            }
         }
-        const int fired = first_satisfied(patterns, state);
+        const int fired = first_satisfied(patterns, state, sources);
         if (fired >= 0) {
             result.outcome.assembled_turn = turn;
             result.outcome.pattern_id = static_cast<std::uint8_t>(fired);
-            result.outcome.satisfied_mask = all_satisfied(patterns, state);
+            result.outcome.satisfied_mask = all_satisfied(patterns, state, sources);
             if (observer != nullptr) {
                 observer->pattern_fired(fired, turn);
             }

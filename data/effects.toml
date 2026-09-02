@@ -417,6 +417,13 @@ reason_category = "no_object_in_model"
 authored_from = "6e8197cacb7af86be4205da63672d2e8447a8f95756e4e611513e64523beb84d"
 reason = "channel returns from the graveyard or bounces; neither zone is meaningful here"
 
+[cards."Dramatic Reversal"]
+status = "modeled"
+authored_from = "52665fc61d5ee36c75b56825526c0e571aac77a4cebecddfcd11404e0d7d5066"
+# "Untap all nonland permanents you control." One-shot, so it needs no loop
+# machinery - with enough rocks it becomes an engine, and that is a PATTERN.
+effects = [ { kind = "MASS_UNTAP", nonland_only = true } ]
+
 [cards."Hidden Strings"]
 status = "inert"
 reason_category = "no_object_in_model"

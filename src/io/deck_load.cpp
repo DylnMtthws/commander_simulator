@@ -21,7 +21,8 @@ namespace {
 // mechanism not running.
 constexpr std::string_view kZoneTerms[] = {"in_play", "in_hand", "in_play_or_hand", "untapped",
                                            "any_of"};
-constexpr std::string_view kScalarTerms[] = {"turn_gte", "creature_count_gte", "library_size_lte"};
+constexpr std::string_view kScalarTerms[] = {"turn_gte", "creature_count_gte",
+                                            "library_size_lte", "loop_entry_cost"};
 constexpr std::string_view kOtherTerms[] = {"flag", "flags"};
 
 // Declared in section 5.2 but not implemented yet. Named separately so the
@@ -103,6 +104,8 @@ Requirement parse_requirement(const toml::table& table, const CardDb& db, Patter
             if (name == "turn_gte") requirement.turn_gte = static_cast<int>(*number);
             else if (name == "creature_count_gte")
                 requirement.creature_count_gte = static_cast<int>(*number);
+            else if (name == "loop_entry_cost")
+                requirement.loop_entry_cost = static_cast<int>(*number);
             else requirement.library_size_lte = static_cast<int>(*number);
         } else if (contains(kOtherTerms, name)) {
             if (!allow_flags) {

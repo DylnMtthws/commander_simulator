@@ -28,6 +28,7 @@ public:
     void cast_spell(int slot, int paid) override;
     void pattern_fired(int pattern, int turn) override;
     void engines_active(FlagMask flags) override;
+    void loop_available(int engine, int entry_cost, int mana_available) override;
     void game_end(int turn, bool censored) override;
 
 private:

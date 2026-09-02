@@ -183,6 +183,11 @@ int simulate(const std::filesystem::path& path, const std::filesystem::path& dec
 
     std::printf("\nMETRIC: goldfish turns-to-assembly. NOT deck strength, win rate, or card\n");
     std::printf("        quality. A faster number is not a better deck.\n");
+    std::printf("\nHOW COMBOS ARE COUNTED: unbounded mana is DETECTED from a declared engine\n");
+    std::printf("        in the deck file, never produced by simulating the loop. An engine\n");
+    std::printf("        fires when its pieces are present AND its entry cost is payable from\n");
+    std::printf("        the mana actually available. This model RECOGNISES a combo; it does\n");
+    std::printf("        not claim to have played one.\n");
     std::printf("\n%d games, seed %llu\n  policy: %s\n", games,
                 static_cast<unsigned long long>(base_seed), policy.name());
     std::printf("  can_pay calls/game %.1f\n", static_cast<double>(can_pay_calls) / games);

@@ -17,7 +17,10 @@
 #include <string>
 #include <vector>
 
+#include <span>
+
 #include "core/card.hpp"
+#include "core/mana.hpp"
 #include "core/state.hpp"
 
 namespace cs {
@@ -44,6 +47,24 @@ struct Requirement {
     int turn_gte = 0;
     int creature_count_gte = 0;
     int library_size_lte = -1;  // -1 == not required
+
+    // The cost, in generic mana, of ENTERING a self-untap loop.
+    //
+    // This is the term that makes an engine a claim about the board rather than
+    // a claim about which cards are on it. Kinnan + Basalt is only unbounded if
+    // you can actually pay the {3} to untap - and note the check needs no
+    // special case for whether Basalt is currently tapped, because an untapped
+    // Basalt is ITSELF one of the sources offering 4:
+    //
+    //   Basalt untapped -> sources include 4x{C}, so {3} is payable        (loop)
+    //   Basalt tapped   -> it is not a source, so {3} must come from elsewhere
+    //
+    // Authored this way from the start rather than as "both pieces are on the
+    // board", because presence-only fires with Kinnan, a tapped Basalt and two
+    // mana - overstating the deck exactly at the turn boundaries the CDF is
+    // most sensitive to, and that is the kind of thing simplified now and
+    // tightened never.
+    int loop_entry_cost = -1;  // -1 == not required
 };
 
 struct Engine {
@@ -68,15 +89,18 @@ struct PatternSet {
 };
 
 [[nodiscard]] bool requirement_holds(const Requirement& requirement, const PatternSet& set,
-                                     const GameState& state, FlagMask active) noexcept;
+                                     const GameState& state, FlagMask active,
+                                     std::span<const Source> sources) noexcept;
 
 // Flags set by every engine whose requirement currently holds.
-[[nodiscard]] FlagMask active_flags(const PatternSet& set, const GameState& state) noexcept;
+[[nodiscard]] FlagMask active_flags(const PatternSet& set, const GameState& state,
+                                    std::span<const Source> sources) noexcept;
 
 // Index of the first satisfied pattern, or -1. Declaration order is the
 // tiebreak, so two patterns true on the same turn always resolve the same way
 // (section 6.5).
-[[nodiscard]] int first_satisfied(const PatternSet& set, const GameState& state) noexcept;
+[[nodiscard]] int first_satisfied(const PatternSet& set, const GameState& state,
+                                  std::span<const Source> sources) noexcept;
 
 // Bit i set if pattern i's requirement holds. Used to tell a DEAD pattern from
 // a SHADOWED one: patterns are checked in declaration order and the first hit
@@ -84,6 +108,7 @@ struct PatternSet {
 // state is reached. Without this the never-fired report cannot distinguish
 // "this line does not happen" from "this line always happens at the same time
 // as an earlier one", and those call for opposite responses.
-[[nodiscard]] FlagMask all_satisfied(const PatternSet& set, const GameState& state) noexcept;
+[[nodiscard]] FlagMask all_satisfied(const PatternSet& set, const GameState& state,
+                                     std::span<const Source> sources) noexcept;
 
 }  // namespace cs

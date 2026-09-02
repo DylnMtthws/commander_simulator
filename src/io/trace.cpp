@@ -94,6 +94,16 @@ void TraceWriter::engines_active(FlagMask flags) {
     std::fprintf(out_, "\n");
 }
 
+void TraceWriter::loop_available(int engine, int entry_cost, int mana_available) {
+    std::fprintf(out_,
+                 "     LOOP DETECTED: engine '%s' entry cost {%d}, payable from %d "
+                 "available mana\n",
+                 patterns_.engines[static_cast<std::size_t>(engine)].name.c_str(), entry_cost,
+                 mana_available);
+    std::fprintf(out_, "       (unbounded mana is DETECTED from this declared engine, not "
+                       "produced by simulation)\n");
+}
+
 void TraceWriter::pattern_fired(int pattern, int turn) {
     std::fprintf(out_, "\n  ASSEMBLED on turn %d: %s\n", turn,
                  patterns_.patterns[static_cast<std::size_t>(pattern)].name.c_str());

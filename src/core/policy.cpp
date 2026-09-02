@@ -49,12 +49,12 @@ int pattern_completion(const Context& context, int slot, const PolicyWeights& we
     hypothetical.command_zone.clear(slot);
     hypothetical.battlefield.set(slot);
 
-    if (first_satisfied(context.patterns, hypothetical) >= 0 &&
-        first_satisfied(context.patterns, context.state) < 0) {
+    if (first_satisfied(context.patterns, hypothetical, context.sources) >= 0 &&
+        first_satisfied(context.patterns, context.state, context.sources) < 0) {
         return weights.completes_pattern;
     }
-    const FlagMask before = active_flags(context.patterns, context.state);
-    const FlagMask after = active_flags(context.patterns, hypothetical);
+    const FlagMask before = active_flags(context.patterns, context.state, context.sources);
+    const FlagMask after = active_flags(context.patterns, hypothetical, context.sources);
     if ((after & ~before) != 0) {
         return weights.completes_engine;
     }
