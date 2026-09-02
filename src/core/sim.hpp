@@ -41,6 +41,7 @@ struct GameStats {
     // it the deck did for itself.
     std::uint32_t cards_drawn_by_effect = 0;
     std::uint32_t convoked = 0;
+    std::uint32_t cards_given_up = 0;
 };
 
 struct GameOutcome {

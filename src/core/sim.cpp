@@ -102,7 +102,7 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
         const int land = policy.choose_land(land_context, result.stats);
         if (land >= 0) {
             state.hand.clear(land);
-            state.battlefield.set(land);
+            enter_battlefield(db, effects, state, config.table, land);
             state.land_played_this_turn = true;
             ++result.stats.lands_played;
             // Announced BEFORE the fetch it triggers. The first version printed
@@ -138,23 +138,7 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
                             break;
                         }
                     }
-                    state.battlefield.set(target);
-                    const CardEffects& found = effects.by_slot[static_cast<std::size_t>(target)];
-                    if (found.has_mana_source &&
-                        enters_tapped(found.mana_source, db, effects, state, config.table)) {
-                        state.tapped.set(target);
-                    }
-                }
-            }
-            // A land that enters tapped produces nothing this turn. Getting
-            // this wrong would silently give the deck a turn it did not have.
-            const CardEffects& entry = effects.by_slot[static_cast<std::size_t>(land)];
-            if (entry.has_mana_source) {
-                if (enters_tapped(entry.mana_source, db, effects, state, config.table)) {
-                    state.tapped.set(land);
-                } else if (entry.mana_source.enters_tapped_unless == EntersTappedUnless::PayLife) {
-                    // Entering untapped was a choice and it was paid for.
-                    state.life -= entry.mana_source.enters_tapped_param;
+                    enter_battlefield(db, effects, state, config.table, target);
                 }
             }
         }
@@ -186,7 +170,7 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
             }
             state.hand.clear(spell);
             state.command_zone.clear(spell);
-            state.battlefield.set(spell);
+            enter_battlefield(db, effects, state, config.table, spell);
             ++result.stats.spells_cast;
 
             // Announced BEFORE its consequences. The fetch had this bug and so
@@ -262,7 +246,7 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
                     if (to_hand) {
                         state.hand.set(found);
                     } else {
-                        state.battlefield.set(found);
+                        enter_battlefield(db, effects, state, config.table, found);
                     }
                     ++result.stats.tutors_used;
                 }
@@ -281,6 +265,33 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
                     if (observer != nullptr) {
                         observer->drew(drawn, state.hand.count());
                     }
+                }
+            }
+
+            // CARD_COST, paid in cards from hand rather than in mana. Chrome
+            // Mox exiles a nonland card; Mox Diamond discards a land. Authored
+            // since Phase 7 and charged since never - `has_card_cost` had zero
+            // readers, so both were free (core/effects.hpp).
+            //
+            // Charged AFTER the spell leaves hand, so a card cannot pay for
+            // itself, and the scorer applies the same rule when deciding whether
+            // it was castable at all.
+            if (cast_entry.has_card_cost) {
+                for (int paid = 0; paid < cast_entry.card_cost.cards; ++paid) {
+                    std::vector<int> in_hand;
+                    card_cost_candidates(cast_entry.card_cost, db, state, in_hand);
+                    const Context cost_context{db, patterns, state, sources, observer, &effects};
+                    const int given_up =
+                        policy.choose_card_cost(cost_context, in_hand, result.stats);
+                    if (observer != nullptr) {
+                        observer->paid_with_card(spell, given_up);
+                    }
+                    if (given_up < 0) {
+                        break;  // nothing legal left; the scorer should have caught this
+                    }
+                    state.hand.clear(given_up);
+                    state.graveyard.set(given_up);
+                    ++result.stats.cards_given_up;
                 }
             }
 

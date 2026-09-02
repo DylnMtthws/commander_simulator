@@ -50,6 +50,7 @@ public:
     virtual void fetched(int /*from_slot*/, int /*to_slot*/) {}
     virtual void tutored(int /*from_slot*/, int /*to_slot*/, bool /*to_hand*/) {}
     virtual void cloned(int /*clone_slot*/, int /*copied_slot*/) {}
+    virtual void paid_with_card(int /*cost_slot*/, int /*given_up_slot*/) {}
     virtual void cast_spell(int /*slot*/, int /*paid*/) {}
     virtual void pattern_fired(int /*pattern*/, int /*turn*/) {}
     virtual void engines_active(FlagMask /*flags*/) {}

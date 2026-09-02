@@ -95,6 +95,18 @@ void TraceWriter::cloned(int clone_slot, int copied_slot) {
                  name_of(copied_slot));
 }
 
+void TraceWriter::paid_with_card(int cost_slot, int given_up_slot) {
+    if (given_up_slot < 0) {
+        std::fprintf(out_, "     GIVE UP: %s has nothing legal to pay with\n",
+                     name_of(cost_slot));
+        return;
+    }
+    // Printed as a COST, beside the card that demanded it. A trace that showed
+    // a card leaving hand with no reason attached would read as a bug.
+    std::fprintf(out_, "     GIVE UP: %s  (paid for %s)\n", name_of(given_up_slot),
+                 name_of(cost_slot));
+}
+
 void TraceWriter::cast_spell(int slot, int paid) {
     std::fprintf(out_, "     CAST: %-28s paying %d\n", name_of(slot), paid);
 }

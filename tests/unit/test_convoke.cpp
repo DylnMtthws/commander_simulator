@@ -223,3 +223,74 @@ TEST_CASE("ablation refuses the two decks it cannot make", "[ablation]") {
                                  slot_of("Kinnan, Bonder Prodigy"), forest),
                       cs::AblationError);
 }
+
+TEST_CASE("a CARD_COST is charged, and makes its card dead when it cannot be", "[card_cost]") {
+    // CARD_COST was authored, validated as required by the loader, and had ZERO
+    // readers for four phases - so Chrome Mox and Mox Diamond were free. RULE
+    // K2 singles this kind out as sitting on the value function's most sensitive
+    // input, which made it the worst one to leave uncalled.
+    cs::EffectDb effects = blank();
+    const int mox = slot_of("Sol Ring");  // stands in for Mox Diamond
+    cs::CardEffects& entry = effects.by_slot[static_cast<std::size_t>(mox)];
+    entry.status = cs::AuthorStatus::Modeled;
+    entry.has_mana_source = true;
+    entry.mana_source.amount = 1;
+    entry.has_card_cost = true;
+    entry.card_cost.cards = 1;
+    entry.card_cost.filter = cs::CardFilter::Land;
+
+    cs::PolicyWeights weights;
+    weights.rank.assign(db().cards.size(), 10);
+    const cs::AuthoredPolicy policy(weights);
+    const cs::PatternSet patterns;
+    const std::vector<cs::Source> rich(8, cs::Source{.produces = 0x1F, .amount = 1});
+    cs::GameStats stats;
+
+    SECTION("with no land in hand it is uncastable, not merely bad") {
+        cs::GameState state;
+        state.hand.set(mox);
+        const cs::Context context{db(), patterns, state, rich, nullptr, &effects};
+        REQUIRE_FALSE(policy.score(context, mox, /*as_land=*/false, stats).castable);
+    }
+    SECTION("with a land in hand it is castable") {
+        cs::GameState state;
+        state.hand.set(mox);
+        state.hand.set(slot_of("Forest"));
+        const cs::Context context{db(), patterns, state, rich, nullptr, &effects};
+        REQUIRE(policy.score(context, mox, /*as_land=*/false, stats).castable);
+    }
+    SECTION("it cannot pay for itself") {
+        // The card being scored is in hand and matches nothing here, but the
+        // check must exclude it in general - a Mox Diamond is not a land, and a
+        // Chrome Mox IS a nonland card that could otherwise imprint itself.
+        cs::CardEffects& imprint = effects.by_slot[static_cast<std::size_t>(mox)];
+        imprint.card_cost.filter = cs::CardFilter::Nonland;
+        cs::GameState state;
+        state.hand.set(mox);  // the only nonland card in hand is the mox itself
+        const cs::Context context{db(), patterns, state, rich, nullptr, &effects};
+        REQUIRE_FALSE(policy.score(context, mox, /*as_land=*/false, stats).castable);
+    }
+}
+
+TEST_CASE("the card given up is the least valuable one", "[card_cost][policy]") {
+    // The only call site in the interface that takes the MINIMUM. The pattern
+    // term is what stops the deck exiling a card that would complete a line.
+    cs::EffectDb effects = blank();
+    cs::PolicyWeights weights;
+    weights.rank.assign(db().cards.size(), 10);
+    weights.rank[static_cast<std::size_t>(slot_of("Kinnan, Bonder Prodigy"))] = 100;
+    weights.rank[static_cast<std::size_t>(slot_of("Mental Misstep"))] = 5;
+    const cs::AuthoredPolicy policy(weights);
+    const cs::PatternSet patterns;
+    cs::GameStats stats;
+
+    cs::GameState state;
+    const std::vector<int> candidates{slot_of("Kinnan, Bonder Prodigy"), slot_of("Mental Misstep"),
+                                      slot_of("Sol Ring")};
+    for (const int slot : candidates) {
+        state.hand.set(slot);
+    }
+    const std::vector<cs::Source> none;
+    const cs::Context context{db(), patterns, state, none, nullptr, &effects};
+    REQUIRE(policy.choose_card_cost(context, candidates, stats) == slot_of("Mental Misstep"));
+}

@@ -266,6 +266,41 @@ void convoke_sources(const CardDb& db, const EffectDb& effects, const GameState&
     }
 }
 
+void card_cost_candidates(const CardCostEffect& cost, const CardDb& db, const GameState& state,
+                          std::vector<int>& out) {
+    out.clear();
+    state.hand.for_each([&](int slot) {
+        const Card& card = db.cards[static_cast<std::size_t>(slot)];
+        const bool land = card.plays_as_land();
+        switch (cost.filter) {
+            case CardFilter::Any: break;
+            case CardFilter::Land:
+                if (!land) return;
+                break;
+            case CardFilter::Nonland:
+                if (land) return;
+                break;
+        }
+        out.push_back(slot);
+    });
+}
+
+void enter_battlefield(const CardDb& db, const EffectDb& effects, GameState& state,
+                       const TableContext& table, int slot) {
+    state.battlefield.set(slot);
+    const CardEffects& entry = effects.by_slot[static_cast<std::size_t>(slot)];
+    if (!entry.has_mana_source) {
+        return;
+    }
+    if (enters_tapped(entry.mana_source, db, effects, state, table)) {
+        state.tapped.set(slot);
+    } else if (entry.mana_source.enters_tapped_unless == EntersTappedUnless::PayLife) {
+        // Entering untapped was a choice and it was paid for. The fetch path
+        // used to skip this, which made every fetched Breeding Pool free.
+        state.life -= entry.mana_source.enters_tapped_param;
+    }
+}
+
 void collect_sources(const CardDb& db, const EffectDb& effects, const GameState& state,
                      const TableContext& table, std::vector<Source>& out) {
     out.clear();

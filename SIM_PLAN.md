@@ -2444,71 +2444,93 @@ declaring the cards in question `inert` and re-running.**
 
 ### 16.0 An ablation measures your implementation, not the card
 
-The authoring order was a judgement call, made deliberately and written into the
-effect file at the time: **convoke last, because it was the hardest cost in the
-deck** — the only one that reads the battlefield, the only one that interacts
-with Kinnan, held back and given its own comment block.
+**The strongest result in this section, and it is a limitation of the method
+rather than a fact about the deck.** It applies to every number in §16.5,
+including the ones that look right.
 
-That judgement ranked by *how hard this is to model*, which is a property of the
-modeller, against contribution, which is a property of the deck. **Nothing
-connects them**, and that part of the finding stands. What does not stand is the
-number.
+> **An ablation removes an *implementation*, not a card. A near-zero delta is
+> therefore ambiguous between "this mechanism does not matter" and "this
+> mechanism is built badly" — and those call for opposite responses. One says
+> stop working on it; the other says start.**
 
-#### The number was wrong, and how it was wrong is the better finding
+#### How it was found: by being wrong about the headline
 
-This section first reported the split as **300 : 1** — one line of TOML declaring
-*Chord of Calling* a tutor worth +7.66 points, against a whole convoke subsystem
-worth −0.02. Measured again after two defects were fixed, both of them mine:
+This section first reported that *Chord of Calling*'s convoke — the hardest cost
+in the deck, deliberately authored last, given its own comment block — was worth
+**−0.02 points** against the one line of TOML declaring the card a tutor, a
+ratio of roughly **300 : 1**. It was written up as evidence that implementation
+complexity is uncorrelated with contribution.
 
-| 200,000 games | turn 3 | turn 6 | turn 12 |
+Re-measured at 200,000 games after two defects were fixed, both mine:
+
+| | turn 3 | turn 6 | turn 12 |
 |---|---|---|---|
-| the whole card | +2.50 | +6.68 | +7.79 |
-| **the tutor half** | +1.83 | +6.02 | +7.67 |
+| the tutor half | +1.83 | +6.02 | +7.67 |
 | **convoke alone** | **+0.67** | **+0.66** | **+0.12** |
 | ratio | **2.7 : 1** | 9.1 : 1 | 64 : 1 |
 
-At the objective §4.1 recommends, convoke is worth **27% of what the simple half
-is worth** — not 0.3%. The disparity is real and large at the tail and modest at
-turn 3.
+At the objective §4.1 recommends, convoke is worth **27% of the simple half**,
+not 0.3%. And it is worth more than 90 of the 98 cards in the sweep.
 
-**The two defects, and only one of them is about the pattern:**
+**The defect that mattered was not in the card. Convoke was paid by a separate
+loop that ran *before* the mana system**, tapping convokable creatures first,
+always, needed or not. Once §6.4's payment assignment landed and convoke bodies
+joined the payable sources, the planner chose between convoking a body and
+tapping a land under one rule — and convoke started working.
 
-1. `wide_colour_into_kinnan_dig` required Kinnan *untapped* for an ability with
-   no tap symbol (§6.4's retraction), so every number in this section was taken
-   against a pattern that fired on the wrong condition.
-2. **Convoke was paid by a separate loop that ran before the mana system.** It
-   tapped convokable creatures *first, always*, whether or not they were needed.
-   Once §6.4's assignment landed, convoke bodies joined the payable sources and
-   the planner chose between convoking a body and tapping a land under one rule.
+**"Convoke is worth 0.02 points" was a fact about my code.** It was measured
+correctly, reported honestly, and it was an artifact.
 
-The second is the one that matters, and it is the lesson:
+#### What follows for reading the sweep
 
-> **"Convoke is worth 0.02 points" was a fact about my code, not about the
-> card.** An ablation removes an implementation. When the result is near zero,
-> that is ambiguous between *this mechanism does not matter* and *this mechanism
-> is built badly*, and the two call for opposite responses — one says stop
-> working on it, the other says start.
+**A near-zero ablation result is a hypothesis about the implementation before it
+is a finding about the deck.** §16.5 now splits its table on that basis rather
+than presenting 98 numbers as if they were alike.
 
-**So a near-zero ablation result is a hypothesis about the implementation before
-it is a finding about the deck.** The cheap check is the one that would have
-caught this: read a trace of the mechanism actually firing and ask whether it is
-doing the sensible thing. Convoke tapping creatures before the mana system had
-even been consulted would have been obvious in one turn of output.
+There are **three** causes of a near-zero delta, not two, and the third is cheap
+to rule out:
 
-This is §16.6's rule turned on its author. A declared simplification is not a
-bounded one — and neither is an *undeclared* one, which is what a mechanism paid
-by the wrong code path is.
+| Cause | How to tell | Response |
+|---|---|---|
+| The card genuinely does little | Near zero at *every* turn, and the implementation reads correctly in a trace | Believe it |
+| **The implementation bypasses a shared system** | Near zero at every turn, and nobody has read a trace of it firing | **Read the trace before believing anything** |
+| §4.1's blind spot: the objective cannot see it | Near zero at turn 3, **large at turn 12** | Believe it, and report the other turn |
 
-#### What survives
+The third is one command. *Basalt Monolith* is the only card in this deck that
+answers to it: +0.02 against the null at turn 3, **+5.50 at turn 12**.
 
-The ordering claim survives with a smaller number and a sharper edge. Convoke
-took a new predicate, a source-augmentation path in the scorer and three tests;
-the tutor took one line. **At turn 12 that is 64 : 1 and at turn 3 it is 2.7 :
-1**, and in neither case did the effort ranking predict the contribution ranking.
+The cheap check for the second is the one that would have caught convoke:
+**read a trace of the mechanism actually firing.** Convoke tapping creatures
+before the mana system had been consulted is obvious in a single turn of output
+and invisible in any aggregate.
 
-It is also why §16.1 onward record their measurement method. A finding that
-contradicts the person who built the model is only worth anything if the reader
-can re-run it — and this one had to be.
+#### The audit this prompted, and what it found
+
+If convoke bypassed the mana system, what else bypasses a shared system? Every
+authored effect was checked for a reader, and every path that puts a permanent
+onto the battlefield was compared against the others. **Two more, both the
+twelfth rule (`PLAN.md` §11.0), both now fixed:**
+
+1. **`CARD_COST` had zero readers.** *Chrome Mox* exiles a nonland card from
+   hand and *Mox Diamond* discards a land. Both were authored, both were
+   validated as required by the loader, and **neither was ever charged** — the
+   moxen were free for four phases. §4.2's RULE K2 singles this kind out as
+   sitting on the value function's most sensitive input, which made it the worst
+   one to leave uncalled. Charging it costs the deck 0.58 points at turn 3 and
+   takes **Mox Diamond from +0.87 to +0.12** — out of the sweep's top eight.
+2. **Four code paths put a permanent onto the battlefield and only one was
+   complete.** The land drop applied `enters_tapped` *and* paid the life for
+   entering untapped; the **fetch paid no life**, so a fetched *Breeding Pool*
+   entered untapped for free while a played one cost 2; and the cast and
+   tutor-to-battlefield paths checked neither. Now one `enter_battlefield`
+   function, called by all four.
+
+**The ordering claim from the original write-up survives with a smaller number.**
+Convoke took a new predicate, a source-augmentation path in the scorer and three
+tests; the tutor took one line. That is 64 : 1 at turn 12 and 2.7 : 1 at turn 3,
+and in neither case did the effort ranking predict the contribution ranking. But
+the *reason* it survives is now measured rather than asserted, and the first
+measurement of it was wrong by two orders of magnitude.
 
 ### 16.1 Clones matter less than their count suggests
 
@@ -2601,41 +2623,80 @@ blank gets cast and wastes mana where an expensive one never does. "A blank card
 is not one number, so anything within about ±0.155 of zero on `vs blank` is not
 distinguished from doing nothing.
 
-#### The answer, and it moved
+#### The trusted list, and the unresolved one
 
-| Card | delta at turn 3 | vs blank |
+**Split on §16.0's ambiguity rather than presented as 98 alike numbers.** A
+near-zero delta does not mean a card does little; it means one of three things,
+and only one of them is a result.
+
+**TRUSTED — modelled cards measurably outside the ±0.108 band** (54 of 63; the
+top of the list):
+
+| Card | vs blank, turn 3 |
+|---|---|
+| Enduring Vitality | +6.79% |
+| Chord of Calling | +2.25% |
+| Nature's Rhythm | +1.78% |
+| Invasion of Ikoria | +1.71% |
+| Finale of Devastation | +1.64% |
+| Chrome Mox | +1.49% |
+| Mox Amber | +0.72% |
+| Birds of Paradise | +0.57% |
+| Tropical Island | +0.56% |
+| Mox Diamond | +0.55% |
+| … 44 more, mostly lands at ≈ +0.4 | |
+
+**UNRESOLVED — modelled cards inside the band** (9 of 63). These are **not
+results**. Each is ambiguous between *the card does little* and *its
+implementation is wrong*, and none has had a trace of it firing read:
+
+| Card | vs blank, turn 3 | Near zero at turn 12 too? |
 |---|---|---|
-| Enduring Vitality | +6.77% | +7.18% |
-| Thrasios, Triton Hero | +3.32% | +3.73% |
-| Chord of Calling | +1.93% | +2.35% |
-| **Copy Artifact** | −0.20% | **+0.21%** |
-| Mockingbird | −0.27% | +0.14% |
-| Flesh Duplicate | −0.33% | +0.08% |
-| Copy Enchantment | −0.36% | +0.05% |
-| Mirrormade | −0.38% | +0.03% |
-| Flash Photography | −0.39% | +0.03% |
-| Mirage Mirror | −0.40% | +0.02% |
-| Clever Impersonator | −0.42% | −0.01% |
+| Mockingbird | +0.100 | yes |
+| Flesh Duplicate | +0.077 | yes |
+| Mirage Mirror | +0.050 | yes |
+| Dramatic Reversal | +0.034 | yes |
+| **Basalt Monolith** | +0.017 | **NO — +5.50** |
+| Copy Enchantment | +0.017 | yes |
+| Mirrormade | +0.014 | yes |
+| Flash Photography | −0.003 | yes |
+| Clever Impersonator | −0.030 | yes |
 
-> **Seven of the eight clones are inside the ±0.155 band and cannot be
-> distinguished from a card declared to do nothing.** *Copy Artifact* is at
-> **+0.21%, outside it** — and it is the one that can copy *Basalt Monolith*.
+*Basalt Monolith* is resolved by the third column: it is §4.1's blind spot, not
+an implementation question, and its turn-12 value settles it. **The other eight
+are seven clones and a mass-untap, and they stay near zero at every turn**, which
+rules out the blind spot and leaves the two causes entangled. Convoke was in
+exactly this position and turned out to be the second one.
 
-**This reading has been wrong twice and the history is the useful part.** It
-first read "only Copy Artifact is measurably above a blank" — which was wrong by
-this section's own rule, because the band was then ±0.17 and Copy Artifact was at
-+0.154, inside it. That correction was right on the data available. Then the
-pattern and payment fixes moved Copy Artifact to +0.21 and the band to ±0.155,
-and it is outside after all.
+**EXPECTED — the four unauthored cards.** *Sylvan Library* (+0.030), *The One
+Ring* (−0.053) and *Valley Floodcaller* (−0.073) are near zero because they do
+nothing; that is the model working. *Thrasios* is at +3.567 despite being
+unauthored, because it is a **pattern term** — the value is the outlet being on
+the battlefield, which the pattern detects without the ability being modelled.
 
-The stable claim across all three readings is the one worth keeping: **seven of
-the eight clones are at zero.** The eighth has been on both sides of a line drawn
-by a spread that is itself a measurement, which is what "the interval is on
-`delta`, not on `vs blank`" was trying to say.
+#### So what the clone finding now is
 
-That answers what §16.1 could not: the question was never "+0.29 or 0" against
-zero, it was against the wrong reference point. Measured against a blank rather
-than against a Forest, the clones are at zero.
+The claim §16.1 has been circling: **seven of the eight clones are
+indistinguishable from a card declared to do nothing.** That is stable across
+every reading. What is *not* established is why — whether clones genuinely do
+little in this deck, or whether `CLONE` has a convoke-shaped defect nobody has
+looked for. **Reading a trace of a clone firing is the outstanding work**, and
+until it is done the clone finding is a hypothesis with a number attached.
+
+**Copy Artifact has now given three different answers across three readings**,
+and the history is more useful than any one of them:
+
+| Reading | Copy Artifact `vs blank` | Band | Verdict |
+|---|---|---|---|
+| First | +0.154 | ±0.17 | inside — *reported as outside, incorrectly* |
+| Second, after the payment fix | +0.209 | ±0.155 | outside |
+| Third, after the pattern and CARD_COST fixes | **+0.167** | **±0.108** | outside |
+
+**The band is itself a measurement** — it is the spread of the 31 inert cards,
+and it moves when the model changes. A card sitting near it can cross without
+itself moving. The stable claim is *seven of eight at zero*; the eighth has been
+on both sides of a line that is not fixed, and it is the one clone that can copy
+*Basalt Monolith*.
 
 #### The ranking is objective-dependent, and strongly
 
@@ -2728,12 +2789,46 @@ Three ways to represent it, none chosen:
 | **B. A coloured, repeated entry cost** | A `Cost` rather than an int, times N | Extends §5.2's vocabulary — governance, and a re-audit of every pattern | Nothing much; it is the correct version of A |
 | **C. Execute the dig** | `TUTOR` with a five-card look, actually resolved | The largest: the policy has to choose targets, and each dig changes the board the next one sees | Turns a detect-model into an execute-model, which §5.4 deliberately is not |
 
-**The cheap partial answer, worth doing before any of them:** re-run with
-`loop_entry_cost` at 7, 14 and 21 and see how much the pattern's fire rate moves.
-If two activations are nearly as common as one, the distinction does not matter
-here and A is enough. If it collapses, the pattern was measuring something much
-weaker than it claimed and B is required. That is one afternoon and it settles
-which of the three is worth building.
+#### PROBE RUN — and it collapses
+
+100,000 games at each entry cost, `loop_entry_cost` as N × 7:
+
+| entry cost | activations | turn 3 | turn 6 | turn 12 | dig fires |
+|---|---|---|---|---|---|
+| 7 | 1 | 8.08% | 37.69% | 67.08% | 36,773 |
+| 14 | 2 | **5.11%** | **31.34%** | 66.65% | 33,188 |
+| 21 | 3 | 4.60% | 19.75% | **60.39%** | 20,957 |
+| 28 | 4 | 4.59% | 18.09% | 46.52% | 3,951 |
+
+**Two activations instead of one costs 2.97 points at turn 3 and 6.35 at turn
+6.** The stated criterion was: *if two activations are nearly as common as one,
+A is enough; if it collapses, B is required.* It collapses, and by more than the
+payment error, the CARD_COST error and every card in the sweep except three.
+
+**So the cost model cannot stay undecided, and the open question is now narrower
+and sharper: what is N?** That is a Magic question, not a modelling one — how
+many digs does this line need before a competent pilot has won — and it is the
+single largest unresolved number in the model. `wide_colour_into_kinnan_dig`
+fires in ~37% of games at N = 1 and ~11% at N = 3.
+
+Two things the probe settled on the way:
+
+- **Option A is adequate for the mechanism.** Generic-only asks for 7N mana
+  rather than `{5}{G}{U}` × N, and under WIDE_COLOUR every creature taps for any
+  colour with Kinnan doubling it, so a board that can pay 7N can essentially
+  always find the coloured pips among it. **B buys accuracy the deck cannot
+  currently exercise.** The gap between A and B is far smaller than the gap
+  between N = 1 and N = 2.
+- **Option C is not needed to decide this.** Executing the dig would answer *how
+  many activations the deck gets*; it would not answer *how many it needs*, which
+  is the question. C remains the right answer for a different question.
+
+**Recommended, not adopted:** N = 2, on the reading that one dig finding one
+non-Human creature is a good turn rather than an assembled combo (§5.4), and the
+second is what converts it into *Thrasios* plus a board. That is a judgement about
+Magic and it should be yours. The number moves 3 points of the headline either
+way, so it belongs in the deck file with a comment saying who decided it and why —
+not in code.
 
 ### 16.8 What is still not established
 

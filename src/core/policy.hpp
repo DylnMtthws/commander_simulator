@@ -56,6 +56,16 @@ public:
     [[nodiscard]] virtual int choose_clone(const Context& context, std::span<const int> candidates,
                                            GameStats& stats) const = 0;
 
+    // Which card in hand to GIVE UP to a CARD_COST, or -1 if none is legal.
+    //
+    // The only decision in the interface where the right answer is the LOWEST
+    // score. Chrome Mox exiles a card and Mox Diamond discards one; you keep the
+    // good ones. It goes through the same scorer for the same reason every other
+    // choice does - one function to test and one thing to print in a trace.
+    [[nodiscard]] virtual int choose_card_cost(const Context& context,
+                                               std::span<const int> candidates,
+                                               GameStats& stats) const = 0;
+
     // Which land to fetch from a set of candidates, or -1 for none.
     //
     // A fetch IS a tutor with a small candidate set, so it goes through the
@@ -96,6 +106,8 @@ public:
                                    bool to_hand, GameStats& stats) const override;
     [[nodiscard]] int choose_clone(const Context& context, std::span<const int> candidates,
                                    GameStats& stats) const override;
+    [[nodiscard]] int choose_card_cost(const Context& context, std::span<const int> candidates,
+                                       GameStats& stats) const override;
     [[nodiscard]] const char* name() const override {
         return "StubPolicyDoNotUseForResults (plays the lowest-indexed legal thing)";
     }
@@ -158,6 +170,8 @@ public:
                                    bool to_hand, GameStats& stats) const override;
     [[nodiscard]] int choose_clone(const Context& context, std::span<const int> candidates,
                                    GameStats& stats) const override;
+    [[nodiscard]] int choose_card_cost(const Context& context, std::span<const int> candidates,
+                                       GameStats& stats) const override;
     [[nodiscard]] const char* name() const override {
         return "AuthoredPolicy (authored ranks plus state-dependent terms)";
     }

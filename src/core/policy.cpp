@@ -102,6 +102,12 @@ int StubPolicyDoNotUseForResults::choose_clone(const Context&, std::span<const i
     return candidates.empty() ? -1 : candidates.front();
 }
 
+int StubPolicyDoNotUseForResults::choose_card_cost(const Context&,
+                                                   std::span<const int> candidates,
+                                                   GameStats&) const {
+    return candidates.empty() ? -1 : candidates.front();
+}
+
 // ---------------------------------------------------------------------------
 // Authored
 // ---------------------------------------------------------------------------
@@ -155,6 +161,23 @@ Consideration AuthoredPolicy::score(const Context& context, int slot, bool as_la
                 clone_candidates(entry.clone, context.db, context.state,
                                  total_mana(context.sources), targets);
                 if (targets.empty()) {
+                    result.castable = false;
+                }
+            }
+            // Same shape for a CARD_COST. Chrome Mox with no nonland card left
+            // in hand imprints nothing and taps for nothing; Mox Diamond with no
+            // land to discard is sacrificed. Both are DEAD rather than merely
+            // mediocre, so they read as uncastable and not as zero.
+            if (entry.has_card_cost) {
+                std::vector<int> payable;
+                card_cost_candidates(entry.card_cost, context.db, context.state, payable);
+                // The card being scored is itself in hand and cannot pay for
+                // itself, so it does not count towards the requirement.
+                int usable = 0;
+                for (const int candidate : payable) {
+                    usable += candidate == slot ? 0 : 1;
+                }
+                if (usable < entry.card_cost.cards) {
                     result.castable = false;
                 }
             }
@@ -318,6 +341,33 @@ int AuthoredPolicy::choose_spell(const Context& context, GameStats& stats) const
     // Floor of 0: an uncastable card carries a large negative term, so it can
     // never be chosen, and there is no second code path deciding castability.
     return best_of(candidates, 0);
+}
+
+int AuthoredPolicy::choose_card_cost(const Context& context, std::span<const int> candidates,
+                                     GameStats& stats) const {
+    // The same scorer, and the ONLY call site that takes the minimum. A card
+    // being given up should be the least valuable one available, and
+    // score_arrival's pattern term is what stops the deck exiling the card that
+    // would have completed a line - it carries +10,000,000, so it is never the
+    // minimum.
+    std::vector<Consideration> scored;
+    scored.reserve(candidates.size());
+    for (const int slot : candidates) {
+        scored.push_back(score_arrival(context, slot, /*to_hand=*/true, stats));
+    }
+    if (context.observer != nullptr) {
+        context.observer->considering(scored, "card to give up");
+    }
+    int worst = -1;
+    int worst_score = 0;
+    for (const Consideration& candidate : scored) {
+        if (worst < 0 || candidate.score < worst_score ||
+            (candidate.score == worst_score && candidate.slot < worst)) {
+            worst = candidate.slot;
+            worst_score = candidate.score;
+        }
+    }
+    return worst;
 }
 
 }  // namespace cs

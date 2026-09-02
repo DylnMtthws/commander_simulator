@@ -289,6 +289,36 @@ void convoke_slots(const CardDb& db, const EffectDb& effects, const GameState& s
 // discarded.
 [[nodiscard]] bool is_permanent(const Card& card) noexcept;
 
+// Cards in hand that could pay a CARD_COST, ascending by slot.
+//
+// Chrome Mox exiles a nonland card from hand; Mox Diamond discards a land. Both
+// were AUTHORED, validated as required by the loader, and never charged - the
+// `has_card_cost` flag had zero readers for four phases, so both moxen were
+// free. RULE K2 (section 4.2) singles this kind out as sitting on the value
+// function's most sensitive input, which made it the worst one to leave
+// uncalled: the sweep had both in its top eight.
+//
+// A guard with no caller, in the ingestion repo's PLAN.md 11.0 sense, and it is
+// listed there under a mechanism quietly not running because nothing about the
+// output distinguishes a free Chrome Mox from a paid one.
+void card_cost_candidates(const CardCostEffect& cost, const CardDb& db, const GameState& state,
+                          std::vector<int>& out);
+
+// Puts a permanent onto the battlefield, with everything that entails.
+//
+// ONE DEFINITION, because there were four entry points and only one of them was
+// complete. The land drop applied enters_tapped AND paid the life for entering
+// untapped; the fetch applied enters_tapped and PAID NO LIFE, so a fetched
+// Breeding Pool entered untapped for free while a played one cost 2; and the
+// cast and tutor-to-battlefield paths checked neither, which is currently
+// unexercised only because no nonland in this deck enters tapped.
+//
+// The twelfth rule in the ingestion repo's PLAN.md 11.0, and the same shape that
+// let convoke bypass the mana system: a second derivation of a concept that
+// already had one.
+void enter_battlefield(const CardDb& db, const EffectDb& effects, GameState& state,
+                       const TableContext& table, int slot);
+
 // Does this land enter tapped, given the board and the declared table context?
 [[nodiscard]] bool enters_tapped(const ManaSourceEffect& effect, const CardDb& db,
                                  const EffectDb& effects, const GameState& state,
