@@ -206,6 +206,18 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
 
             const CardEffects& cast_entry = effects.by_slot[static_cast<std::size_t>(spell)];
 
+            // CONVOKE, before anything reads the mana available. Each creature
+            // tapped pays {1} or one pip of its colour, and only creatures with
+            // no mana ability of their own are offered - under Kinnan a mana
+            // dork produces two and convoking it produces one, so tapping it
+            // for mana dominates (core/effects.hpp).
+            int convoke_available = 0;
+            std::vector<int> convokable;
+            if (cast_entry.convoke) {
+                convoke_slots(db, effects, state, convokable);
+                convoke_available = static_cast<int>(convokable.size());
+            }
+
             if (cast_entry.has_clone) {
                 std::vector<int> targets;
                 clone_candidates(cast_entry.clone, db, state, total_mana(sources), targets);
@@ -226,7 +238,8 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
                 // coloured part, approximated as everything currently
                 // available. Generous, and stated as such.
                 std::vector<int> targets;
-                tutor_candidates(cast_entry.tutor, db, state, total_mana(sources), targets);
+                tutor_candidates(cast_entry.tutor, db, state,
+                                 total_mana(sources) + convoke_available, targets);
                 const bool to_hand = cast_entry.tutor.destination == TutorDestination::Hand;
                 const Context tutor_context{db, patterns, state, sources, observer, &effects};
                 const int found =
@@ -249,10 +262,21 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
                     }
                     ++result.stats.tutors_used;
                 }
-                // A tutor spell is not a permanent. Only the ETB tutors are.
-                if (!cast_entry.has_mana_source) {
-                    state.battlefield.clear(spell);
-                    state.graveyard.set(spell);
+            }
+
+            // DRAW, on resolution. Borne Upon a Wind's second line - see
+            // data/effects.toml for why its first line nearly buried it.
+            if (cast_entry.has_draw) {
+                for (int i = 0; i < cast_entry.draw.cards; ++i) {
+                    const int drawn = draw_one(state, rng);
+                    if (drawn < 0) {
+                        break;  // decked; the turn cap ends the game either way
+                    }
+                    ++result.stats.cards_drawn;
+                    ++result.stats.cards_drawn_by_effect;
+                    if (observer != nullptr) {
+                        observer->drew(drawn, state.hand.count());
+                    }
                 }
             }
 
@@ -269,6 +293,21 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
                 });
                 state.tapped = keep_tapped;
                 ++result.stats.mass_untaps;
+            }
+
+            // Convoke is paid FIRST, because a convoked creature is not a
+            // source and cannot be spent twice. Slot order, like the rest of
+            // payment - the set was already filtered to creatures whose tap is
+            // worth nothing else.
+            for (const int convoked : convokable) {
+                if (to_tap <= 0) {
+                    break;
+                }
+                if (!state.tapped.test(convoked)) {
+                    state.tapped.set(convoked);
+                    --to_tap;
+                    ++result.stats.convoked;
+                }
             }
 
             // Paying taps sources. Crude - it taps in slot order rather than
@@ -291,6 +330,25 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
                     to_tap -= source_entry.mana_source.amount;
                 }
             });
+
+            // An instant or sorcery does not stay on the battlefield.
+            //
+            // This used to be a clause inside the TUTOR block reading "if it is
+            // not a mana source", which was right for the nine tutors and wrong
+            // for everything else: Dramatic Reversal and Borne Upon a Wind are
+            // both instants, and under the old rule they sat on the battlefield
+            // for the rest of the game as blank permanents - counted by Gene
+            // Pollinator's untapped-permanent condition and offered to every
+            // clone as a legal target. The rule belongs to the CARD TYPE, not
+            // to one effect kind.
+            //
+            // The exception is a clone: Flash Photography is a sorcery that
+            // leaves a token copy behind, and the copy IS this slot.
+            if (!is_permanent(db.cards[static_cast<std::size_t>(spell)]) &&
+                state.copy_of[static_cast<std::size_t>(spell)] < 0) {
+                state.battlefield.clear(spell);
+                state.graveyard.set(spell);
+            }
         }
 
         ++result.stats.turns;

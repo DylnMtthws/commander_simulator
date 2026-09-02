@@ -35,6 +35,11 @@ struct GameStats {
     std::uint32_t mass_untaps = 0;
     std::uint32_t tutors_used = 0;
     std::uint32_t clones_made = 0;
+    // Cards drawn by an effect rather than by the draw step. Separate because
+    // the two answer different questions: total cards seen, versus how much of
+    // it the deck did for itself.
+    std::uint32_t cards_drawn_by_effect = 0;
+    std::uint32_t convoked = 0;
 };
 
 struct GameOutcome {

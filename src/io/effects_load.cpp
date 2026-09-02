@@ -123,6 +123,10 @@ EffectDb load_effects(const std::filesystem::path& path, const CardDb& db) {
         target.status = AuthorStatus::Modeled;
         ++effects.modeled;
 
+        // CONVOKE is a cost property, so it is a card-level key rather than a
+        // member of the closed effect set (core/effects.hpp).
+        target.convoke = (*entry)["convoke"].value_or<bool>(false);
+
         const auto* list = (*entry)["effects"].as_array();
         if (list == nullptr || list->empty()) {
             fail(name + ": a modeled card needs at least one effect");
@@ -246,6 +250,16 @@ EffectDb load_effects(const std::filesystem::path& path, const CardDb& db) {
                 clone.max_from_x = (*effect)["max_from_x"].value_or<bool>(false);
                 target.has_clone = true;
                 target.clone = clone;
+            } else if (kind == "DRAW") {
+                DrawEffect draw;
+                draw.cards = static_cast<int>((*effect)["cards"].value_or<int64_t>(1));
+                if (draw.cards <= 0) {
+                    fail(context + ": a DRAW of zero or fewer cards is not a DRAW. If the "
+                                   "card genuinely draws nothing here, it is inert with a "
+                                   "reason.");
+                }
+                target.has_draw = true;
+                target.draw = draw;
             } else if (kind == "MASS_UNTAP") {
                 MassUntapEffect untap;
                 untap.nonland_only = (*effect)["nonland_only"].value_or<bool>(true);

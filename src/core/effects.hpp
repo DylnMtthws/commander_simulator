@@ -139,6 +139,17 @@ struct CloneEffect {
     bool max_from_x = false;  // Mockingbird: mana value <= mana spent
 };
 
+// DRAW: put N cards from the library into hand, on resolution.
+//
+// The kind arrived for BORNE UPON A WIND, and how it arrived is the point. The
+// card's first line grants flash, which is `timing_only` and inert here - the
+// same reading that made High Fae Trickster inert. Its second line is "Draw a
+// card". Categorising on the first line and stopping would have filed a cantrip
+// under `timing_only` and made it invisible.
+struct DrawEffect {
+    int cards = 1;
+};
+
 enum class ModifierMode : std::uint8_t { Multiply, GrantCreatureMana };
 
 struct ModifierEffect {
@@ -167,6 +178,15 @@ struct CardEffects {
     TutorEffect tutor;
     bool has_clone = false;
     CloneEffect clone;
+    bool has_draw = false;
+    DrawEffect draw;
+
+    // CONVOKE is a property of the COST, not an effect, which is why it is a
+    // card-level flag and not a member of the closed kind set. Section 4.2's
+    // test: it does not ask the loop for a verb it lacks, it changes what may
+    // pay for an existing one. Chord of Calling is the only user.
+    bool convoke = false;
+
     std::string reason_category;
 };
 
@@ -224,6 +244,38 @@ void tutor_candidates(const TutorEffect& tutor, const CardDb& db, const GameStat
 // Battlefield slots this clone could copy.
 void clone_candidates(const CloneEffect& clone, const CardDb& db, const GameState& state,
                       int mana_available, std::vector<int>& out);
+
+// APPENDS the mana convoke makes available to one particular card.
+//
+// Convoke pays {1} or one mana of a tapped creature's colour, so each eligible
+// creature is worth exactly one Source of its colour identity. Two properties
+// are deliberate and both are stated in data/effects.toml:
+//
+//   * A creature that already taps for mana is NOT offered. Under Kinnan it
+//     produces two mana and convoking it produces one, so tapping it for mana
+//     weakly dominates convoking it in every board this deck reaches. That
+//     makes the omission exact rather than an approximation.
+//   * Convoke mana is NOT multiplied. Kinnan triggers on tapping a nonland
+//     permanent FOR MANA; convoke is a cost payment and taps no mana ability.
+//
+// The result is per-card and must never be merged into collect_sources - these
+// sources exist only while paying for THIS spell.
+void convoke_sources(const CardDb& db, const EffectDb& effects, const GameState& state,
+                     std::vector<Source>& out);
+
+// The battlefield slots convoke may tap, ascending. One predicate, two callers:
+// the scorer wants Sources and the turn loop wants slots to tap, and deriving
+// them from different tests is how they would come to disagree.
+void convoke_slots(const CardDb& db, const EffectDb& effects, const GameState& state,
+                   std::vector<int>& out);
+
+// Does this card stay on the battlefield after it resolves?
+//
+// Battle is deliberately excluded: SIM_PLAN.md section 4.6 decided the model
+// never gains the type, because a Siege flips by being attacked and there is no
+// combat here - so Invasion of Ikoria's ETB is authored and the permanent is
+// discarded.
+[[nodiscard]] bool is_permanent(const Card& card) noexcept;
 
 // Does this land enter tapped, given the board and the declared table context?
 [[nodiscard]] bool enters_tapped(const ManaSourceEffect& effect, const CardDb& db,

@@ -552,6 +552,31 @@ authored_from = "db4a959eeafe152a037fc6dfa2ed2af2ef719d3b724026eee9053d26114710d
 # Transmute {1}{U}{U} for a mana value 1 card. Sol Ring, Mana Vault, the dorks.
 effects = [ { kind = "TUTOR", filter = "any", destination = "hand", max_mana_value = 1 } ]
 
+[cards."Chord of Calling"]
+status = "modeled"
+authored_from = "9298c09a6d13d8747bbd59fce706dbc56ac5cc0661c059a9a595200c8d89f6b4"
+convoke = true
+# {X}{G}{G}{G}, and the ninth tutor. The search half is Finale of Devastation's
+# exactly - a creature with mana value X or less, onto the battlefield.
+#
+# CONVOKE is the whole reason this was left until last, and the modelling
+# decision is worth stating because it is EXACT rather than an approximation.
+# Convoke lets each creature tapped pay {1} or one mana of its colour. So a
+# creature is offered to convoke only if it has no mana ability of its own:
+#
+#   * A mana dork under Kinnan taps for TWO mana. Convoking it pays one. Tapping
+#     it for mana therefore weakly dominates convoking it on every board this
+#     deck can reach, and without Kinnan the two are equal - so never offering a
+#     mana creature to convoke loses nothing.
+#   * Everything else on the battlefield with the Creature type - Thrasios,
+#     Trophy Mage, Valley Floodcaller, a clone of one of them - has no mana
+#     ability, and convoke is the only way it ever pays for anything.
+#
+# Convoke mana is NOT multiplied by Kinnan. "Whenever you tap a nonland
+# permanent FOR MANA" - convoke taps no mana ability, it pays a cost. Getting
+# that wrong would have made this the best card in the deck.
+effects = [ { kind = "TUTOR", filter = "creature", destination = "battlefield", max_from_x = true } ]
+
 [cards."Dramatic Reversal"]
 status = "modeled"
 authored_from = "52665fc61d5ee36c75b56825526c0e571aac77a4cebecddfcd11404e0d7d5066"
@@ -685,3 +710,36 @@ authored_from = "09053efe1a9af95f79ff5258813410d5baf70ba868fb9f04d1263c9f6b62973
 # "Exile this card from your hand: Add {G}." Mana from HAND - the verb the loop
 # would otherwise lack, and the reason RITUAL is a kind at two users.
 effects = [ { kind = "RITUAL", colors = ["G"], amount = 1, from_zone = "hand" } ]
+
+# ===========================================================================
+# DRAW - put N cards from the library into hand.
+#
+# ONE user in this deck, and it is here because of HOW it was found rather than
+# because the kind was planned for. See the entry.
+# ===========================================================================
+
+[cards."Borne Upon a Wind"]
+status = "modeled"
+authored_from = "7e4f470294e075e97c76ccf15c1a415a17a3bff1994a8c1697c641b5ae0863c0"
+# "You may cast spells this turn as though they had flash. / Draw a card."
+#
+# THE NEAR-MISS THE INERT TABLE EXISTS TO CATCH, and it is worth its own line
+# because it is the failure DIRECTION that has no symptom. Reading the first
+# line and stopping gives `timing_only` - the identical, and correct, reading
+# that put High Fae Trickster in the inert table: there is no stack and no
+# priority here, so granting flash does nothing. The second line is a cantrip.
+#
+# Stated precisely, because the count did not move: this card was never filed as
+# inert, it was UNAUTHORED. What it establishes is that the obvious reading
+# would have filed it, next to a card already in the table for that same reading.
+#
+# An inert card that turns out to do something is the expensive error, because
+# nothing downstream ever contradicts it: an unmodelled effect makes the deck
+# look slower, the number stays plausible, and the card sits in a table headed
+# "what the model cannot see" where its being there is the whole point. The
+# category would not have been wrong about the clause it described. It would
+# have been wrong about that being the only clause.
+#
+# So the 31 deserve a re-read rather than a re-count, and `timing_only` - one
+# card, one line of text - is where a re-read starts.
+effects = [ { kind = "DRAW", cards = 1 } ]

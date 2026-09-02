@@ -146,8 +146,20 @@ Consideration AuthoredPolicy::score(const Context& context, int slot, bool as_la
     } else {
         const Face* face = castable_face_of(card);
         if (face != nullptr) {
+            // CONVOKE changes what may pay for THIS card and nothing else, so
+            // the extra sources are built here and thrown away. Merging them
+            // into collect_sources would let every other spell in hand spend a
+            // creature that only Chord of Calling can tap.
+            std::vector<Source> with_convoke;
+            std::span<const Source> payable = context.sources;
+            if (context.effects != nullptr &&
+                context.effects->by_slot[index].convoke) {
+                with_convoke.assign(context.sources.begin(), context.sources.end());
+                convoke_sources(context.db, *context.effects, context.state, with_convoke);
+                payable = with_convoke;
+            }
             ++stats.can_pay_calls;
-            result.castable = can_pay(*face->cost, context.sources, 0);
+            result.castable = can_pay(*face->cost, payable, 0);
         }
         if (result.castable && context.effects != nullptr) {
             // A CLONE with nothing legal to copy is DEAD, not merely mediocre.

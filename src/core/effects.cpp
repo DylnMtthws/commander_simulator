@@ -1,5 +1,7 @@
 #include "core/effects.hpp"
 
+#include <string_view>
+
 namespace cs {
 
 bool enters_tapped(const ManaSourceEffect& effect, const CardDb& db, const EffectDb& effects,
@@ -157,6 +159,73 @@ void clone_candidates(const CloneEffect& clone, const CardDb& db, const GameStat
             out.push_back(effective);
         }
     });
+}
+
+bool is_permanent(const Card& card) noexcept {
+    // The FRONT FACE's type line, not all_types.
+    //
+    // all_types is a union over every face, and reading it here got the answer
+    // exactly backwards on the one card it matters for: Invasion of Ikoria is a
+    // Battle whose back face is Zilortha, a Legendary Creature, so the card-level
+    // list contains "Creature" and the Siege would have stayed on the
+    // battlefield - against section 4.6, which decided the permanent is
+    // discarded because a Siege flips by being attacked and there is no combat.
+    //
+    // Same shape as the ingestion PLAN.md 11.0 rule about oracle_text: a
+    // card-level field that aggregates faces answers a question about no
+    // particular face, and does it without an error. A test caught this one.
+    if (card.faces.empty()) {
+        return false;
+    }
+    const std::string& line = card.faces.front().type_line;
+    static constexpr std::string_view kPermanent[] = {"Artifact", "Creature", "Enchantment",
+                                                      "Land", "Planeswalker"};
+    for (const std::string_view type : kPermanent) {
+        if (line.find(type) != std::string::npos) {
+            return true;
+        }
+    }
+    // Battle is absent on purpose - section 4.6, and the comment above.
+    return false;
+}
+
+void convoke_slots(const CardDb& db, const EffectDb& effects, const GameState& state,
+                   std::vector<int>& out) {
+    out.clear();
+    state.battlefield.for_each([&](int slot) {
+        if (state.tapped.test(slot)) {
+            return;
+        }
+        const int effective = state.effective(slot);
+        const Card& card = db.cards[static_cast<std::size_t>(effective)];
+        bool creature = false;
+        for (const std::string& type : card.all_types) {
+            creature = creature || type == "Creature";
+        }
+        if (!creature) {
+            return;
+        }
+        // A creature that taps for mana is worth more tapped for mana. Skipping
+        // it here is what makes convoke additive rather than a choice the policy
+        // would have to make - see the header for why that is exact.
+        if (effects.by_slot[static_cast<std::size_t>(effective)].has_mana_source) {
+            return;
+        }
+        out.push_back(slot);
+    });
+}
+
+void convoke_sources(const CardDb& db, const EffectDb& effects, const GameState& state,
+                     std::vector<Source>& out) {
+    std::vector<int> slots;
+    convoke_slots(db, effects, state, slots);
+    for (const int slot : slots) {
+        const Card& card = db.cards[static_cast<std::size_t>(state.effective(slot))];
+        out.push_back(Source{.produces = card.colour_identity,
+                             .amount = 1,
+                             .is_land = false,
+                             .is_creature = true});
+    }
 }
 
 void collect_sources(const CardDb& db, const EffectDb& effects, const GameState& state,
