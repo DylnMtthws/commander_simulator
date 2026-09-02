@@ -131,6 +131,9 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
                 std::vector<int> candidates;
                 fetch_candidates(fetch_entry.fetch, db, state, candidates);
                 const int target = policy.choose_fetch(land_context, candidates, result.stats);
+                if (observer != nullptr) {
+                    observer->fetched(land, target);
+                }
                 state.battlefield.clear(land);
                 state.graveyard.set(land);
                 state.life -= fetch_entry.fetch.life_cost;

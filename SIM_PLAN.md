@@ -431,6 +431,25 @@ authoring order** — a bias with no symptom.
 
 #### The two diagnostics you asked for
 
+> **A representation can remove a policy question instead of answering it.**
+>
+> Two instances, and they are the same move:
+>
+> | Question | Naive form | What the representation did |
+> |---|---|---|
+> | "Does Kinnan multiply this?" | a branch in the policy | `is_land` on the Source, read by the mana system |
+> | "Should I pay 2 life for an untapped Breeding Pool?" | a scorer term weighing life against tempo | a `life_floor`, so an unaffordable source is filtered out at collection |
+>
+> Neither question is answered anywhere. Both stopped being questions. **A source
+> you cannot afford is not a source**, so `can_pay` never learns about life and
+> the scorer never weighs it — life cost ~60 lines and no policy surface at all.
+>
+> The general form: before adding a term to a decision function, check whether
+> the decision can be made not to arise. A filter upstream is cheaper than a
+> term downstream, it cannot be mis-weighted against other terms (the magnitude
+> mismatch in §6.2), and it needs no tuning. When it does not apply, the
+> decision was real and belongs in the policy — but it is worth asking first.
+
 **`MANA_SOURCE` has 30 users — is it hiding a distinction?** Partly, and here is
 the honest account. It carries five flags: `produces`, `taps`, `is_land`,
 `is_creature`, `enters_tapped`. Four are inert to the loop — it taps a thing and

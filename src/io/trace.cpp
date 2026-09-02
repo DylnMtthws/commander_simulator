@@ -69,6 +69,14 @@ void TraceWriter::played_land(int slot) {
     std::fprintf(out_, "     PLAY LAND: %s\n", name_of(slot));
 }
 
+void TraceWriter::fetched(int from_slot, int to_slot) {
+    if (to_slot < 0) {
+        std::fprintf(out_, "     FETCH: %s finds nothing\n", name_of(from_slot));
+        return;
+    }
+    std::fprintf(out_, "     FETCH: %s -> %s\n", name_of(from_slot), name_of(to_slot));
+}
+
 void TraceWriter::cast_spell(int slot, int paid) {
     std::fprintf(out_, "     CAST: %-28s paying %d\n", name_of(slot), paid);
 }

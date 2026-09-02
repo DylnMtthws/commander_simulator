@@ -261,3 +261,61 @@ life_floor   = 10    # below this the deck stops paying life for mana (40 to sta
 # Card advantage that actually works with no opponents.
 "The One Ring"            = 50
 "Sylvan Library"          = 45
+
+# ---------------------------------------------------------------------------
+# LANDS, ranked deliberately.
+#
+# Ranks live here rather than in effects.toml because a rank is a per-DECK
+# preference, not a property of the card - the same land ranks differently in a
+# deck with different colour requirements.
+#
+# Why this matters more than it looks: land rank is the tiebreak for BOTH the
+# land drop and the fetch target. Every land previously shared default_rank, so
+# fetch targets tied at 10000 and resolved by export_index - which is
+# alphabetical by card name. The fetch decision was being made by the alphabet.
+#
+# THE ORDERING, so it can be disagreed with rather than reverse-engineered:
+#
+#   1. Untapped duals with no cost      Tropical Island, Command Tower
+#   2. Untapped duals in THIS context   Rejuvenating Springs (opponents = 3),
+#                                       Exotic Orchard (opponent_colors)
+#   3. Fetches, by what they reach      Misty Rainforest reaches all four
+#   4. Conditional-untapped duals       Breeding Pool (life), Botanical Sanctum (early)
+#   5. Duals with a recurring cost      Yavimaya Coast, Waterlogged Grove
+#   6. Any-colour with a cost           City of Brass, Mana Confluence, Tarnished Citadel
+#   7. Colourless                       Ancient Tomb (fast but Kinnan cannot use it)
+#   8. Basics                           Forest, Island
+#   9. Single-colour utility            Otawara, Boseiju, Sink into Stupor
+#  10. Near-dead                        Gemstone Caverns (free play never applies)
+#
+# Two orderings worth arguing about. Ancient Tomb is the fastest land in the
+# deck and ranks 8th, because it makes COLOURLESS and every spell here has
+# coloured pips. And Exotic Orchard ranks 2nd only because [table] says
+# opponent_colors is WUBRG - set that to [] and it produces nothing at all.
+# ---------------------------------------------------------------------------
+
+"Tropical Island"         = 40
+"Command Tower"           = 39
+"Rejuvenating Springs"    = 38
+"Misty Rainforest"        = 37
+"Exotic Orchard"          = 36
+"Breeding Pool"           = 35
+"Windswept Heath"         = 34
+"Wooded Foothills"        = 34
+"Verdant Catacombs"       = 34
+"Flooded Strand"          = 33
+"Polluted Delta"          = 33
+"Scalding Tarn"           = 33
+"Botanical Sanctum"       = 32
+"Yavimaya Coast"          = 30
+"Waterlogged Grove"       = 29
+"City of Brass"           = 28
+"Mana Confluence"         = 27
+"Ancient Tomb"            = 26
+"Island"                  = 23
+"Forest"                  = 22
+"Tarnished Citadel"       = 20
+"Otawara, Soaring City"   = 18
+"Boseiju, Who Endures"    = 17
+"Sink into Stupor"        = 16
+"Gemstone Caverns"        = 12
