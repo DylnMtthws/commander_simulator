@@ -1563,6 +1563,42 @@ choice.
 **Do not** do SoA layouts, custom allocators, or SIMD in v1. §2.4 says you do
 not need them, and they would obstruct §6.6's trace output.
 
+### 11.1 Measured, Phase 2 (`-O3`, base M1)
+
+`can_pay` built for correctness, then measured before any optimisation:
+
+| Call | ns |
+|---|---|
+| `{G}{U}`, early board (4 sources) | 72 |
+| `{G}{U}`, late board (22 sources) | 63 |
+| `{5}{G}{U}`, late board | 63 |
+| `{X}{G}{G}{G}`, late board, X=0 | 66 |
+| `{B}{B}`, late board — **unpayable** | 64 |
+| `max_affordable_x`, `{X}{G}{G}{G}`, late | 297 |
+
+**Verdict: no optimisation warranted.** §6.4 budgeted 200–500 ns; it comes in at
+~65, three to eight times under. Two things worth noting beyond the headline:
+
+- **The unpayable case costs the same as the payable one.** That is the
+  most-constrained-first ordering doing its job — a failing search is where a
+  naive ordering would thrash, and it does not.
+- **Board size barely matters** (72 ns at 4 sources, 63 at 22). The work is
+  dominated by fixed setup, not by the search, which means the search is
+  finding its assignment almost immediately on real boards.
+
+`max_affordable_x` is ~5 `can_pay` calls via binary search, as expected.
+
+> **What this does NOT tell us, and what to measure next.** This is nanoseconds
+> per *call*. The per-game cost is `calls × 65 ns`, and the call count is a
+> property of the **policy**, which does not exist yet. At a guess of ~200 calls
+> per game that is ~13 µs of mana per game — already most of §2.4's 20 µs
+> budget, which confirms `can_pay` is the hot path but says nothing about
+> whether the total is 20 µs or 200 µs.
+>
+> **So the measurement that matters is calls-per-game, and it cannot be taken
+> until Phase 5.** Optimising ns-per-call now would be tuning the half already
+> known to be fine.
+
 ---
 
 ## 12. The C++ project
@@ -1681,8 +1717,37 @@ commander_simulator/
 **The load-bearing rule: `core/` does no I/O, includes no `<iostream>`, and
 links nothing but the standard library.** That single constraint is what makes
 Python bindings additive later — a binding module calls `simulate_batch` and
-never touches `io/`. Enforce it with a CMake target that does not link `io/`,
-so a violation is a link error rather than a code review.
+never touches `io/`.
+
+> **PATTERN B — a boundary that cannot be crossed by accident.**
+>
+> This is the second instance in the project, and the pattern is worth naming
+> because both instances arrived by the same reasoning and both are stronger
+> than the reviews they replace.
+>
+> | Boundary | How it is enforced | What crossing it does |
+> |---|---|---|
+> | `mtg_consumer` cannot read `mtg_internal` | No `USAGE` grant | Query fails: `permission denied for schema mtg_internal` |
+> | `cs_core` cannot use JSON | `cs_core` links only the standard library | **Fails to compile** — the include path is not there to find |
+>
+> Neither is a rule someone remembers. In both cases the wrong thing is not
+> discouraged, it is *unavailable*: the upstream one fails at the first query,
+> and ours fails at the first build, before any test runs and before review.
+>
+> **The test for whether a boundary qualifies:** could a well-intentioned person
+> cross it without noticing? If yes, it is a convention and will eventually be
+> crossed. A convention costs a review; a build property costs a compile error
+> with the file and line already in it.
+>
+> Where a build property is not achievable, the fallback is a check that runs
+> unconditionally — `scripts/check_core_is_sealed.sh` catches what still
+> compiles (`<iostream>`, `std::unordered_map`, `std::random_device`), because
+> those are in the standard library and therefore always reachable. That is
+> strictly weaker: it is a rule that runs, not an impossibility.
+
+Realised as: `cs_core` declares no `target_link_libraries` naming a project
+library, `cs_io` links `nlohmann_json` as `PRIVATE` so nothing inherits a parser
+through it, and the CLI links `cs_io` alone since `cs_core` arrives transitively.
 
 ---
 

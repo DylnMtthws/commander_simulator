@@ -15,7 +15,8 @@
 # subtler cases that still compile.
 
 add_library(cs_core
-    version.cpp)
+    version.cpp
+    mana.cpp)
 
 # PUBLIC on the include directory: anything linking cs_core inherits the path,
 # so the CLI and the tests can #include <core/version.hpp> without repeating it.

@@ -29,7 +29,8 @@ FetchContent_MakeAvailable(Catch2)
 
 add_executable(cs_tests
     unit/test_smoke.cpp
-    unit/test_card_db_load.cpp)
+    unit/test_card_db_load.cpp
+    unit/test_mana.cpp)
 
 # Catch2WithMain supplies main(), so no test file writes one.
 # cs_core arrives transitively via cs_io's PUBLIC link.
