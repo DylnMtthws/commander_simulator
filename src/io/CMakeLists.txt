@@ -32,7 +32,19 @@ FetchContent_Declare(
     FIND_PACKAGE_ARGS NAMES nlohmann_json)
 FetchContent_MakeAvailable(nlohmann_json)
 
-add_library(cs_io card_db_load.cpp)
+# toml++ for the deck file. TOML rather than JSON because deck files are
+# hand-authored and hand-edited constantly - patterns, ranks, scorer weights -
+# and TOML has comments. A design document you cannot annotate is one you will
+# stop annotating.
+FetchContent_Declare(
+    tomlplusplus
+    GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
+    GIT_TAG        v3.4.0
+    GIT_SHALLOW    TRUE
+    FIND_PACKAGE_ARGS NAMES tomlplusplus)
+FetchContent_MakeAvailable(tomlplusplus)
+
+add_library(cs_io card_db_load.cpp deck_load.cpp)
 target_include_directories(cs_io PUBLIC ${PROJECT_SOURCE_DIR}/src)
 
 # nlohmann_json is PRIVATE: cs_io's header exposes only core types and
@@ -40,4 +52,4 @@ target_include_directories(cs_io PUBLIC ${PROJECT_SOURCE_DIR}/src)
 # A consumer reaching for nlohmann/json has to ask for it deliberately.
 target_link_libraries(cs_io
     PUBLIC  cs_core
-    PRIVATE cs_warnings nlohmann_json::nlohmann_json)
+    PRIVATE cs_warnings nlohmann_json::nlohmann_json tomlplusplus::tomlplusplus)

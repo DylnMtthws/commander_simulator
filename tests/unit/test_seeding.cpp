@@ -30,9 +30,17 @@ const cs::CardDb& fixture() {
     return db;
 }
 
+// An empty pattern set: S1 is about the RNG, and a pattern firing would end
+// games early and vary the number of turns for reasons unrelated to seeding.
+const cs::PatternSet& no_patterns() {
+    static const cs::PatternSet empty;
+    return empty;
+}
+
 cs::GameResult play(std::uint64_t index) {
     const cs::StubPolicyDoNotUseForResults policy;
-    return cs::run_game(fixture(), cs::GameConfig{}, policy, cs::seed_for_game(kBaseSeed, index));
+    return cs::run_game(fixture(), no_patterns(), cs::GameConfig{}, policy,
+                        cs::seed_for_game(kBaseSeed, index));
 }
 
 // Enough to compare two games without needing operator== on the whole result.
@@ -151,9 +159,9 @@ TEST_CASE("seed derivation is counter-based, not sequential", "[seeding][S1]") {
     }
     SECTION("a different base seed gives a different game") {
         const cs::StubPolicyDoNotUseForResults policy;
-        const auto one = cs::run_game(fixture(), cs::GameConfig{}, policy,
+        const auto one = cs::run_game(fixture(), no_patterns(), cs::GameConfig{}, policy,
                                       cs::seed_for_game(1, 0));
-        const auto two = cs::run_game(fixture(), cs::GameConfig{}, policy,
+        const auto two = cs::run_game(fixture(), no_patterns(), cs::GameConfig{}, policy,
                                       cs::seed_for_game(2, 0));
         REQUIRE_FALSE(sign(one) == sign(two));
     }

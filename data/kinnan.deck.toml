@@ -134,3 +134,69 @@ mainboard = [
   "Wooded Foothills",
   "Yavimaya Coast",
 ]
+
+# ---------------------------------------------------------------------------
+# Engines and win patterns (SIM_PLAN.md section 5).
+#
+# PROVISIONAL. Effects are not authored until Phase 7, so the stub policy is
+# not really piloting this deck and any number produced now is about the loop,
+# not about the list. The structure is what is being exercised.
+#
+# Patterns name the STATE they detect, never an outcome. This deck contains no
+# card that reads "you win the game" - Emrakul targets an opponent, Hullbreaker
+# bounces permanents you do not control, Finale wants a combat step - so the
+# quantity is TURNS TO ASSEMBLY (section 5.4). The loader rejects a pattern
+# named like an outcome.
+# ---------------------------------------------------------------------------
+
+[[engine]]
+name = "kinnan_basalt"
+sets = ["INFINITE:C"]
+# Basalt taps for {C}{C}{C}, Kinnan adds one {C}, {3} untaps it: net +1
+# colourless per iteration. The mana is COLOURLESS, which is why the outlet
+# below is Thrasios ({4} generic) and not Kinnan's own {5}{G}{U} (section 2.6).
+[engine.requires]
+in_play  = ["Kinnan, Bonder Prodigy", "Basalt Monolith"]
+untapped = ["Basalt Monolith"]
+
+[[engine]]
+name = "kinnan_enduring_vitality"
+sets = ["WIDE_COLOUR"]
+# Vitality grants every creature "{T}: add one mana of any color"; Kinnan makes
+# each of them produce two. Wide coloured mana, NOT unbounded - which is why it
+# sets a different flag.
+[engine.requires]
+in_play            = ["Kinnan, Bonder Prodigy", "Enduring Vitality"]
+creature_count_gte = 2
+
+[[win]]
+name = "infinite_C_into_thrasios"
+# Thrasios costs {4} to activate, all generic, so unbounded colourless converts
+# straight into drawing the library. The deck's primary line.
+[win.requires]
+flag    = "INFINITE:C"
+in_play = ["Thrasios, Triton Hero"]
+
+[[win]]
+name = "infinite_C_outlet_in_hand"
+# Engine assembled with the outlet still in hand. A weaker state than the one
+# above and deliberately a separate pattern rather than an OR, so the mix
+# reports how often the deck arrives here instead.
+[win.requires]
+flag    = "INFINITE:C"
+in_hand = ["Thrasios, Triton Hero"]
+
+[[win]]
+name = "wide_colour_into_kinnan_dig"
+# Kinnan's own {5}{G}{U} ability, which the colourless engine cannot pay for
+# but a Vitality board can.
+[win.requires]
+flag     = "WIDE_COLOUR"
+in_play  = ["Kinnan, Bonder Prodigy"]
+untapped = ["Kinnan, Bonder Prodigy"]
+
+[[win]]
+name = "wide_colour_into_thrasios"
+[win.requires]
+flag    = "WIDE_COLOUR"
+in_play = ["Thrasios, Triton Hero"]

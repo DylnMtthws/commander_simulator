@@ -127,6 +127,22 @@ nonbasic Reserved List land, a modal DFC, a transform Battle, an X spell, a
 Phyrexian cost, and the commander. Each card records what it is there to
 exercise in the fixture's own `fixture_rationale`.
 
+**Keep it small. Small is what makes it useful.** The fixture has now caught
+three defects the 100-card deck could not, and none was a scale problem:
+
+| Found | Why the real deck could not |
+|---|---|
+| `export_index` must be dense | Only a *subset* of an export has holes in it |
+| `below()` hangs on power-of-two bounds | 8 cards reach a library of 2 on the opening hand; 99 need ~97 draws |
+| The S1 signature was blind to draw order | With 100 cards the stub's counters vary; with 8 they do not |
+
+It is not a scaled-down corpus, it is a **differently-shaped input**, and the
+shape is what finds things. Growing it toward realism would make it resemble
+`data/cards.json` and stop finding anything that file does not. So add a card
+only to cover a *shape* that is absent, never to make the set more
+representative — if a bug needs a hundred cards to reproduce, it belongs in a
+test against the real export.
+
 Regenerate it after any change to the export format:
 
 ```bash

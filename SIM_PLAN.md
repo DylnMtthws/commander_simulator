@@ -1167,6 +1167,13 @@ statistics over the uncensored set with the censored fraction reported alongside
 > degrades toward zero and every ablation interval gets wider — with no error, no
 > warning, and no symptom except numbers that need more games than they should.
 >
+> S1 belongs to a failure class worth recognising on sight — **a mechanism
+> quietly not running** (ingestion `PLAN.md` §11.0). This project has produced
+> three instances: a sequentially-seeded RNG that silently disables CRN,
+> `RelWithDebInfo` defining `NDEBUG` and compiling out every `assert` in the
+> test suite, and upstream's `is_unchanged` short-circuit that never fired.
+> None had a symptom. Suspect anything *configured* rather than *called*.
+>
 > **Test S1 directly** (`tests/unit/seeding`), not as a side effect of other
 > tests: assert that game 7 of a 10-game batch equals `simulate_one(…, seed, 7)`
 > run alone; that a batch's results are identical across 1, 4, and 8 threads;

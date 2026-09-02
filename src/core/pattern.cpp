@@ -1,0 +1,85 @@
+#include "core/pattern.hpp"
+
+#include <algorithm>
+
+namespace cs {
+
+bool requirement_holds(const Requirement& requirement, const PatternSet& set,
+                       const GameState& state, FlagMask active) noexcept {
+    if ((active & requirement.flags) != requirement.flags) {
+        return false;
+    }
+    if (!state.battlefield.contains(requirement.in_play)) {
+        return false;
+    }
+    if (!state.hand.contains(requirement.in_hand)) {
+        return false;
+    }
+    // "in either zone" is not "in the union of the zones" for a single card,
+    // but for a conjunction of cards it is exactly that.
+    if (!(state.battlefield | state.hand).contains(requirement.in_play_or_hand)) {
+        return false;
+    }
+    if (requirement.has_any_of && !state.battlefield.intersects(requirement.any_of)) {
+        return false;
+    }
+    if (!requirement.untapped.empty()) {
+        if (!state.battlefield.contains(requirement.untapped)) {
+            return false;
+        }
+        // Present is not enough: a tapped Kinnan is not an engine.
+        if (state.tapped.intersects(requirement.untapped)) {
+            return false;
+        }
+    }
+    if (state.turn < requirement.turn_gte) {
+        return false;
+    }
+    if (requirement.creature_count_gte > 0 &&
+        (state.battlefield & set.creature_slots).count() < requirement.creature_count_gte) {
+        return false;
+    }
+    if (requirement.library_size_lte >= 0 &&
+        state.library_size() > requirement.library_size_lte) {
+        return false;
+    }
+    return true;
+}
+
+FlagMask active_flags(const PatternSet& set, const GameState& state) noexcept {
+    FlagMask active = 0;
+    // One pass, no fixpoint: an engine may not reference another engine's flag
+    // (section 5.1), so a second pass could never set anything new. If engines
+    // ever compose, this becomes a loop and needs cycle detection - which is
+    // the cost the two-level design is avoiding.
+    for (const Engine& engine : set.engines) {
+        if (requirement_holds(engine.requires_, set, state, 0)) {
+            active |= engine.sets;
+        }
+    }
+    return active;
+}
+
+FlagMask all_satisfied(const PatternSet& set, const GameState& state) noexcept {
+    const FlagMask active = active_flags(set, state);
+    FlagMask satisfied = 0;
+    const std::size_t limit = std::min(set.patterns.size(), kMaxFlags);
+    for (std::size_t i = 0; i < limit; ++i) {
+        if (requirement_holds(set.patterns[i].requires_, set, state, active)) {
+            satisfied |= FlagMask{1} << i;
+        }
+    }
+    return satisfied;
+}
+
+int first_satisfied(const PatternSet& set, const GameState& state) noexcept {
+    const FlagMask active = active_flags(set, state);
+    for (std::size_t i = 0; i < set.patterns.size(); ++i) {
+        if (requirement_holds(set.patterns[i].requires_, set, state, active)) {
+            return static_cast<int>(i);
+        }
+    }
+    return -1;
+}
+
+}  // namespace cs

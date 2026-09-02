@@ -76,6 +76,7 @@ std::uint64_t digest_state(const GameState& state) noexcept {
         mix(0xFFFF);  // separator, so adjacent zones cannot alias
     };
     mix_zone(state.hand);
+    mix_zone(state.command_zone);
     mix_zone(state.battlefield);
     mix_zone(state.graveyard);
     mix_zone(state.tapped);
@@ -98,7 +99,12 @@ int StubPolicyDoNotUseForResults::choose_spell(const CardDb& db, const GameState
                                               std::span<const Source> sources,
                                               GameStats& stats) const {
     int chosen = -1;
-    state.hand.for_each([&](int slot) {
+    // Hand and command zone together. The commander is castable from the
+    // command zone, and without this every pattern naming Kinnan is unreachable
+    // by construction - which is exactly what the never-fired report said when
+    // this was missing.
+    const Zone castable_from = state.hand | state.command_zone;
+    castable_from.for_each([&](int slot) {
         if (chosen != -1) {
             return;
         }
@@ -117,8 +123,8 @@ int StubPolicyDoNotUseForResults::choose_spell(const CardDb& db, const GameState
     return chosen;
 }
 
-GameResult run_game(const CardDb& db, const GameConfig& config, const Policy& policy,
-                    std::uint64_t seed) {
+GameResult run_game(const CardDb& db, const PatternSet& patterns, const GameConfig& config,
+                    const Policy& policy, std::uint64_t seed) {
     Rng rng(seed);
     GameState state;
 
@@ -168,6 +174,7 @@ GameResult run_game(const CardDb& db, const GameConfig& config, const Policy& po
                 break;
             }
             state.hand.clear(spell);
+            state.command_zone.clear(spell);
             state.battlefield.set(spell);
             ++result.stats.spells_cast;
 
@@ -187,6 +194,18 @@ GameResult run_game(const CardDb& db, const GameConfig& config, const Policy& po
 
         ++result.stats.turns;
         result.turns_simulated = turn;
+
+        // Patterns are evaluated once per turn, after the main phase. Checking
+        // after every individual cast would report the same TURN number, since
+        // that is the reported quantity - so per-turn is exact for the metric,
+        // not an approximation of it.
+        const int fired = first_satisfied(patterns, state);
+        if (fired >= 0) {
+            result.outcome.assembled_turn = turn;
+            result.outcome.pattern_id = static_cast<std::uint8_t>(fired);
+            result.outcome.satisfied_mask = all_satisfied(patterns, state);
+            break;  // first assembly is the answer; nothing after it is measured
+        }
     }
     result.state_digest = digest_state(state);
     return result;

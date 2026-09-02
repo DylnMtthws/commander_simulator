@@ -27,6 +27,9 @@ void begin_game(GameState& state, int deck_slots, int commander_slot, int hand_s
                 Rng& rng) noexcept {
     state = GameState{};
     state.commander_slot = commander_slot;
+    if (commander_slot >= 0) {
+        state.command_zone.set(commander_slot);
+    }
 
     // Every slot except the commander, which starts in the command zone rather
     // than the library. Ascending order: the starting arrangement must not

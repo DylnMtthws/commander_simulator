@@ -31,7 +31,8 @@ add_executable(cs_tests
     unit/test_smoke.cpp
     unit/test_card_db_load.cpp
     unit/test_mana.cpp
-    unit/test_seeding.cpp)
+    unit/test_seeding.cpp
+    unit/test_deck_load.cpp)
 
 # Catch2WithMain supplies main(), so no test file writes one.
 # cs_core arrives transitively via cs_io's PUBLIC link.

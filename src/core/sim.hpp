@@ -7,8 +7,10 @@
 // happened rather than whether anything was achieved.
 
 #include <cstdint>
+#include <optional>
 
 #include "core/card.hpp"
+#include "core/pattern.hpp"
 #include "core/policy.hpp"
 #include "core/state.hpp"
 
@@ -29,7 +31,29 @@ struct GameStats {
     std::uint32_t spells_cast = 0;
 };
 
+struct GameOutcome {
+    // std::optional, NEVER a sentinel. A 99 or a -1 eventually gets averaged
+    // and becomes a plausible-looking number; an optional makes every caller
+    // handle censoring, checked by the compiler (SIM_PLAN.md section 7.2).
+    //
+    // Named assembled_turn, not win_turn: this deck has no card that wins the
+    // game, so what is measured is when a declared pattern's state is reached
+    // (section 5.4).
+    std::optional<std::uint8_t> assembled_turn;
+
+    // Valid if and only if assembled_turn holds a value. kNoPattern otherwise.
+    std::uint8_t pattern_id = kNoPattern;
+
+    // Every pattern whose state also held on the assembling turn. Bit i is
+    // pattern i. A pattern that is satisfied here but never wins pattern_id is
+    // SHADOWED by an earlier declaration, not dead.
+    FlagMask satisfied_mask = 0;
+
+    [[nodiscard]] bool censored() const noexcept { return !assembled_turn.has_value(); }
+};
+
 struct GameResult {
+    GameOutcome outcome;
     GameStats stats;
     std::uint8_t turns_simulated = 0;
 
@@ -55,7 +79,8 @@ struct GameConfig {
 };
 
 // Plays one game. A pure function of (db, config, seed) - INVARIANT S1.
-[[nodiscard]] GameResult run_game(const CardDb& db, const GameConfig& config, const Policy& policy,
+[[nodiscard]] GameResult run_game(const CardDb& db, const PatternSet& patterns,
+                                  const GameConfig& config, const Policy& policy,
                                   std::uint64_t seed);
 
 }  // namespace cs

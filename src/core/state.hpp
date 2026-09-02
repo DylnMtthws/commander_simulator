@@ -53,6 +53,33 @@ public:
         }
     }
 
+    // Is every member of `other` also a member of this? The bitmask form of
+    // "all these cards are on the battlefield", which is what a pattern term
+    // compiles to (SIM_PLAN.md section 11).
+    [[nodiscard]] constexpr bool contains(const Zone& other) const noexcept {
+        return (words_[0] & other.words_[0]) == other.words_[0] &&
+               (words_[1] & other.words_[1]) == other.words_[1];
+    }
+
+    // Do the two sets overlap at all? "at least one of these" as one AND.
+    [[nodiscard]] constexpr bool intersects(const Zone& other) const noexcept {
+        return ((words_[0] & other.words_[0]) | (words_[1] & other.words_[1])) != 0;
+    }
+
+    [[nodiscard]] constexpr Zone operator&(const Zone& other) const noexcept {
+        Zone result;
+        result.words_[0] = words_[0] & other.words_[0];
+        result.words_[1] = words_[1] & other.words_[1];
+        return result;
+    }
+
+    [[nodiscard]] constexpr Zone operator|(const Zone& other) const noexcept {
+        Zone result;
+        result.words_[0] = words_[0] | other.words_[0];
+        result.words_[1] = words_[1] | other.words_[1];
+        return result;
+    }
+
     [[nodiscard]] friend constexpr bool operator==(const Zone&, const Zone&) = default;
 
 private:
@@ -79,6 +106,14 @@ struct GameState {
     std::uint8_t drawn = 0;
 
     Zone hand;
+    // The command zone. Holds the commander until it is cast, and is a separate
+    // zone rather than a flag because the policy has to be able to choose it
+    // alongside cards in hand.
+    //
+    // Commander tax (+{2} per recast) is NOT modelled: nothing in this model
+    // destroys a permanent, so a commander is cast at most once per game and
+    // the tax never applies. If removal is ever modelled, this becomes wrong.
+    Zone command_zone;
     Zone battlefield;
     Zone graveyard;
     Zone tapped;
