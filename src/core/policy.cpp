@@ -127,6 +127,12 @@ bool StubPolicyDoNotUseForResults::choose_life_payment(const Context& context,
     return context.state.life - known_payment > 0;
 }
 
+int StubPolicyDoNotUseForResults::choose_untap_target(const Context&,
+                                                      std::span<const int> candidates,
+                                                      GameStats&) const {
+    return candidates.empty() ? -1 : candidates.front();
+}
+
 int StubPolicyDoNotUseForResults::choose_select(const Context&, std::span<const int> revealed,
                                                 GameStats&) const {
     return revealed.empty() ? -1 : revealed.front();
@@ -407,6 +413,37 @@ bool AuthoredPolicy::choose_life_payment(const Context& context, int known_payme
                                          GameStats&) const {
     return context.state.life - known_payment >= weights_.life_floor &&
            context.state.life > weights_.life_floor;
+}
+
+int AuthoredPolicy::choose_untap_target(const Context& context,
+                                        std::span<const int> candidates,
+                                        GameStats&) const {
+    int best = -1;
+    int best_amount = -1;
+    int best_rank = -1;
+    for (const int slot : candidates) {
+        int amount = 0;
+        if (context.effects != nullptr) {
+            const CardEffects& entry = context.effects->by_slot[
+                static_cast<std::size_t>(context.state.effective(slot))];
+            if (entry.has_mana_source) {
+                amount = entry.mana_source.amount;
+            } else if (entry.has_ritual) {
+                amount = entry.ritual.amount;
+            }
+        }
+        const int rank = static_cast<std::size_t>(slot) < weights_.rank.size()
+                             ? weights_.rank[static_cast<std::size_t>(slot)]
+                             : 0;
+        if (best < 0 || amount > best_amount ||
+            (amount == best_amount && rank > best_rank) ||
+            (amount == best_amount && rank == best_rank && slot < best)) {
+            best = slot;
+            best_amount = amount;
+            best_rank = rank;
+        }
+    }
+    return best;
 }
 
 int AuthoredPolicy::choose_card_cost(const Context& context, std::span<const int> candidates,

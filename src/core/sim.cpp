@@ -1,5 +1,6 @@
 #include "core/sim.hpp"
 
+#include <algorithm>
 #include <vector>
 
 #include "core/mana.hpp"
@@ -385,6 +386,23 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
                 });
                 state.tapped = keep_tapped;
                 ++result.stats.mass_untaps;
+            }
+
+            if (cast_entry.has_untap_target) {
+                std::vector<int> candidates;
+                untap_target_candidates(cast_entry.untap_target, db, state, candidates);
+                for (int chosen = 0; chosen < cast_entry.untap_target.targets; ++chosen) {
+                    collect_sources(db, effects, state, config.table, sources);
+                    const Context untap_context{db, patterns, state, sources, observer, &effects};
+                    const int target =
+                        policy.choose_untap_target(untap_context, candidates, result.stats);
+                    if (target < 0) {
+                        break;
+                    }
+                    state.tapped.clear(target);
+                    candidates.erase(std::remove(candidates.begin(), candidates.end(), target),
+                                     candidates.end());
+                }
             }
 
             // Historical resolution state is recorded independently of the

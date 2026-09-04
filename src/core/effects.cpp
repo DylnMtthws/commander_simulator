@@ -356,6 +356,21 @@ void escape_cost_candidates(const GameState& state, int escaping, std::vector<in
     });
 }
 
+void untap_target_candidates(const UntapTargetEffect& effect, const CardDb& db,
+                             const GameState& state, std::vector<int>& out) {
+    out.clear();
+    state.tapped.for_each([&](int slot) {
+        if (!state.battlefield.test(slot)) {
+            return;
+        }
+        if (effect.nonland_only &&
+            db.cards[static_cast<std::size_t>(state.effective(slot))].plays_as_land()) {
+            return;
+        }
+        out.push_back(slot);
+    });
+}
+
 void enter_battlefield(const CardDb& db, const EffectDb& effects, GameState& state,
                        const TableContext& table, int slot) {
     state.battlefield.set(slot);

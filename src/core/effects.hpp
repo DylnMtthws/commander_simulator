@@ -140,6 +140,13 @@ struct MassUntapEffect {
     bool nonland_only = true;
 };
 
+// UNTAP_TARGET untaps a policy-selected set of permanents. This is distinct
+// from MASS_UNTAP: the loop must choose which object receives the verb.
+struct UntapTargetEffect {
+    int targets = 0;
+    bool nonland_only = false;
+};
+
 // CLONE: enter as a copy of a permanent already on the battlefield.
 //
 // A clone's value is entirely "what is the best permanent available to copy",
@@ -253,6 +260,8 @@ struct CardEffects {
     RitualEffect ritual;
     bool has_mass_untap = false;
     MassUntapEffect mass_untap;
+    bool has_untap_target = false;
+    UntapTargetEffect untap_target;
     bool has_tutor = false;
     TutorEffect tutor;
     bool has_clone = false;
@@ -429,6 +438,9 @@ void card_cost_candidates(const CardCostEffect& cost, const CardDb& db, const Ga
 
 void escape_cost_candidates(const GameState& state, int escaping,
                             std::vector<int>& out);
+
+void untap_target_candidates(const UntapTargetEffect& effect, const CardDb& db,
+                             const GameState& state, std::vector<int>& out);
 
 // Puts a permanent onto the battlefield, with everything that entails.
 //

@@ -396,6 +396,17 @@ EffectDb load_effects(const std::filesystem::path& path, const CardDb& db,
                 untap.nonland_only = (*effect)["nonland_only"].value_or<bool>(true);
                 target.has_mass_untap = true;
                 target.mass_untap = untap;
+            } else if (kind == "UNTAP_TARGET") {
+                const auto targets = (*effect)["targets"].value<int64_t>();
+                const auto nonland_only = (*effect)["nonland_only"].value<bool>();
+                if (!targets || *targets <= 0 || !nonland_only.has_value()) {
+                    fail(context +
+                         ": UNTAP_TARGET requires positive 'targets' and explicit "
+                         "'nonland_only'; neither field has a silent default.");
+                }
+                target.has_untap_target = true;
+                target.untap_target.targets = static_cast<int>(*targets);
+                target.untap_target.nonland_only = *nonland_only;
             } else if (kind == "STATIC_MANA_MODIFIER") {
                 ModifierEffect modifier;
                 const auto mode = (*effect)["mode"].value_or<std::string>("");

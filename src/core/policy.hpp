@@ -91,6 +91,10 @@ public:
     [[nodiscard]] virtual bool choose_life_payment(const Context& context, int known_payment,
                                                    GameStats& stats) const = 0;
 
+    [[nodiscard]] virtual int choose_untap_target(const Context& context,
+                                                  std::span<const int> candidates,
+                                                  GameStats& stats) const = 0;
+
     // Which land to fetch from a set of candidates, or -1 for none.
     //
     // A fetch IS a tutor with a small candidate set, so it goes through the
@@ -137,6 +141,9 @@ public:
                                          GameStats& stats) const override;
     [[nodiscard]] bool choose_life_payment(const Context& context, int known_payment,
                                            GameStats& stats) const override;
+    [[nodiscard]] int choose_untap_target(const Context& context,
+                                          std::span<const int> candidates,
+                                          GameStats& stats) const override;
     [[nodiscard]] int choose_select(const Context& context, std::span<const int> revealed,
                                     GameStats& stats) const override;
     [[nodiscard]] const char* name() const override {
@@ -208,6 +215,9 @@ public:
                                          GameStats& stats) const override;
     [[nodiscard]] bool choose_life_payment(const Context& context, int known_payment,
                                            GameStats& stats) const override;
+    [[nodiscard]] int choose_untap_target(const Context& context,
+                                          std::span<const int> candidates,
+                                          GameStats& stats) const override;
     [[nodiscard]] int choose_select(const Context& context, std::span<const int> revealed,
                                     GameStats& stats) const override;
     [[nodiscard]] const char* name() const override {

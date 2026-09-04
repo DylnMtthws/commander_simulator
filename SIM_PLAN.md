@@ -707,6 +707,18 @@ its mana-base floor remains unchanged. *Ad Nauseam* and *Necropotence* are the
 first users. `life_floor` is now copied into `PolicyWeights`, and `Policy`
 chooses every repeated life payment from current state plus that one payment.
 
+#### 2026-09-03 re-audit — `UNTAP_TARGET`
+
+`UNTAP_TARGET` is separate from `MASS_UNTAP` because choosing which permanent
+receives an untap is a policy decision the loop did not have. Target count and
+the nonland restriction are flags. Re-auditing all existing entries found
+*Hidden Strings*, already explicit `inert`: its untap half is now mechanically
+expressible, but changing it in Kinnan pack 1.0.0 would widen that existing
+scenario, and cipher still needs combat, so the authored classification remains
+unchanged and documented. *Cerulean Wisps* is the first modeled user and also
+uses the pre-existing `DRAW` kind. Dramatic Reversal correctly remains
+`MASS_UNTAP`; its text chooses no target.
+
 #### SCOPE NOTE — the scorer is thinly validated by this deck
 
 **This deck has no cantrips.** No *Brainstorm*, no *Ponder*, no *Preordain*.
