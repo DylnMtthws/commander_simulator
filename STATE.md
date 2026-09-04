@@ -45,10 +45,11 @@ deck**, and the model cannot see 31 of the 99 cards.
   unsupported-pack fixture. The current CLI and HTTP service emit v2.
 - **Oracle-ID exporter input** — `mtgsim-export --candidate`, constrained to
   `mtg_v1` and the `mtg_consumer` role.
-- **Cloud alignment W1–W4 and W6–W9** — `main` was cleaned and pushed; Linux
+- **Cloud alignment W1–W9** — `main` was cleaned and pushed; Linux
   joined the macOS CI matrix; baseline simulations use quota-aware threading;
-  the zero-envelope HTTP service, linux/amd64 image, offline container smoke
-  test, and deployment draft are landed on `cloud-alignment`.
+  full sweeps use an ablation/arm work queue; and the zero-envelope HTTP
+  service, linux/amd64 image, offline container smoke test, and deployment draft
+  are landed on `cloud-alignment`.
 
 ## Cloud service hand-off (2026-09-04)
 
@@ -72,12 +73,14 @@ Runtime configuration:
 | `SIM_MAX_CONCURRENT` | `1` | Simulations in flight; excess receives 429 |
 | `SIM_CARDS_FILE` | unset | Test/offline card snapshot; cannot coexist with a DSN outside `SIM_TESTING=1` |
 
-Measured Release timings for the linux/amd64 image, seed 1, on the generated
-legal Kinnan fixture: a 20,000-game single run took **2.595 s**; the 30,000-game
-full 98-ablation sweep took **1,154.704 s (19m14.704s)**. The local container
-reported two CPUs and ran through amd64 emulation on an arm64 Mac mini, so these
-are conservative Linux wall times, not native CI-runner performance. Replace
-them with native runner measurements when this branch is published and CI runs.
+Measured Release timings for the final linux/amd64 image, seed 1, on the
+generated legal Kinnan fixture: a 20,000-game single run took **2.641 s**; the
+30,000-game full 98-ablation sweep took **1,115.987 s (18m35.987s)**. The same
+sweep before W5 took 1,154.704 s, so the two-worker queue saved 38.717 s (3.35%)
+even on this low-concurrency host. The local container reported two CPUs and ran
+through amd64 emulation on an arm64 Mac mini, so these are conservative Linux
+wall times, not native CI-runner performance. Replace them with native runner
+measurements when this branch is published and CI runs.
 
 Reproducibility was checked independently of those timings. A 2,000-game run,
 seed 1, two threads, and the same generated fixture produced digest
@@ -85,13 +88,14 @@ seed 1, two threads, and the same generated fixture produced digest
 pre-change, serial, and threaded reference runs also all produced
 `775e9cd226241071`; no expected value was updated.
 
-W5 is not yet landed. Per the cloud plan it is the next compute item, attempted
-only after this W9 documentation commit and its full gate are green.
+W5 is landed. A full human sweep report was byte-for-byte identical before and
+after; a v2 request sweep was identical after removing only timestamps. The
+queue runs the paired-CRN and independently seeded arms as separate serial tasks
+and reconstructs results in target order.
 
 ## In flight
 
-The optional W5 sweep work-queue rewrite is the only implementation item in
-flight. It does not broaden the simulator model. The service boundary does not
+No implementation phase is currently in flight. The service boundary does not
 imply that a second strategy or an opponent model already exists, and the
 historical Kinnan measurements and human-readable CLI remain unchanged in
 meaning.

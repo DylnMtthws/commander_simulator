@@ -12,6 +12,7 @@
 #include <string>
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -577,6 +578,7 @@ Run drive(int games, int threads, Work work) {
 // two standard errors is the realised variance reduction - the number section
 // 10.4 explicitly refuses to let anyone assume.
 struct AblationResult {
+    int slot = -1;
     std::string card;
     bool inert = false;
     cs::Difference paired;
@@ -586,6 +588,26 @@ struct AblationResult {
     double baseline_p = 0.0;
     double ablated_p = 0.0;
 };
+
+AblationResult summarise_ablation(const cs::CardDb& db, const cs::EffectDb& effects,
+                                  int slot, int turn, const cs::PairedRun& coupled,
+                                  const cs::RunSummary& independent) {
+    AblationResult result;
+    result.slot = slot;
+    result.card = db.cards[static_cast<std::size_t>(slot)].listed_name;
+    result.inert = effects.by_slot[static_cast<std::size_t>(slot)].status ==
+                   cs::AuthorStatus::Inert;
+    const cs::PairedCounts& cell = coupled.by_turn[static_cast<std::size_t>(turn)];
+    result.paired = cs::paired_difference(cell);
+    result.baseline_only = cell.baseline_only;
+    result.ablated_only = cell.ablated_only;
+    const auto n = static_cast<double>(coupled.games);
+    result.baseline_p = (cell.both + cell.baseline_only) / n;
+    result.ablated_p = (cell.both + cell.ablated_only) / n;
+    result.unpaired = cs::unpaired_difference(cell.both + cell.baseline_only, coupled.games,
+                                              cs::cumulative(independent, turn), independent.games);
+    return result;
+}
 
 AblationResult measure_ablation(const cs::CardDb& db, const cs::EffectDb& effects,
                                 const cs::io::DeckFile& deck, const cs::GameConfig& config,
@@ -599,17 +621,6 @@ AblationResult measure_ablation(const cs::CardDb& db, const cs::EffectDb& effect
                               first, count);
     });
 
-    AblationResult result;
-    result.card = db.cards[static_cast<std::size_t>(slot)].listed_name;
-    result.inert = effects.by_slot[static_cast<std::size_t>(slot)].status == cs::AuthorStatus::Inert;
-    const cs::PairedCounts& cell = coupled.by_turn[static_cast<std::size_t>(turn)];
-    result.paired = cs::paired_difference(cell);
-    result.baseline_only = cell.baseline_only;
-    result.ablated_only = cell.ablated_only;
-    const auto n = static_cast<double>(coupled.games);
-    result.baseline_p = (cell.both + cell.baseline_only) / n;
-    result.ablated_p = (cell.both + cell.ablated_only) / n;
-
     // The uncoupled arm: same deck, DIFFERENT seed sequence. Nothing else
     // changes, so the only difference between the two intervals below is the
     // coupling.
@@ -619,9 +630,78 @@ AblationResult measure_ablation(const cs::CardDb& db, const cs::EffectDb& effect
             return cs::simulate_batch(arm.db, arm.effects, arm.patterns, config, ablated_policy,
                                       base_seed ^ 0x9E3779B97F4A7C15ULL, first, count);
         });
-    result.unpaired = cs::unpaired_difference(cell.both + cell.baseline_only, coupled.games,
-                                              cs::cumulative(independent, turn), independent.games);
-    return result;
+    return summarise_ablation(db, effects, slot, turn, coupled, independent);
+}
+
+// A full sweep has two independent units of work per target: the paired CRN
+// comparison and the separately seeded ablated arm. Giving each worker a whole
+// unit removes the two join barriers per card while keeping every game range
+// serial and therefore preserving the exact counts each result is built from.
+std::vector<AblationResult> measure_ablations(
+    const cs::CardDb& db, const cs::EffectDb& effects, const cs::io::DeckFile& deck,
+    const cs::GameConfig& config, const std::vector<int>& targets, int replacement,
+    int games, int threads, std::uint64_t base_seed, int turn) {
+    if (threads <= 1 || targets.size() <= 1) {
+        std::vector<AblationResult> results;
+        results.reserve(targets.size());
+        for (const int slot : targets) {
+            results.push_back(measure_ablation(db, effects, deck, config, slot, replacement,
+                                               games, threads, base_seed, turn));
+        }
+        return results;
+    }
+
+    struct Work {
+        int slot;
+        cs::AblatedDeck arm;
+        cs::PairedRun coupled;
+        cs::RunSummary independent;
+    };
+
+    std::vector<Work> work;
+    work.reserve(targets.size());
+    for (const int slot : targets) {
+        work.push_back({slot,
+                        cs::ablate(db, effects, deck.weights, deck.patterns, slot, replacement),
+                        {}, {}});
+    }
+
+    const std::size_t task_count = work.size() * 2;
+    const int worker_count = std::min(threads, static_cast<int>(task_count));
+    std::atomic<std::size_t> next_task{0};
+    std::vector<std::thread> workers;
+    workers.reserve(static_cast<std::size_t>(worker_count));
+    for (int worker = 0; worker < worker_count; ++worker) {
+        workers.emplace_back([&] {
+            while (true) {
+                const std::size_t task = next_task.fetch_add(1, std::memory_order_relaxed);
+                if (task >= task_count) {
+                    return;
+                }
+                Work& item = work[task / 2];
+                if (task % 2 == 0) {
+                    item.coupled = cs::run_paired(db, effects, deck.weights, item.arm,
+                                                  deck.patterns, config, base_seed, 0, games);
+                } else {
+                    const cs::AuthoredPolicy ablated_policy(item.arm.weights);
+                    item.independent = cs::simulate_batch(
+                        item.arm.db, item.arm.effects, item.arm.patterns, config,
+                        ablated_policy, base_seed ^ 0x9E3779B97F4A7C15ULL, 0, games);
+                }
+            }
+        });
+    }
+    for (std::thread& worker : workers) {
+        worker.join();
+    }
+
+    std::vector<AblationResult> results;
+    results.reserve(work.size());
+    for (const Work& item : work) {
+        results.push_back(
+            summarise_ablation(db, effects, item.slot, turn, item.coupled, item.independent));
+    }
+    return results;
 }
 
 int simulate(const std::filesystem::path& path, const std::filesystem::path& deck_path,
@@ -730,6 +810,7 @@ int simulate_request(const std::filesystem::path& request_path,
             if (replacement < 0) {
                 throw std::runtime_error("strategy pack's ablation replacement is absent");
             }
+            std::vector<int> targets;
             for (const cs::Card& card : db.cards) {
                 if (card.is_commander || card.export_index == replacement ||
                     (!ablation_names.empty() &&
@@ -737,17 +818,20 @@ int simulate_request(const std::filesystem::path& request_path,
                          ablation_names.end())) {
                     continue;
                 }
-                const AblationResult measured = measure_ablation(
-                    db, effects, pack, config, card.export_index, replacement, games,
-                    threads, seed, objective_turn);
+                targets.push_back(card.export_index);
+            }
+            const std::vector<AblationResult> measured = measure_ablations(
+                db, effects, pack, config, targets, replacement, games, threads, seed,
+                objective_turn);
+            for (const AblationResult& result : measured) {
                 ablations.push_back({
-                    .oracle_id = card.oracle_id,
+                    .oracle_id = db.cards[static_cast<std::size_t>(result.slot)].oracle_id,
                     .replacement_oracle_id =
                         db.cards[static_cast<std::size_t>(replacement)].oracle_id,
                     .objective_turn = objective_turn,
-                    .delta = measured.paired.delta,
-                    .interval_low = measured.paired.low,
-                    .interval_high = measured.paired.high});
+                    .delta = result.paired.delta,
+                    .interval_low = result.paired.low,
+                    .interval_high = result.paired.high});
             }
             if (ablations.empty()) {
                 throw std::runtime_error("no ablation target matched the request");
@@ -825,12 +909,8 @@ int sweep(const std::filesystem::path& path, const std::filesystem::path& deck_p
         return 1;
     }
 
-    std::vector<AblationResult> results;
-    results.reserve(targets.size());
-    for (const int slot : targets) {
-        results.push_back(measure_ablation(db, effects, deck, config, slot, replacement, games,
-                                           threads, base_seed, turn));
-    }
+    std::vector<AblationResult> results = measure_ablations(
+        db, effects, deck, config, targets, replacement, games, threads, base_seed, turn);
 
     // THE VARIANCE-REDUCTION MEASUREMENT (section 10.4), reported before the
     // table, because it is what says whether the intervals in that table are
