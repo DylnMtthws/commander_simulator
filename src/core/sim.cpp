@@ -37,6 +37,7 @@ std::uint64_t digest_state(const GameState& state) noexcept {
         mix(static_cast<std::uint64_t>(state.copy_of[i] + 1));
     }
     mix_zone(state.hand);
+    mix_zone(state.delayed_hand);
     mix_zone(state.command_zone);
     mix_zone(state.battlefield);
     mix_zone(state.graveyard);
@@ -70,10 +71,55 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
     GameResult result;
     result.stats.cards_drawn = config.opening_hand;
 
+    const auto resolve_draw = [&](const DrawEffect& draw, int source,
+                                  std::span<const Source> current_sources) {
+        for (;;) {
+            const int known_payment = draw.life_loss == DrawLifeLoss::Fixed
+                                          ? draw.life_per_card * draw.cards
+                                          : 0;
+            const Context life_context{db, patterns, state, current_sources, observer, &effects};
+            if (draw.life_loss != DrawLifeLoss::None &&
+                !policy.choose_life_payment(life_context, known_payment, result.stats)) {
+                break;
+            }
+            bool drew_any = false;
+            for (int i = 0; i < draw.cards; ++i) {
+                const int drawn = draw_one(state, rng);
+                if (drawn < 0) {
+                    break;
+                }
+                drew_any = true;
+                if (draw.life_loss == DrawLifeLoss::Fixed) {
+                    state.life -= draw.life_per_card;
+                } else if (draw.life_loss == DrawLifeLoss::ManaValue) {
+                    state.life -= db.cards[static_cast<std::size_t>(drawn)].mana_value;
+                }
+                if (draw.delayed) {
+                    state.hand.clear(drawn);
+                    state.delayed_hand.set(drawn);
+                }
+                ++result.stats.cards_drawn;
+                ++result.stats.cards_drawn_by_effect;
+                if (observer != nullptr) {
+                    observer->drew(drawn, state.hand.count());
+                }
+            }
+            static_cast<void>(source);
+            if (!draw.repeat || !drew_any) {
+                break;
+            }
+        }
+    };
+
     for (std::uint8_t turn = 1; turn <= config.turn_cap; ++turn) {
         state.turn = turn;
         state.storm_count = 0;
         state.land_played_this_turn = false;
+
+        // Necropotence-style delayed cards become usable on the following
+        // turn, never in the same main phase that paid for them.
+        state.hand = state.hand | state.delayed_hand;
+        state.delayed_hand.reset();
 
         // Untap - except the cards whose text says they do not. Basalt
         // Monolith, Grim Monolith and Mana Vault all carry "doesn't untap
@@ -282,18 +328,8 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
 
             // DRAW, on resolution. Borne Upon a Wind's second line - see
             // data/effects.toml for why its first line nearly buried it.
-            if (cast_entry.has_draw) {
-                for (int i = 0; i < cast_entry.draw.cards; ++i) {
-                    const int drawn = draw_one(state, rng);
-                    if (drawn < 0) {
-                        break;  // decked; the turn cap ends the game either way
-                    }
-                    ++result.stats.cards_drawn;
-                    ++result.stats.cards_drawn_by_effect;
-                    if (observer != nullptr) {
-                        observer->drew(drawn, state.hand.count());
-                    }
-                }
+            if (cast_entry.has_draw && !cast_entry.draw.activated) {
+                resolve_draw(cast_entry.draw, spell, sources);
             }
 
             if (cast_entry.has_exile_library) {
@@ -527,6 +563,17 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
                 break;
             }
         }
+
+        // Life-paid activated draw engines. The policy alone decides whether
+        // to pay again; GameState only applies the chosen transition.
+        state.battlefield.for_each([&](int slot) {
+            const CardEffects& entry =
+                effects.by_slot[static_cast<std::size_t>(state.effective(slot))];
+            if (entry.has_draw && entry.draw.activated) {
+                collect_sources(db, effects, state, config.table, sources);
+                resolve_draw(entry.draw, slot, sources);
+            }
+        });
 
         ++result.stats.turns;
         result.turns_simulated = turn;

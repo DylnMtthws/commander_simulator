@@ -197,8 +197,15 @@ struct SelectEffect {
 // same reading that made High Fae Trickster inert. Its second line is "Draw a
 // card". Categorising on the first line and stopping would have filed a cantrip
 // under `timing_only` and made it invisible.
+enum class DrawLifeLoss : std::uint8_t { None = 0, Fixed, ManaValue };
+
 struct DrawEffect {
     int cards = 1;
+    DrawLifeLoss life_loss = DrawLifeLoss::None;
+    int life_per_card = 0;
+    bool repeat = false;
+    bool activated = false;
+    bool delayed = false;
 };
 
 // EXILE_LIBRARY is a verb rather than a DRAW flag: cards leave the library for

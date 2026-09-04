@@ -121,6 +121,12 @@ int StubPolicyDoNotUseForResults::choose_escape_cost(const Context&,
     return candidates.empty() ? -1 : candidates.front();
 }
 
+bool StubPolicyDoNotUseForResults::choose_life_payment(const Context& context,
+                                                       int known_payment,
+                                                       GameStats&) const {
+    return context.state.life - known_payment > 0;
+}
+
 int StubPolicyDoNotUseForResults::choose_select(const Context&, std::span<const int> revealed,
                                                 GameStats&) const {
     return revealed.empty() ? -1 : revealed.front();
@@ -395,6 +401,12 @@ int AuthoredPolicy::choose_escape_cost(const Context& context,
         }
     }
     return worst;
+}
+
+bool AuthoredPolicy::choose_life_payment(const Context& context, int known_payment,
+                                         GameStats&) const {
+    return context.state.life - known_payment >= weights_.life_floor &&
+           context.state.life > weights_.life_floor;
 }
 
 int AuthoredPolicy::choose_card_cost(const Context& context, std::span<const int> candidates,

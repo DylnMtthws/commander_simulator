@@ -862,6 +862,24 @@ authored_from = "e1f8d442713061989ed30ea5f70a7f2338bacd12c0a6d4baa475ee4606d3bb3
 # is not; this overstates lines that activate LED before committing their hand.
 effects = [ { kind = "RITUAL", colors = ["W","U","B","R","G"], amount = 3, from_zone = "battlefield" } ]
 
+[cards."Ad Nauseam"]
+status = "modeled"
+authored_from = "80ed5608e94e5bfb6e928acf243f28aca694aa658bbe2e5530dc383fafd4c28c"
+# "Reveal the top card of your library and put that card into your hand. You
+# lose life equal to its mana value. You may repeat this process any number of
+# times." The authored policy repeats while above its declared life_floor; the
+# next mana value is unknown when it chooses to continue, as it is in Magic.
+effects = [ { kind = "DRAW", cards = 1, life_loss = "mana_value", repeat = true, activated = false, delayed = false } ]
+
+[cards."Necropotence"]
+status = "modeled"
+authored_from = "5d36e78f5cc9347ad3c051b3703be0f2a84646bd8c502c9cd64698bba6436c59"
+# "Pay 1 life: Exile the top card of your library face down. Put that card into
+# your hand at the beginning of your next end step." The simulator makes those
+# cards available on the following turn, so they cannot be spent in the main
+# phase that paid for them. Hand-size discard is not modeled.
+effects = [ { kind = "DRAW", cards = 1, life_loss = "fixed", life_per_card = 1, repeat = true, activated = true, delayed = true } ]
+
 [cards."Thassa's Oracle"]
 status = "unauthored"
 authored_from = "6a2a0571a5c0efc1745ba0a2a20cc047afbf1b0d34616c959168ee9f35e4135f"

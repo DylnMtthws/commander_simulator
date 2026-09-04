@@ -334,6 +334,32 @@ EffectDb load_effects(const std::filesystem::path& path, const CardDb& db,
                                    "card genuinely draws nothing here, it is inert with a "
                                    "reason.");
                 }
+                if (const auto life_loss = (*effect)["life_loss"].value<std::string>()) {
+                    if (*life_loss == "fixed") {
+                        draw.life_loss = DrawLifeLoss::Fixed;
+                        const auto amount = (*effect)["life_per_card"].value<int64_t>();
+                        if (!amount || *amount <= 0) {
+                            fail(context +
+                                 ": fixed life_loss requires positive 'life_per_card'.");
+                        }
+                        draw.life_per_card = static_cast<int>(*amount);
+                    } else if (*life_loss == "mana_value") {
+                        draw.life_loss = DrawLifeLoss::ManaValue;
+                    } else {
+                        fail(context + ": unknown life_loss '" + *life_loss + "'");
+                    }
+                    const auto repeat = (*effect)["repeat"].value<bool>();
+                    const auto activated = (*effect)["activated"].value<bool>();
+                    const auto delayed = (*effect)["delayed"].value<bool>();
+                    if (!repeat.has_value() || !activated.has_value() || !delayed.has_value()) {
+                        fail(context +
+                             ": a life-paid DRAW must explicitly state repeat, activated, "
+                             "and delayed; none has a silent default.");
+                    }
+                    draw.repeat = *repeat;
+                    draw.activated = *activated;
+                    draw.delayed = *delayed;
+                }
                 target.has_draw = true;
                 target.draw = draw;
             } else if (kind == "EXILE_LIBRARY") {

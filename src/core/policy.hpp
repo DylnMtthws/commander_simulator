@@ -85,6 +85,12 @@ public:
                                                  std::span<const int> candidates,
                                                  GameStats& stats) const = 0;
 
+    // Whether to make the next life-paid draw. The current state and the
+    // known fixed payment (zero when the next card's mana value is unknown)
+    // are the complete input; the policy never receives a move list.
+    [[nodiscard]] virtual bool choose_life_payment(const Context& context, int known_payment,
+                                                   GameStats& stats) const = 0;
+
     // Which land to fetch from a set of candidates, or -1 for none.
     //
     // A fetch IS a tutor with a small candidate set, so it goes through the
@@ -129,6 +135,8 @@ public:
                                        GameStats& stats) const override;
     [[nodiscard]] int choose_escape_cost(const Context& context, std::span<const int> candidates,
                                          GameStats& stats) const override;
+    [[nodiscard]] bool choose_life_payment(const Context& context, int known_payment,
+                                           GameStats& stats) const override;
     [[nodiscard]] int choose_select(const Context& context, std::span<const int> revealed,
                                     GameStats& stats) const override;
     [[nodiscard]] const char* name() const override {
@@ -173,6 +181,7 @@ struct PolicyWeights {
     std::vector<int> rank;
     int land_floor = 3;
     int land_ceiling = 6;
+    int life_floor = 10;
 
     int completes_pattern = 10000000;
     int completes_engine = 1000000;
@@ -197,6 +206,8 @@ public:
                                        GameStats& stats) const override;
     [[nodiscard]] int choose_escape_cost(const Context& context, std::span<const int> candidates,
                                          GameStats& stats) const override;
+    [[nodiscard]] bool choose_life_payment(const Context& context, int known_payment,
+                                           GameStats& stats) const override;
     [[nodiscard]] int choose_select(const Context& context, std::span<const int> revealed,
                                     GameStats& stats) const override;
     [[nodiscard]] const char* name() const override {

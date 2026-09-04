@@ -696,6 +696,17 @@ scenario. *Underworld Breach* is the first `ESCAPE` user. Together with the new
 `MILL` user *Brain Freeze* and the existing `RITUAL` representation used for
 *Lion's Eye Diamond*, the loop can now consume and replenish a real graveyard.
 
+#### 2026-09-03 re-audit — life-paid `DRAW`
+
+Life became a policy-visible resource without adding a kind. `DRAW` already
+contains the verb; fixed or mana-value life loss, repetition, activation, and
+delay change its cost, quantity, and timing, so §4.2's three-question rule makes
+them flags. The flags have no silent defaults when life payment is present.
+Re-auditing all prior entries found no Kinnan list A draw effect that pays life;
+its mana-base floor remains unchanged. *Ad Nauseam* and *Necropotence* are the
+first users. `life_floor` is now copied into `PolicyWeights`, and `Policy`
+chooses every repeated life payment from current state plus that one payment.
+
 #### SCOPE NOTE — the scorer is thinly validated by this deck
 
 **This deck has no cantrips.** No *Brainstorm*, no *Ponder*, no *Preordain*.

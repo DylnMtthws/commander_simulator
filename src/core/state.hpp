@@ -140,6 +140,7 @@ struct GameState {
     std::array<std::int8_t, kMaxDeckSlots> copy_of{};
 
     Zone hand;
+    Zone delayed_hand;  // cards set aside to enter hand at the next turn
     // The command zone. Holds the commander until it is cast, and is a separate
     // zone rather than a flag because the policy has to be able to choose it
     // alongside cards in hand.
