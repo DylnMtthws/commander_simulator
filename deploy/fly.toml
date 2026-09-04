@@ -1,0 +1,22 @@
+# Draft deployment shape only; do not deploy from this repository session.
+# MTGSIM_DATABASE_URL is a platform secret and must never be added to this file.
+# The app is reached only over Fly's private network; do not allocate a public IP.
+
+app = "sim-worker"
+primary_region = "ord"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  SIM_MAX_CONCURRENT = "1"
+  SIM_TIMEOUT_SECONDS = "300"
+
+[http_service]
+  internal_port = 8080
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "performance-16x"
