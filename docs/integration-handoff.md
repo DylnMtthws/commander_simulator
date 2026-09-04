@@ -18,10 +18,10 @@ render the result but must not relabel or reinterpret its metric.
 The two authoritative contracts are:
 
 - `contracts/cedh-deck-candidate.v1.schema.json`
-- `contracts/cedh-simulation-result.v1.schema.json`
+- `contracts/cedh-simulation-result.v2.schema.json`
 
 Their `schema_version` values are `cedh-deck-candidate.v1` and
-`cedh-simulation-result.v1`. Additive or semantic changes require a new schema
+`cedh-simulation-result.v2`. Additive or semantic changes require a new schema
 version; consumers should reject unknown versions.
 
 ## Candidate production
@@ -87,7 +87,7 @@ Omit `--output-json`, or pass `--output-json -`, to receive one JSON document on
 stdout. Machine mode emits diagnostics only on stderr, so successful stdout is
 directly parseable. A nonzero exit means no valid result was produced.
 
-`--objective-turn N` changes the requested assembly horizon. The only v1
+`--turn N` changes the requested assembly horizon. The only v1
 scenario is `--scenario goldfish_assembly.v1`. A future controlled-disruption
 model must use a distinct scenario ID/version rather than changing the meaning
 of this one.
@@ -110,6 +110,54 @@ The service verifies that the candidate's commander and 99 library oracle IDs
 and quantities exactly match the enriched snapshot. Export the same candidate
 that is sent to the simulator. The result's `card_data` block identifies that
 snapshot and corpus boundary.
+
+## HTTP service contract
+
+Listen on `0.0.0.0:8080`. Plain HTTP; TLS is the platform's job.
+
+`GET /healthz` → `200 {"status":"ok","cs_version":"<semver>","strategy_packs":["kinnan-midrange-goldfish@1.0.0", ...]}`
+
+`POST /simulate`, `Content-Type: application/json`:
+
+```json
+{
+  "candidate": { ...a cedh-deck-candidate.v1 document, verbatim... },
+  "games": 20000,
+  "turn": 3,
+  "seed": 12345,
+  "scenario": "goldfish_assembly.v1",
+  "sweep": false,
+  "ablate": []
+}
+```
+
+- `candidate` is required. All other fields optional with the defaults shown. `ablate` is a list of card names; `sweep: true` and non-empty `ablate` are mutually exclusive (400 if both).
+- `games` is clamped to `SIM_MAX_GAMES` (env, default 60000). A request above the cap is **rejected with 400**, not silently clamped; the result must never claim more games than were run.
+- The service resolves card data itself: it runs the exporter for the candidate's oracle ids against `MTGSIM_DATABASE_URL`, then runs `cs --request <candidate> --cards <exported> --games N --turn T --seed S --scenario X [--sweep | --ablate ...] --threads $CS_THREADS --output-json -`.
+- **Response 200 body is byte-for-byte the document `cs --output-json -` wrote.** No envelope. The Deck Lab validates it against the result schema it vendors from `contracts/`.
+- Response headers: `X-Sim-Version: <cs semver>`, `X-Sim-Result-Schema: <schema id, e.g. cedh-simulation-result.v2>`, `X-Cards-Sha256: <cards_sha256 from the export manifest>`, `X-Sim-Threads: <n>`.
+- Errors, JSON body `{"error": "<machine code>", "detail": "<human text>", "stderr": "<tail of cs stderr, max 4 KB>"}`:
+  - `400 invalid_request`: malformed JSON, missing candidate, bad field types, games over cap, sweep+ablate.
+  - `422 unsupported`: `cs` rejected the candidate (pack/version/commander mismatch, wrong quantity sum). Pass the `cs` exit reason through in `detail`.
+  - `503 card_data_unavailable`: the export failed (database unreachable, role check failed).
+  - `504 timeout`: `cs` exceeded `SIM_TIMEOUT_SECONDS` (env, default 300).
+  - `500 simulator_failed`: any other nonzero exit.
+- Concurrency: at most `SIM_MAX_CONCURRENT` (env, default 1) simulations in flight; extra requests receive `429 busy` with `Retry-After: 5`. One machine, all cores, one job at a time is the intended shape.
+- The service is **stateless**. It may be killed between requests at any time. It must not write anything it needs later except an optional cache under `/tmp`.
+
+Environment variables the service reads, all with defaults except the first:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `MTGSIM_DATABASE_URL` | required | consumer DSN; already read by the exporter |
+| `CS_BIN` | `/app/cs` | path to the binary |
+| `CS_THREADS` | cgroup-aware CPU count | passed as `--threads` |
+| `CS_PACKS_DIR` | `/app/data` | strategy pack registry passed as `--deck` |
+| `SIM_PORT` | `8080` | |
+| `SIM_MAX_GAMES` | `60000` | |
+| `SIM_TIMEOUT_SECONDS` | `300` | |
+| `SIM_MAX_CONCURRENT` | `1` | |
+| `SIM_CARDS_FILE` | unset | **test/offline mode**: skip the export and use this file; the service must refuse to start with both this and a DSN set outside `SIM_TESTING=1` |
 
 ## Determinism and metadata
 

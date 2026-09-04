@@ -117,7 +117,7 @@ and a half.
 The authoritative wire contracts are:
 
 - `contracts/cedh-deck-candidate.v1.schema.json`
-- `contracts/cedh-simulation-result.v1.schema.json`
+- `contracts/cedh-simulation-result.v2.schema.json`
 
 The normal subprocess form writes JSON only to stdout; diagnostics are stderr:
 
@@ -157,6 +157,71 @@ states explicitly that assembly probability is not win rate. See
 [`docs/integration-handoff.md`](docs/integration-handoff.md) for the producer and
 UI contract.
 
+## Running as a service
+
+Build the production-shaped Linux image locally without publishing it:
+
+```bash
+docker build --platform linux/amd64 --tag mtgsim:local .
+```
+
+Production resolves each candidate through the read-only Postgres exporter.
+The DSN may include `?sslmode=require` and is passed to psycopg unchanged:
+
+```bash
+docker run --rm --platform linux/amd64 -p 8080:8080 \
+  -e 'MTGSIM_DATABASE_URL=postgresql://mtg_consumer:password@db/mtg?sslmode=require' \
+  mtgsim:local
+```
+
+The service reads:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `MTGSIM_DATABASE_URL` | required | Consumer DSN; already read by the exporter |
+| `CS_BIN` | `/app/cs` | Path to the binary |
+| `CS_THREADS` | cgroup-aware CPU count | Passed as `--threads` |
+| `CS_PACKS_DIR` | `/app/data` | Strategy pack registry passed as `--deck` |
+| `SIM_PORT` | `8080` | Plain HTTP listen port |
+| `SIM_MAX_GAMES` | `60000` | Per-request game limit; larger requests are rejected |
+| `SIM_TIMEOUT_SECONDS` | `300` | Simulator subprocess timeout |
+| `SIM_MAX_CONCURRENT` | `1` | Maximum simulations in flight |
+| `SIM_CARDS_FILE` | unset | Test/offline mode: skip the export and use this file |
+
+Submit the candidate document inside the HTTP request. The successful response
+body is exactly the JSON bytes written by `cs --output-json -`:
+
+```bash
+curl http://127.0.0.1:8080/healthz
+
+jq -n --slurpfile candidate candidate.json \
+  '{candidate: $candidate[0], games: 20000, turn: 3, seed: 12345,
+    scenario: "goldfish_assembly.v1", sweep: false, ablate: []}' \
+  | curl --fail --header 'Content-Type: application/json' \
+      --data-binary @- http://127.0.0.1:8080/simulate > result.json
+```
+
+For an offline smoke test, generate a disposable legal 100-card snapshot from
+the small shape fixture, then mount it read-only. This mode never contacts a
+database:
+
+```bash
+mkdir -p build/service-fixture
+uv run --python 3.13 --no-project python scripts/make_repro_fixture.py \
+  --cards build/service-fixture/cards.json \
+  --candidate build/service-fixture/candidate.json
+
+docker run --rm --platform linux/amd64 -p 8080:8080 \
+  -e SIM_TESTING=1 -e SIM_CARDS_FILE=/tmp/cards.json \
+  --mount "type=bind,source=$(pwd)/build/service-fixture/cards.json,target=/tmp/cards.json,readonly" \
+  mtgsim:local
+```
+
+Outside `SIM_TESTING=1`, startup refuses a configuration containing both a DSN
+and `SIM_CARDS_FILE`. The complete frozen HTTP contract, including response
+headers and error bodies, is in
+[`docs/integration-handoff.md`](docs/integration-handoff.md).
+
 ```bash
 ./build/release/src/cli/cs --hands 60 --games 4000   # sampled opening hands, raw
 ./build/release/src/cli/cs --grid 3000 --games 300   # the keep/mull feature grid
@@ -169,9 +234,10 @@ a list rather than a chart (§13.1).
 
 ## Build
 
-Needs CMake, Ninja and Apple Clang (Xcode command line tools).
+Needs CMake, Ninja and a C++20 compiler. Apple Clang and GCC 12 are both tested.
 
 ```bash
+# macOS
 brew install cmake ninja
 
 cmake --preset asan          # configure
@@ -179,6 +245,10 @@ cmake --build --preset asan  # build
 ctest --preset asan          # test
 ./build/asan/src/cli/cs      # run
 ```
+
+On Debian or Ubuntu, install `cmake ninja-build g++ git`; the same presets and
+commands apply. CI runs the sealed-core checks and the full `ci` preset on both
+`macos-15` and `ubuntu-latest`.
 
 ## Presets
 
@@ -203,6 +273,8 @@ Use `release` only for timing. A benchmark taken under `asan` is meaningless.
 ```
 src/core/     the simulation. Links ONLY the standard library.
 src/cli/      command-line front end. All I/O lives on this side.
+service/      stateless HTTP wrapper around the versioned CLI.
+export/       read-only Postgres-to-card-snapshot package.
 tests/unit/   Catch2 tests
 scripts/      check_core_is_sealed.sh
 ```
