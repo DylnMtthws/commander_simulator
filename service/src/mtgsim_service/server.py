@@ -17,8 +17,10 @@ from secrets import compare_digest
 from typing import Any
 from urllib.parse import urlsplit
 
+import psycopg
 from mtgsim_export.candidate import CandidateError, load_candidate
-from mtgsim_export.export import export_candidate
+from mtgsim_export.export import ExportError, _assert_consumer_role, export_candidate
+from psycopg.rows import dict_row
 
 MAX_REQUEST_BYTES = 10 * 1024 * 1024
 REQUEST_SCHEMA = "cedh-simulation-request.v1"
@@ -584,13 +586,49 @@ def make_server(
 def main() -> int:
     settings = Settings.from_env()
     server = make_server(settings)
+    # Serve process liveness while checking the database. Network latency must
+    # not delay /healthz; exports still assert their own role on every connection.
+    serving = threading.Thread(target=server.serve_forever, daemon=True)
+    serving.start()
     try:
-        server.serve_forever()
+        assert_startup_database_role(settings)
+        serving.join()
     except KeyboardInterrupt:
         pass
     finally:
+        server.shutdown()
         server.server_close()
+        serving.join()
     return 0
+
+
+def assert_startup_database_role(settings: Settings) -> None:
+    """Refuse pipeline credentials at boot; offline snapshots need no database."""
+    if settings.cards_file is not None:
+        return
+    if not settings.database_url:
+        raise ValueError("MTGSIM_DATABASE_URL must be set for database-backed service startup")
+    try:
+        with psycopg.connect(
+            settings.database_url,
+            row_factory=dict_row,
+            connect_timeout=5,
+            options="-c statement_timeout=1000 -c default_transaction_read_only=on",
+        ) as conn:
+            _assert_consumer_role(conn)
+    except ExportError as exc:
+        raise ValueError(
+            f"MTGSIM_DATABASE_URL startup role check failed: {exc} "
+            "Set MTGSIM_DATABASE_URL to the mtg_consumer DSN, not the pipeline's "
+            "MTG_DATABASE_URL."
+        ) from None
+    except psycopg.Error:
+        # Connection diagnostics can contain credentials; name the configuration
+        # to repair without logging the DSN or the driver's connection error.
+        raise ValueError(
+            "MTGSIM_DATABASE_URL startup role check could not connect or query. "
+            "Set it to a reachable mtg_consumer DSN."
+        ) from None
 
 
 if __name__ == "__main__":

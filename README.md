@@ -209,6 +209,13 @@ The service reads:
 | `SIM_MAX_ABLATIONS` | `8` | Most cards one request may name in `ablate` |
 | `SIM_CARDS_FILE` | unset | Test/offline mode: skip the export and use this file |
 
+On startup, the HTTP service checks that `MTGSIM_DATABASE_URL` connects as
+`mtg_consumer`, using the exporter's existing role assertion. A wrong role or
+failed connection closes the server and exits with a configuration error.
+`/healthz` remains process liveness and responds while that bounded check runs;
+each export still checks its own connection. `SIM_CARDS_FILE` skips the startup
+database check for offline operation. No database connection is made at import.
+
 Submit the candidate document inside the HTTP request. The successful response
 body is exactly the JSON bytes written by `cs --output-json -`:
 
