@@ -73,20 +73,23 @@ Runtime configuration:
 | `SIM_MAX_CONCURRENT` | `1` | Simulations in flight; excess receives 429 |
 | `SIM_CARDS_FILE` | unset | Test/offline card snapshot; cannot coexist with a DSN outside `SIM_TESTING=1` |
 
-Measured Release timings for the final linux/amd64 image, seed 1, on the
-generated legal Kinnan fixture: a 20,000-game single run took **2.641 s**; the
-30,000-game full 98-ablation sweep took **1,115.987 s (18m35.987s)**. The same
-sweep before W5 took 1,154.704 s, so the two-worker queue saved 38.717 s (3.35%)
-even on this low-concurrency host. The local container reported two CPUs and ran
-through amd64 emulation on an arm64 Mac mini, so these are conservative Linux
-wall times, not native CI-runner performance. Replace them with native runner
-measurements when this branch is published and CI runs.
+Measured Release timings on the native GitHub Actions `ubuntu-latest` x64
+runner, seed 1, two threads, and the generated legal Kinnan fixture: a
+20,000-game single run took **0.68 s**; the 30,000-game full 98-ablation sweep
+took **297.61 s (4m57.61s)**. These values came from manual workflow run
+`33906314023`; the benchmark is manual-only so ordinary CI does not pay for a
+full sweep.
+
+For comparison, the final linux/amd64 image under amd64 emulation on the arm64
+Mac mini took 2.641 s and 1,115.987 s respectively. The emulated sweep before
+W5 took 1,154.704 s, so the two-worker queue saved 38.717 s (3.35%) even on that
+low-concurrency host.
 
 Reproducibility was checked independently of those timings. A 2,000-game run,
-seed 1, two threads, and the same generated fixture produced digest
-`a1d3dda25c8e2d8d` on both the macOS build and the linux/amd64 image. W4's
-pre-change, serial, and threaded reference runs also all produced
-`775e9cd226241071`; no expected value was updated.
+seed 1, and the same generated fixture produced digest `a1d3dda25c8e2d8d` on
+both the GitHub Actions macOS arm64 and Ubuntu x64 runners; CI diffed the two
+artifacts successfully. W4's pre-change, serial, and threaded reference runs
+also all produced `775e9cd226241071`; no expected value was updated.
 
 W5 is landed. A full human sweep report was byte-for-byte identical before and
 after; a v2 request sweep was identical after removing only timestamps. The
