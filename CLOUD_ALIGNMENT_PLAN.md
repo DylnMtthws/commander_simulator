@@ -180,10 +180,10 @@ Note in the file header that `MTGSIM_DATABASE_URL` is a platform secret, never i
 
 ## 5. Definition of done
 
-- [ ] `main` pushed; CI green on both `macos-15` and `ubuntu-latest`, digests equal across platforms.
+- [x] `main` pushed; CI green on both `macos-15` and `ubuntu-latest`, digests equal across platforms.
 - [x] `cs --version` exists; result documents carry version, cards hash and schema id.
 - [x] `--request` baseline and plain report use all threads; digest unchanged versus serial.
-- [ ] `docker build --platform linux/amd64 .` succeeds; container answers `/healthz` in under 2 s and `/simulate` in offline mode.
+- [x] `docker build --platform linux/amd64 .` succeeds; container answers `/healthz` in under 2 s and `/simulate` in offline mode.
 - [x] Service tests cover every status code in section 2.2.
 - [x] `deploy/fly.toml` committed; `README.md`, `docs/integration-handoff.md`, `STATE.md` updated.
 - [ ] Hand-off note in `STATE.md` listing: image build command, the env table, the measured sweep and single-run wall times on the CI runner, and W5 status.

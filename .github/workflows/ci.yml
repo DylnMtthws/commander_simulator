@@ -12,6 +12,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -105,6 +106,29 @@ jobs:
         with:
           name: cs-digest-${{ runner.os }}
           path: cs-digest.txt
+
+      - name: Benchmark native Linux runner
+        if: runner.os == 'Linux' && github.event_name == 'workflow_dispatch'
+        run: |
+          threads=$(nproc)
+          printf 'runner_arch=%s\nthreads=%s\n' "${RUNNER_ARCH}" "${threads}" \
+            > ci-benchmark.txt
+          /usr/bin/time --format='single_wall_seconds=%e' --append \
+            --output=ci-benchmark.txt \
+            ./build/service/src/cli/cs --games 20000 --seed 1 \
+            --threads "${threads}" > /dev/null
+          /usr/bin/time --format='sweep_wall_seconds=%e' --append \
+            --output=ci-benchmark.txt \
+            ./build/service/src/cli/cs --sweep --games 30000 --seed 1 \
+            --threads "${threads}" > /dev/null
+          cat ci-benchmark.txt
+
+      - name: Upload native Linux benchmark
+        if: runner.os == 'Linux' && github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cs-benchmark-Linux
+          path: ci-benchmark.txt
 
   reproducibility:
     needs: build-and-test
