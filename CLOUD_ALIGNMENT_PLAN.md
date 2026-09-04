@@ -139,6 +139,15 @@ Multi-stage:
 Add a CI job that builds the image for `linux/amd64` with `push: false`, then runs the container with `SIM_TESTING=1 SIM_CARDS_FILE=...` and curls `/healthz` and one `/simulate`. Image publishing is **not** part of this plan.
 
 ### W8. `fly.toml` draft (do not deploy)
+
+> **Superseded 2026-09-04.** The `performance-16x` size below was drafted before
+> the interactive path was measured at 0.68 s for 20,000 games. The deployment
+> is now split into a small always-on `sim-worker` (`deploy/fly.toml`,
+> `shared-cpu-2x`) and an ephemeral `sim-sweep` batch worker
+> (`deploy/fly.sweep.toml`, `performance-4x`, scaled to zero). See
+> `docs/hosting-cost-model.md` and the STATE.md section of the same date. The
+> snippet below is kept as the record of what W8 landed.
+
 Commit a `deploy/fly.toml` documenting the intended shape so the deployment phase does not guess:
 
 ```toml
@@ -180,10 +189,10 @@ Note in the file header that `MTGSIM_DATABASE_URL` is a platform secret, never i
 
 ## 5. Definition of done
 
-- [ ] `main` pushed; CI green on both `macos-15` and `ubuntu-latest`, digests equal across platforms.
-- [ ] `cs --version` exists; result documents carry version, cards hash and schema id.
-- [ ] `--request` baseline and plain report use all threads; digest unchanged versus serial.
-- [ ] `docker build --platform linux/amd64 .` succeeds; container answers `/healthz` in under 2 s and `/simulate` in offline mode.
-- [ ] Service tests cover every status code in section 2.2.
-- [ ] `deploy/fly.toml` committed; `README.md`, `docs/integration-handoff.md`, `STATE.md` updated.
-- [ ] Hand-off note in `STATE.md` listing: image build command, the env table, the measured sweep and single-run wall times on the CI runner, and W5 status.
+- [x] `main` pushed; CI green on both `macos-15` and `ubuntu-latest`, digests equal across platforms.
+- [x] `cs --version` exists; result documents carry version, cards hash and schema id.
+- [x] `--request` baseline and plain report use all threads; digest unchanged versus serial.
+- [x] `docker build --platform linux/amd64 .` succeeds; container answers `/healthz` in under 2 s and `/simulate` in offline mode.
+- [x] Service tests cover every status code in section 2.2.
+- [x] `deploy/fly.toml` committed; `README.md`, `docs/integration-handoff.md`, `STATE.md` updated.
+- [x] Hand-off note in `STATE.md` listing: image build command, the env table, the measured sweep and single-run wall times on the CI runner, and W5 status.

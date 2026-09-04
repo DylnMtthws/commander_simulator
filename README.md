@@ -114,10 +114,15 @@ and a half.
 
 ## Machine-readable service boundary
 
-The authoritative wire contracts are:
+The authoritative wire contracts, both directions:
 
-- `contracts/cedh-deck-candidate.v1.schema.json`
-- `contracts/cedh-simulation-result.v1.schema.json`
+- `contracts/cedh-simulation-request.v1.schema.json` — the `POST /simulate` envelope
+- `contracts/cedh-deck-candidate.v2.schema.json` — the deck document inside it
+- `contracts/cedh-simulation-result.v3.schema.json` — the result
+- `contracts/hash-golden-vectors.json` — both hashes, as executable vectors
+
+Superseded versions stay in `contracts/` as historical record and are not
+accepted. See `docs/integration-handoff.md` for the cutover.
 
 The normal subprocess form writes JSON only to stdout; diagnostics are stderr:
 
@@ -136,10 +141,23 @@ names the only v1 scenario, and `--ablate "Sol Ring"` or `--sweep` adds paired
 common-random-number ablation results with uncertainty.
 
 Candidate libraries are keyed only by `oracle_id`; quantities must sum to
-exactly 99. `candidate_hash` is SHA-256 over compact JSON containing only the
-semantic fields documented in the candidate schema. Producer/card-data/corpus
-provenance travels beside the hash, while `user_constraints` is opaque and is
-never interpreted by the simulator.
+exactly 99.
+
+Two hashes, answering two questions. `deck_sha256` identifies **the deck list
+and nothing else** — sorted commander oracle IDs then the coalesced library,
+excluding the strategy pack, the requester and every run parameter. The
+simulator recomputes it from the submitted list and refuses a mismatch; it
+never trusts the submitted value. `simulation_input_sha256`, on the result,
+covers **everything that can change the numbers**: the deck hash, the resolved
+pack's identity and content hash, the simulator and card-data versions, the
+scenario, seed, games, turn, sweep and ablations. Compare `deck_sha256` for
+deck identity; key caches on `simulation_input_sha256`.
+
+These replace v2's `candidate_hash`, which mixed the strategy pack into a field
+named like a deck identity — so an identical deck run under a different pack
+reported as a different deck. `candidate_hash` is now refused by name rather
+than ignored. Producer/card-data/corpus provenance travels beside the hashes,
+while `user_constraints` is opaque and is never interpreted by the simulator.
 
 The loaded strategy pack must match both the requested pack version and the
 commander oracle IDs. Anything else is rejected. There is no generic fallback
@@ -157,6 +175,117 @@ states explicitly that assembly probability is not win rate. See
 [`docs/integration-handoff.md`](docs/integration-handoff.md) for the producer and
 UI contract.
 
+## Running as a service
+
+Build the production-shaped Linux image locally without publishing it:
+
+```bash
+docker build --platform linux/amd64 --tag mtgsim:local .
+```
+
+Production resolves each candidate through the read-only Postgres exporter.
+The DSN may include `?sslmode=require` and is passed to psycopg unchanged:
+
+```bash
+docker run --rm --platform linux/amd64 -p 8080:8080 \
+  -e 'MTGSIM_DATABASE_URL=postgresql://mtg_consumer:password@db/mtg?sslmode=require' \
+  mtgsim:local
+```
+
+The service reads:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `MTGSIM_DATABASE_URL` | required | Consumer DSN; already read by the exporter |
+| `CS_BIN` | `/app/cs` | Path to the binary |
+| `CS_THREADS` | cgroup-aware CPU count | Passed as `--threads` |
+| `CS_PACKS_DIR` | `/app/data` | Strategy pack registry passed as `--deck` |
+| `SIM_PORT` | `8080` | Plain HTTP listen port |
+| `SIM_MAX_GAMES` | `60000` | Per-request game limit; larger requests are rejected |
+| `SIM_TIMEOUT_SECONDS` | `300` | Simulator subprocess timeout |
+| `SIM_MAX_CONCURRENT` | `1` | Maximum simulations in flight |
+| `SIM_ALLOW_SWEEP` | `0` | `1` makes this process the batch sweep worker |
+| `SIM_SWEEP_TOKEN` | unset | Bearer token a sweep request must present; required when sweeps are on |
+| `SIM_MAX_ABLATIONS` | `8` | Most cards one request may name in `ablate` |
+| `SIM_CARDS_FILE` | unset | Test/offline mode: skip the export and use this file |
+
+On startup, the HTTP service checks that `MTGSIM_DATABASE_URL` connects as
+`mtg_consumer`, using the exporter's existing role assertion. A wrong role or
+failed connection closes the server and exits with a configuration error.
+`/healthz` remains process liveness and responds while that bounded check runs;
+each export still checks its own connection. `SIM_CARDS_FILE` skips the startup
+database check for offline operation. No database connection is made at import.
+
+Submit the candidate document inside the HTTP request. The successful response
+body is exactly the JSON bytes written by `cs --output-json -`:
+
+```bash
+curl http://127.0.0.1:8080/healthz
+
+jq -n --slurpfile candidate candidate.json \
+  '{candidate: $candidate[0], games: 20000, turn: 3, seed: 12345,
+    scenario: "goldfish_assembly.v1", sweep: false, ablate: []}' \
+  | curl --fail --header 'Content-Type: application/json' \
+      --data-binary @- http://127.0.0.1:8080/simulate > result.json
+```
+
+For an offline smoke test, generate a disposable legal 100-card snapshot from
+the small shape fixture, then mount it read-only. This mode never contacts a
+database:
+
+```bash
+mkdir -p build/service-fixture
+uv run --python 3.13 --no-project python scripts/make_repro_fixture.py \
+  --cards build/service-fixture/cards.json \
+  --candidate build/service-fixture/candidate.json
+
+docker run --rm --platform linux/amd64 -p 8080:8080 \
+  -e SIM_TESTING=1 -e SIM_CARDS_FILE=/tmp/cards.json \
+  --mount "type=bind,source=$(pwd)/build/service-fixture/cards.json,target=/tmp/cards.json,readonly" \
+  mtgsim:local
+```
+
+Outside `SIM_TESTING=1`, startup refuses a configuration containing both a DSN
+and `SIM_CARDS_FILE`. The complete frozen HTTP contract, including response
+headers and error bodies, is in
+[`docs/integration-handoff.md`](docs/integration-handoff.md).
+
+### Sweeps are a different workload and a different machine
+
+A single interactive run is 20,000 games in **0.68 s** on two threads. A full
+leave-one-out sweep is 98 ablations, **297.61 s** on the same two threads and
+about 600 CPU-seconds. Serving both from one always-on machine means paying for
+the sweep's cores around the clock and letting a five-minute job sit in front of
+a sub-second request, so the two are deployed separately:
+
+| | Config | Size | Runs |
+|---|---|---|---|
+| Interactive | [`deploy/fly.toml`](deploy/fly.toml) | 2 vCPU, 1 GB | warm |
+| Sweep | [`deploy/fly.sweep.toml`](deploy/fly.sweep.toml) | 4 vCPU, configurable | only when asked |
+
+`POST /simulate` with `sweep: true` is **refused with 403 by the interactive
+service** before `cs` is started. It succeeds only on a deployment with
+`SIM_ALLOW_SWEEP=1` and a matching `Authorization: Bearer $SIM_SWEEP_TOKEN`
+header. The client sending `"ablate": []` is not what keeps sweeps out of the
+request path; the server is.
+
+Without HTTP at all, the same code path runs as a one-off command — the image's
+second entry point, and what an ephemeral batch machine executes:
+
+```bash
+scripts/run_sweep.sh \
+  --candidate build/service-fixture/candidate.json \
+  --cards build/service-fixture/cards.json \
+  --games 30000 --output sweep.json          # local, no database
+
+scripts/run_sweep.sh --backend fly --candidate /app/candidate.json \
+  --vm-size performance-8x                   # one ephemeral Fly machine, destroyed after
+```
+
+Sizing, the baseline-versus-per-sweep cost split, and the concurrency test still
+outstanding for the web tier are in
+[`docs/hosting-cost-model.md`](docs/hosting-cost-model.md).
+
 ```bash
 ./build/release/src/cli/cs --hands 60 --games 4000   # sampled opening hands, raw
 ./build/release/src/cli/cs --grid 3000 --games 300   # the keep/mull feature grid
@@ -169,9 +298,10 @@ a list rather than a chart (§13.1).
 
 ## Build
 
-Needs CMake, Ninja and Apple Clang (Xcode command line tools).
+Needs CMake, Ninja and a C++20 compiler. Apple Clang and GCC 12 are both tested.
 
 ```bash
+# macOS
 brew install cmake ninja
 
 cmake --preset asan          # configure
@@ -179,6 +309,10 @@ cmake --build --preset asan  # build
 ctest --preset asan          # test
 ./build/asan/src/cli/cs      # run
 ```
+
+On Debian or Ubuntu, install `cmake ninja-build g++ git`; the same presets and
+commands apply. CI runs the sealed-core checks and the full `ci` preset on both
+`macos-15` and `ubuntu-latest`.
 
 ## Presets
 
@@ -203,6 +337,8 @@ Use `release` only for timing. A benchmark taken under `asan` is meaningless.
 ```
 src/core/     the simulation. Links ONLY the standard library.
 src/cli/      command-line front end. All I/O lives on this side.
+service/      stateless HTTP wrapper around the versioned CLI.
+export/       read-only Postgres-to-card-snapshot package.
 tests/unit/   Catch2 tests
 scripts/      check_core_is_sealed.sh
 ```

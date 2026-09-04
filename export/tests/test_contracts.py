@@ -8,7 +8,11 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator, FormatChecker
 
-from mtgsim_export.candidate import CandidateError, candidate_hash, load_candidate
+from mtgsim_export.candidate import (
+    CandidateError,
+    candidate_deck_sha256,
+    load_candidate,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONTRACTS = REPO_ROOT / "contracts"
@@ -22,11 +26,10 @@ def _load(path: Path) -> dict[str, object]:
 @pytest.mark.parametrize(
     ("schema_name", "fixture_name"),
     [
-        ("cedh-deck-candidate.v1.schema.json", "kinnan-candidate.v1.json"),
-        ("cedh-deck-candidate.v1.schema.json", "unsupported-pack-candidate.v1.json"),
-        ("cedh-deck-candidate.v1.schema.json", "kinnan-derived-candidate.v1.json"),
-        ("cedh-simulation-result.v1.schema.json", "simulation-result.v1.json"),
-        ("cedh-simulation-result.v2.schema.json", "simulation-result.v2.json"),
+        ("cedh-deck-candidate.v2.schema.json", "kinnan-candidate.v2.json"),
+        ("cedh-deck-candidate.v2.schema.json", "unsupported-pack-candidate.v2.json"),
+        ("cedh-deck-candidate.v2.schema.json", "kinnan-derived-candidate.v2.json"),
+        ("cedh-simulation-result.v3.schema.json", "simulation-result.v3.json"),
     ],
 )
 def test_contract_fixture_validates(schema_name: str, fixture_name: str) -> None:
@@ -38,25 +41,25 @@ def test_contract_fixture_validates(schema_name: str, fixture_name: str) -> None
 
 
 def test_candidate_schema_refuses_an_extra_semantic_field() -> None:
-    schema = _load(CONTRACTS / "cedh-deck-candidate.v1.schema.json")
-    candidate = _load(FIXTURES / "kinnan-candidate.v1.json")
+    schema = _load(CONTRACTS / "cedh-deck-candidate.v2.schema.json")
+    candidate = _load(FIXTURES / "kinnan-candidate.v2.json")
     candidate["commander_name"] = "Kinnan, Bonder Prodigy"
     errors = list(Draft202012Validator(schema).iter_errors(candidate))
     assert any("Additional properties" in error.message for error in errors)
 
 
 def test_result_schema_cannot_call_assembly_probability_win_rate() -> None:
-    schema = _load(CONTRACTS / "cedh-simulation-result.v2.schema.json")
-    result = _load(FIXTURES / "simulation-result.v2.json")
+    schema = _load(CONTRACTS / "cedh-simulation-result.v3.schema.json")
+    result = _load(FIXTURES / "simulation-result.v3.json")
     result["metric"]["id"] = "win_rate"  # type: ignore[index]
     errors = list(Draft202012Validator(schema).iter_errors(result))
     assert errors
 
 
-def test_candidate_hash_and_exact_99_are_executable_invariants(tmp_path: Path) -> None:
-    path = FIXTURES / "kinnan-candidate.v1.json"
+def test_deck_hash_and_exact_99_are_executable_invariants(tmp_path: Path) -> None:
+    path = FIXTURES / "kinnan-candidate.v2.json"
     candidate = load_candidate(path)
-    assert candidate.candidate_hash == candidate_hash(candidate)
+    assert candidate.deck_sha256 == candidate_deck_sha256(candidate)
     assert sum(card.quantity for card in candidate.library) == 99
 
     malformed = _load(path)
@@ -68,7 +71,7 @@ def test_candidate_hash_and_exact_99_are_executable_invariants(tmp_path: Path) -
 
 
 def test_candidate_loader_requires_provenance_shape(tmp_path: Path) -> None:
-    malformed = _load(FIXTURES / "kinnan-candidate.v1.json")
+    malformed = _load(FIXTURES / "kinnan-candidate.v2.json")
     malformed["provenance"] = {}
     bad_path = tmp_path / "missing-provenance.json"
     bad_path.write_text(json.dumps(malformed))

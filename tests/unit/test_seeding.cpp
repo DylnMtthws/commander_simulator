@@ -353,7 +353,20 @@ TEST_CASE("a batch run in parallel equals the same batch run serially",
             cs::merge(merged, part);
         }
         REQUIRE(merged.games == serial.games);
+        REQUIRE(merged.censored == serial.censored);
         REQUIRE(merged.assembled_on == serial.assembled_on);
+        REQUIRE(merged.fired == serial.fired);
+        REQUIRE(merged.satisfied == serial.satisfied);
+        REQUIRE(merged.can_pay_calls == serial.can_pay_calls);
+        REQUIRE(merged.turns_total == serial.turns_total);
+        REQUIRE(merged.cards_drawn == serial.cards_drawn);
+        REQUIRE(merged.cards_drawn_by_effect == serial.cards_drawn_by_effect);
+        REQUIRE(merged.spells_cast == serial.spells_cast);
+        REQUIRE(merged.tutors_used == serial.tutors_used);
+        REQUIRE(merged.clones_made == serial.clones_made);
+        REQUIRE(merged.convoked == serial.convoked);
+        REQUIRE(merged.selects_used == serial.selects_used);
+        REQUIRE(merged.selects_hit == serial.selects_hit);
         REQUIRE(merged.digest_xor == serial.digest_xor);
     }
 }

@@ -2,10 +2,15 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <sstream>
 #include <string_view>
 #include <vector>
 
 #include <toml++/toml.hpp>
+
+#include "io/sha256.hpp"
 
 namespace cs::io {
 namespace {
@@ -286,14 +291,28 @@ bool library_entry_applies(const toml::table& entry, const CardDb& db,
 
 DeckFile load_deck(const std::filesystem::path& path, const CardDb& db,
                    bool allow_no_patterns) {
+    std::string source;
+    {
+        std::ifstream stream(path, std::ios::binary);
+        if (!stream) {
+            fail("cannot open " + path.string());
+        }
+        std::ostringstream buffer;
+        buffer << stream.rdbuf();
+        source = buffer.str();
+    }
     toml::table root;
     try {
-        root = toml::parse_file(path.string());
+        root = toml::parse(source, path.string());
     } catch (const toml::parse_error& error) {
         fail("cannot parse " + path.string() + ": " + std::string(error.description()));
     }
 
     DeckFile deck;
+    // Hash the bytes, not the parsed table: a reformatting that changes no
+    // value still changes the file, and a fingerprint that hid that would let
+    // two different files claim one identity.
+    deck.strategy_pack.content_sha256 = "sha256:" + sha256_hex(source);
     const auto require_table = [&](const char* key) -> const toml::table& {
         const auto* table = root[key].as_table();
         if (table == nullptr) {
@@ -427,7 +446,7 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db,
     }
 
     const auto append_patterns = [&](const toml::table& document, bool inherited,
-                                     const std::string& source) {
+                                     const std::string& pattern_source) {
     if (const auto* engines = document["engine"].as_array()) {
         for (const toml::node& node : *engines) {
             const auto* entry = node.as_table();
@@ -436,7 +455,7 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db,
             engine.name = (*entry)["name"].value_or<std::string>("");
             if (engine.name.empty()) fail("every [[engine]] needs a name");
             const std::string context = "engine '" + engine.name + "'";
-            if (inherited && !library_entry_applies(*entry, db, source + ": " + context)) {
+            if (inherited && !library_entry_applies(*entry, db, pattern_source + ": " + context)) {
                 continue;
             }
 
@@ -468,7 +487,7 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db,
             if (pattern.name.empty()) fail("every [[win]] needs a name");
             reject_outcome_naming(pattern.name);
             const std::string context = "pattern '" + pattern.name + "'";
-            if (inherited && !library_entry_applies(*entry, db, source + ": " + context)) {
+            if (inherited && !library_entry_applies(*entry, db, pattern_source + ": " + context)) {
                 continue;
             }
             pattern.terminal_state =

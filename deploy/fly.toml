@@ -1,0 +1,61 @@
+# Interactive tier. Draft deployment shape only; do not deploy from this
+# repository session.
+#
+# MTGSIM_DATABASE_URL is a platform secret and must never be added to this file.
+# The app is reached only over Fly's private network; do not allocate a public IP.
+#
+# SIZING (measured, native GitHub Actions ubuntu-latest x64, seed 1, the
+# generated legal Kinnan fixture):
+#
+#   20,000-game single run, 2 threads .......... 0.68 s wall  (~1.4 CPU-seconds)
+#   30,000-game 98-ablation sweep, 2 threads ... 297.61 s wall (~600 CPU-seconds)
+#
+# The interactive request is the first row. Two vCPUs run it in under a second
+# with SIM_MAX_CONCURRENT=1 serialising the queue, and resident memory is tens
+# of megabytes, so 1 GB is already generous headroom. The earlier draft asked
+# for performance-16x; nothing measured here justifies 16 dedicated cores for a
+# 0.68 s job, and the second row - the only workload that ever wanted them -
+# does not run on this app any more. See deploy/fly.sweep.toml.
+#
+# 0.68 s is one run on an idle machine, not a concurrency measurement. Before
+# treating 2 vCPUs as settled, run the load test in docs/hosting-cost-model.md.
+
+app = "sim-worker"
+primary_region = "ord"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  # Pinned rather than auto-detected so the deployed thread count is exactly the
+  # one the 0.68 s figure was measured with, and so it cannot silently follow a
+  # VM resize.
+  CS_THREADS = "2"
+  SIM_MAX_CONCURRENT = "1"
+  SIM_TIMEOUT_SECONDS = "300"
+  # Batch work is refused here. SIM_ALLOW_SWEEP defaults to 0; it is set
+  # explicitly so that turning it on is a visible, reviewable diff.
+  SIM_ALLOW_SWEEP = "0"
+  # A caller can otherwise buy a full sweep's compute by naming 98 cards in
+  # `ablate`. The client sending an empty list is not a limit.
+  SIM_MAX_ABLATIONS = "8"
+
+[http_service]
+  internal_port = 8080
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  # One warm machine: the tier is small enough that idle cost is the price of
+  # not making the first tester of the day pay a ~2 s cold start. Set to 0 to
+  # scale to zero; nothing else in the deployment depends on this value.
+  min_machines_running = 1
+
+[[http_service.checks]]
+  interval = "15s"
+  timeout = "2s"
+  grace_period = "5s"
+  method = "GET"
+  path = "/healthz"
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "1gb"

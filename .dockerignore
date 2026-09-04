@@ -1,0 +1,10 @@
+.git
+build
+export/.venv
+service/.venv
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+data/cards.json
+*.md

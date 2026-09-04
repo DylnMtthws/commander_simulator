@@ -8,10 +8,12 @@ testable without the thing whose bug it exists to catch.
 from __future__ import annotations
 
 from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from mtgsim_export.export import ExportError, _face_documents, _resolve
+from mtgsim_export.candidate import Candidate
+from mtgsim_export.export import ExportError, _face_documents, _resolve, export_candidate
 from mtgsim_export.mana import ManaCostError
 
 
@@ -124,3 +126,26 @@ def test_face_cost_is_cross_checked_against_mana_value() -> None:
     """Guards against a mis-parse: {1}{U} cannot be mana value 9."""
     with pytest.raises(ManaCostError, match="implies mana value 2 but the database says 9"):
         _face_documents(card("Wrong", cost="{1}{U}", mv=9), [], "Wrong")
+
+
+def test_candidate_export_passes_a_query_string_dsn_unmodified() -> None:
+    dsn = "postgresql://mtg_consumer:secret@db/mtg?sslmode=require"
+    candidate = Candidate(
+        candidate_id="fixture",
+        commander_oracle_ids=("commander",),
+        library=(),
+        strategy_pack_id="fixture",
+        strategy_pack_version="1.0.0",
+        deck_sha256="sha256:fixture",
+    )
+    connection = MagicMock()
+    connection.__enter__.return_value = connection
+    expected = {"manifest": {}, "cards": []}
+    with (
+        patch("mtgsim_export.export.psycopg.connect", return_value=connection) as connect,
+        patch("mtgsim_export.export.build_candidate_export", return_value=expected),
+    ):
+        assert export_candidate(dsn, candidate) is expected
+
+    assert connect.call_args.args == (dsn,)
+    assert connect.call_args.kwargs.keys() == {"row_factory"}

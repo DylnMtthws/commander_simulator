@@ -1,9 +1,7 @@
 # CI: configure, build, test, and check the core is sealed.
 #
-# macOS runner because that is the only platform this project targets - it runs
-# locally on an Apple Silicon Mac mini and nowhere else. Adding ubuntu here
-# would test a configuration nobody uses, and would eventually fail for reasons
-# that do not matter.
+# Linux amd64 is the deployment target. macOS remains a first-class CI leg
+# because local development happens on Apple Silicon Macs.
 #
 # The ci preset is asan plus -Werror. Warnings are errors in CI and NOT locally:
 # a warning should stop a merge without stopping someone mid-thought.
@@ -14,6 +12,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -21,12 +20,32 @@ concurrency:
 
 jobs:
   build-and-test:
-    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Ninja
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            export/uv.lock
+            service/uv.lock
+
+      - name: Install Ninja on macOS
+        if: runner.os == 'macOS'
         run: brew install ninja
+
+      - name: Install Ninja on Ubuntu
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
 
       # Catch2 is fetched at configure time, so cache it or every run pays a
       # clone plus a full build of the framework.
@@ -34,7 +53,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: build/ci/_deps
-          key: deps-${{ runner.os }}-${{ hashFiles('tests/CMakeLists.txt') }}
+          key: deps-${{ runner.os }}-${{ hashFiles('tests/CMakeLists.txt', 'src/io/CMakeLists.txt') }}
 
       - name: Core is sealed
         run: ./scripts/check_core_is_sealed.sh
@@ -53,3 +72,175 @@ jobs:
       # turns CI green while testing nothing.
       - name: Test
         run: ctest --preset ci
+
+      - name: Build release simulator for service tests
+        run: |
+          cmake -S . -B build/service -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+          cmake --build build/service --target cs
+
+      - name: Test service package
+        env:
+          CS_BIN: ${{ github.workspace }}/build/service/src/cli/cs
+          CS_PACKS_DIR: ${{ github.workspace }}/data
+          SIM_CARDS_FILE: ${{ runner.temp }}/mtgsim-repro/cards.json
+          SIM_TESTING: "1"
+        run: |
+          uv sync --project service --frozen --all-groups
+          uv run --python 3.13 --no-project python scripts/make_repro_fixture.py \
+            --cards "${SIM_CARDS_FILE}" --candidate "${RUNNER_TEMP}/candidate.json"
+          uv run --project service --frozen ruff check service scripts/make_repro_fixture.py export/src/mtgsim_export
+          uv run --project service --frozen mypy service/src export/src
+          uv run --project service --frozen pytest -q export/tests service/tests
+
+      - name: Record fixed-seed CLI digest
+        run: |
+          uv run --python 3.13 --no-project python scripts/make_repro_fixture.py \
+            --cards data/cards.json --candidate "${RUNNER_TEMP}/candidate.json"
+          ./build/service/src/cli/cs --games 2000 --seed 1 \
+            | awk '/digest xor/ {print $3}' > cs-digest.txt
+          test -s cs-digest.txt
+          cat cs-digest.txt
+
+      - name: Upload fixed-seed digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: cs-digest-${{ runner.os }}
+          path: cs-digest.txt
+
+      - name: Benchmark native Linux runner
+        if: runner.os == 'Linux' && github.event_name == 'workflow_dispatch'
+        run: |
+          threads=$(nproc)
+          printf 'runner_arch=%s\nthreads=%s\n' "${RUNNER_ARCH}" "${threads}" \
+            > ci-benchmark.txt
+          /usr/bin/time --format='single_wall_seconds=%e' --append \
+            --output=ci-benchmark.txt \
+            ./build/service/src/cli/cs --games 20000 --seed 1 \
+            --threads "${threads}" > /dev/null
+          /usr/bin/time --format='sweep_wall_seconds=%e' --append \
+            --output=ci-benchmark.txt \
+            ./build/service/src/cli/cs --sweep --games 30000 --seed 1 \
+            --threads "${threads}" > /dev/null
+          cat ci-benchmark.txt
+
+      - name: Upload native Linux benchmark
+        if: runner.os == 'Linux' && github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cs-benchmark-Linux
+          path: ci-benchmark.txt
+
+  reproducibility:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download macOS digest
+        uses: actions/download-artifact@v4
+        with:
+          name: cs-digest-macOS
+          path: digests/macos
+
+      - name: Download Linux digest
+        uses: actions/download-artifact@v4
+        with:
+          name: cs-digest-Linux
+          path: digests/linux
+
+      - name: Require identical macOS and Linux digests
+        run: diff -u digests/macos/cs-digest.txt digests/linux/cs-digest.txt
+
+  image-smoke:
+    needs: [build-and-test, reproducibility]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build linux/amd64 image without publishing
+        run: docker build --platform linux/amd64 --tag mtgsim:ci .
+
+      - name: Generate disposable offline fixture
+        run: |
+          python3 scripts/make_repro_fixture.py \
+            --cards "${RUNNER_TEMP}/cards.json" \
+            --candidate "${RUNNER_TEMP}/candidate.json"
+          python3 - "${RUNNER_TEMP}/candidate.json" "${RUNNER_TEMP}/request.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          candidate = json.loads(Path(sys.argv[1]).read_text())
+          Path(sys.argv[2]).write_text(json.dumps({
+              "schema_version": "cedh-simulation-request.v1",
+              "candidate": candidate,
+              "games": 20,
+          }))
+          PY
+
+      - name: Smoke-test health and simulation
+        run: |
+          container_id=$(docker run --rm --detach \
+            --publish 127.0.0.1:18080:8080 \
+            --env SIM_TESTING=1 \
+            --env SIM_CARDS_FILE=/tmp/cards.json \
+            --mount "type=bind,source=${RUNNER_TEMP}/cards.json,target=/tmp/cards.json,readonly" \
+            mtgsim:ci)
+          trap 'docker stop "${container_id}"' EXIT
+          start_ns=$(date +%s%N)
+          for attempt in $(seq 1 40); do
+            if curl --fail --silent --show-error \
+              http://127.0.0.1:18080/healthz > "${RUNNER_TEMP}/health.json"; then
+              break
+            fi
+            sleep 0.05
+          done
+          end_ns=$(date +%s%N)
+          python3 - "${start_ns}" "${end_ns}" "${RUNNER_TEMP}/health.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          elapsed = (int(sys.argv[2]) - int(sys.argv[1])) / 1_000_000_000
+          assert elapsed < 2, f"health startup took {elapsed:.3f}s"
+          assert json.loads(Path(sys.argv[3]).read_text())["status"] == "ok"
+          print(f"health startup: {elapsed:.3f}s")
+          PY
+          curl --fail --silent --show-error \
+            --header 'Content-Type: application/json' \
+            --data-binary "@${RUNNER_TEMP}/request.json" \
+            http://127.0.0.1:18080/simulate > "${RUNNER_TEMP}/result.json"
+          # The image must refuse batch work by default. A sweep is ~600 CPU-s;
+          # nothing should be able to buy it with an unauthenticated request.
+          python3 - "${RUNNER_TEMP}/request.json" "${RUNNER_TEMP}/sweep-request.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          request = json.loads(Path(sys.argv[1]).read_text())
+          request["sweep"] = True
+          Path(sys.argv[2]).write_text(json.dumps(request))
+          PY
+          sweep_status=$(curl --silent --output "${RUNNER_TEMP}/sweep.json" \
+            --write-out '%{http_code}' \
+            --header 'Content-Type: application/json' \
+            --header 'Authorization: Bearer guessed' \
+            --data-binary "@${RUNNER_TEMP}/sweep-request.json" \
+            http://127.0.0.1:18080/simulate)
+          test "${sweep_status}" = 403 || {
+            echo "sweep was not refused: HTTP ${sweep_status}"; cat "${RUNNER_TEMP}/sweep.json"; exit 1;
+          }
+          echo "sweep refused with 403 as expected"
+          python3 - "${RUNNER_TEMP}/result.json" "${RUNNER_TEMP}/candidate.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          result = json.loads(Path(sys.argv[1]).read_text())
+          candidate = json.loads(Path(sys.argv[2]).read_text())
+          assert result["schema_version"] == "cedh-simulation-result.v3"
+          assert result["simulation"]["games"] == 20
+          # The deck hash the simulator recomputed must be the one we sent, and
+          # the input fingerprint must be a genuinely different value.
+          assert result["candidate"]["deck_sha256"] == candidate["deck_sha256"]
+          assert result["simulation_input_sha256"] != result["candidate"]["deck_sha256"]
+          assert result["run_id"] == "run-" + result["simulation_input_sha256"][7:31]
+          PY

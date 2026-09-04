@@ -5,11 +5,14 @@
 // statistics arrive in Phase 6 (SIM_PLAN.md section 9.5).
 
 #include <cstdio>
+#include <exception>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <string>
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -36,6 +39,31 @@ namespace {
 // happened to find a zero byte. Print one by passing its length.
 void print_view(const char* format, std::string_view value) {
     std::printf(format, static_cast<int>(value.size()), value.data());
+}
+
+int default_thread_count() {
+    const unsigned int hardware = std::thread::hardware_concurrency();
+    const int fallback = hardware > 0 ? static_cast<int>(hardware) : 1;
+
+    // cgroup v2 expresses a CPU quota as "quota period". "max" means the
+    // process is unconstrained, in which case the host's concurrency is the
+    // best available answer. Fractional quotas round up so a 1.5-CPU service
+    // can keep both available execution slots busy.
+    std::ifstream cpu_max("/sys/fs/cgroup/cpu.max");
+    std::string quota_text;
+    long long period = 0;
+    if (!(cpu_max >> quota_text >> period) || quota_text == "max" || period <= 0) {
+        return fallback;
+    }
+    try {
+        const long long quota = std::stoll(quota_text);
+        if (quota <= 0) return fallback;
+        const long long count = quota / period + (quota % period != 0 ? 1 : 0);
+        if (count > std::numeric_limits<int>::max()) return fallback;
+        return std::max(1, static_cast<int>(count));
+    } catch (const std::exception&) {
+        return fallback;
+    }
 }
 
 int summarise(const std::filesystem::path& path) {
@@ -76,7 +104,9 @@ int summarise(const std::filesystem::path& path) {
         lands += has_land ? 1 : 0;
         castable += has_castable ? 1 : 0;
         variable += has_variable ? 1 : 0;
-        multi_faced += card.faces.size() > 1 ? 1 : 0;
+        if (card.faces.size() > 1) {
+            ++multi_faced;
+        }
     }
 
     std::printf("  %zu with a land face, %zu castable, %zu X spells, %zu multi-faced\n",
@@ -548,6 +578,7 @@ Run drive(int games, int threads, Work work) {
 // two standard errors is the realised variance reduction - the number section
 // 10.4 explicitly refuses to let anyone assume.
 struct AblationResult {
+    int slot = -1;
     std::string card;
     bool inert = false;
     cs::Difference paired;
@@ -557,6 +588,26 @@ struct AblationResult {
     double baseline_p = 0.0;
     double ablated_p = 0.0;
 };
+
+AblationResult summarise_ablation(const cs::CardDb& db, const cs::EffectDb& effects,
+                                  int slot, int turn, const cs::PairedRun& coupled,
+                                  const cs::RunSummary& independent) {
+    AblationResult result;
+    result.slot = slot;
+    result.card = db.cards[static_cast<std::size_t>(slot)].listed_name;
+    result.inert = effects.by_slot[static_cast<std::size_t>(slot)].status ==
+                   cs::AuthorStatus::Inert;
+    const cs::PairedCounts& cell = coupled.by_turn[static_cast<std::size_t>(turn)];
+    result.paired = cs::paired_difference(cell);
+    result.baseline_only = cell.baseline_only;
+    result.ablated_only = cell.ablated_only;
+    const auto n = static_cast<double>(coupled.games);
+    result.baseline_p = (cell.both + cell.baseline_only) / n;
+    result.ablated_p = (cell.both + cell.ablated_only) / n;
+    result.unpaired = cs::unpaired_difference(cell.both + cell.baseline_only, coupled.games,
+                                              cs::cumulative(independent, turn), independent.games);
+    return result;
+}
 
 AblationResult measure_ablation(const cs::CardDb& db, const cs::EffectDb& effects,
                                 const cs::io::DeckFile& deck, const cs::GameConfig& config,
@@ -570,17 +621,6 @@ AblationResult measure_ablation(const cs::CardDb& db, const cs::EffectDb& effect
                               first, count);
     });
 
-    AblationResult result;
-    result.card = db.cards[static_cast<std::size_t>(slot)].listed_name;
-    result.inert = effects.by_slot[static_cast<std::size_t>(slot)].status == cs::AuthorStatus::Inert;
-    const cs::PairedCounts& cell = coupled.by_turn[static_cast<std::size_t>(turn)];
-    result.paired = cs::paired_difference(cell);
-    result.baseline_only = cell.baseline_only;
-    result.ablated_only = cell.ablated_only;
-    const auto n = static_cast<double>(coupled.games);
-    result.baseline_p = (cell.both + cell.baseline_only) / n;
-    result.ablated_p = (cell.both + cell.ablated_only) / n;
-
     // The uncoupled arm: same deck, DIFFERENT seed sequence. Nothing else
     // changes, so the only difference between the two intervals below is the
     // coupling.
@@ -590,13 +630,83 @@ AblationResult measure_ablation(const cs::CardDb& db, const cs::EffectDb& effect
             return cs::simulate_batch(arm.db, arm.effects, arm.patterns, config, ablated_policy,
                                       base_seed ^ 0x9E3779B97F4A7C15ULL, first, count);
         });
-    result.unpaired = cs::unpaired_difference(cell.both + cell.baseline_only, coupled.games,
-                                              cs::cumulative(independent, turn), independent.games);
-    return result;
+    return summarise_ablation(db, effects, slot, turn, coupled, independent);
+}
+
+// A full sweep has two independent units of work per target: the paired CRN
+// comparison and the separately seeded ablated arm. Giving each worker a whole
+// unit removes the two join barriers per card while keeping every game range
+// serial and therefore preserving the exact counts each result is built from.
+std::vector<AblationResult> measure_ablations(
+    const cs::CardDb& db, const cs::EffectDb& effects, const cs::io::DeckFile& deck,
+    const cs::GameConfig& config, const std::vector<int>& targets, int replacement,
+    int games, int threads, std::uint64_t base_seed, int turn) {
+    if (threads <= 1 || targets.size() <= 1) {
+        std::vector<AblationResult> results;
+        results.reserve(targets.size());
+        for (const int slot : targets) {
+            results.push_back(measure_ablation(db, effects, deck, config, slot, replacement,
+                                               games, threads, base_seed, turn));
+        }
+        return results;
+    }
+
+    struct Work {
+        int slot;
+        cs::AblatedDeck arm;
+        cs::PairedRun coupled;
+        cs::RunSummary independent;
+    };
+
+    std::vector<Work> work;
+    work.reserve(targets.size());
+    for (const int slot : targets) {
+        work.push_back({slot,
+                        cs::ablate(db, effects, deck.weights, deck.patterns, slot, replacement),
+                        {}, {}});
+    }
+
+    const std::size_t task_count = work.size() * 2;
+    const int worker_count = std::min(threads, static_cast<int>(task_count));
+    std::atomic<std::size_t> next_task{0};
+    std::vector<std::thread> workers;
+    workers.reserve(static_cast<std::size_t>(worker_count));
+    for (int worker = 0; worker < worker_count; ++worker) {
+        workers.emplace_back([&] {
+            while (true) {
+                const std::size_t task = next_task.fetch_add(1, std::memory_order_relaxed);
+                if (task >= task_count) {
+                    return;
+                }
+                Work& item = work[task / 2];
+                if (task % 2 == 0) {
+                    item.coupled = cs::run_paired(db, effects, deck.weights, item.arm,
+                                                  deck.patterns, config, base_seed, 0, games);
+                } else {
+                    const cs::AuthoredPolicy ablated_policy(item.arm.weights);
+                    item.independent = cs::simulate_batch(
+                        item.arm.db, item.arm.effects, item.arm.patterns, config,
+                        ablated_policy, base_seed ^ 0x9E3779B97F4A7C15ULL, 0, games);
+                }
+            }
+        });
+    }
+    for (std::thread& worker : workers) {
+        worker.join();
+    }
+
+    std::vector<AblationResult> results;
+    results.reserve(work.size());
+    for (const Work& item : work) {
+        results.push_back(
+            summarise_ablation(db, effects, item.slot, turn, item.coupled, item.independent));
+    }
+    return results;
 }
 
 int simulate(const std::filesystem::path& path, const std::filesystem::path& deck_path,
-             const std::filesystem::path& effects_path, int games, std::uint64_t base_seed) {
+             const std::filesystem::path& effects_path, int games, std::uint64_t base_seed,
+             int threads) {
     cs::CardDb db;
     cs::io::DeckFile deck;
     cs::EffectDb effects;
@@ -614,8 +724,10 @@ int simulate(const std::filesystem::path& path, const std::filesystem::path& dec
     const cs::GameConfig config = make_config(deck);
 
     print_header(db, deck, effects, deck_path, games, base_seed);
-    const cs::RunSummary run =
-        cs::simulate_batch(db, effects, deck.patterns, config, policy, base_seed, 0, games);
+    const cs::RunSummary run = drive<cs::RunSummary>(games, threads, [&](int first, int count) {
+        return cs::simulate_batch(db, effects, deck.patterns, config, policy, base_seed, first,
+                                  count);
+    });
     print_report(db, deck, run, config, policy);
     return 0;
 }
@@ -630,7 +742,7 @@ int simulate_request(const std::filesystem::path& request_path,
                      const std::filesystem::path& output_path, int games,
                      std::uint64_t seed, int objective_turn,
                      const std::string& scenario, bool do_ablation,
-                     const std::string& only, int threads) {
+                     const std::vector<std::string>& ablation_names, int threads) {
     if (games <= 0) {
         std::fprintf(stderr, "error: --request requires --games greater than zero\n");
         return 2;
@@ -654,6 +766,10 @@ int simulate_request(const std::filesystem::path& request_path,
             .objective_turn = objective_turn,
             .scenario_id = cs::io::kGoldfishScenarioId,
             .scenario_version = cs::io::kGoldfishScenarioVersion,
+            // --sweep is a full leave-one-out; --ablate names its targets. Both
+            // set do_ablation, so the empty name list is what tells them apart.
+            .sweep = do_ablation && ablation_names.empty(),
+            .ablations = ablation_names,
             .started_at = cs::io::utc_timestamp_now(),
             .completed_at = {}};
         const cs::CardDb db = cs::io::load_card_db(cards_path);
@@ -688,29 +804,38 @@ int simulate_request(const std::filesystem::path& request_path,
             return 2;
         }
         const cs::RunSummary run =
-            cs::simulate_batch(db, effects, pack.patterns, config, policy, seed, 0, games);
+            drive<cs::RunSummary>(games, threads, [&](int first, int count) {
+                return cs::simulate_batch(db, effects, pack.patterns, config, policy, seed,
+                                          first, count);
+            });
         std::vector<cs::io::ServiceAblationResult> ablations;
         if (do_ablation) {
             const int replacement = cs::slot_of_listed(db, pack.ablation_replacement);
             if (replacement < 0) {
                 throw std::runtime_error("strategy pack's ablation replacement is absent");
             }
+            std::vector<int> targets;
             for (const cs::Card& card : db.cards) {
                 if (card.is_commander || card.export_index == replacement ||
-                    (!only.empty() && card.listed_name != only)) {
+                    (!ablation_names.empty() &&
+                     std::find(ablation_names.begin(), ablation_names.end(), card.listed_name) ==
+                         ablation_names.end())) {
                     continue;
                 }
-                const AblationResult measured = measure_ablation(
-                    db, effects, pack, config, card.export_index, replacement, games,
-                    threads, seed, objective_turn);
+                targets.push_back(card.export_index);
+            }
+            const std::vector<AblationResult> measured = measure_ablations(
+                db, effects, pack, config, targets, replacement, games, threads, seed,
+                objective_turn);
+            for (const AblationResult& result : measured) {
                 ablations.push_back({
-                    .oracle_id = card.oracle_id,
+                    .oracle_id = db.cards[static_cast<std::size_t>(result.slot)].oracle_id,
                     .replacement_oracle_id =
                         db.cards[static_cast<std::size_t>(replacement)].oracle_id,
                     .objective_turn = objective_turn,
-                    .delta = measured.paired.delta,
-                    .interval_low = measured.paired.low,
-                    .interval_high = measured.paired.high});
+                    .delta = result.paired.delta,
+                    .interval_low = result.paired.low,
+                    .interval_high = result.paired.high});
             }
             if (ablations.empty()) {
                 throw std::runtime_error("no ablation target matched the request");
@@ -734,6 +859,13 @@ int simulate_request(const std::filesystem::path& request_path,
             std::fprintf(stderr, "wrote %s\n", output_path.c_str());
         }
         return 0;
+    } catch (const cs::io::ContractError& error) {
+        // The machine code goes on the wire ahead of the prose so the HTTP
+        // service can classify the refusal without matching English. Getting
+        // this wrong is how a pack that is not installed gets reported to a
+        // user as "your deck changed".
+        std::fprintf(stderr, "error: [%s] %s\n", error.code().c_str(), error.what());
+        return 1;
     } catch (const std::runtime_error& error) {
         std::fprintf(stderr, "error: %s\n", error.what());
         return 1;
@@ -788,12 +920,8 @@ int sweep(const std::filesystem::path& path, const std::filesystem::path& deck_p
         return 1;
     }
 
-    std::vector<AblationResult> results;
-    results.reserve(targets.size());
-    for (const int slot : targets) {
-        results.push_back(measure_ablation(db, effects, deck, config, slot, replacement, games,
-                                           threads, base_seed, turn));
-    }
+    std::vector<AblationResult> results = measure_ablations(
+        db, effects, deck, config, targets, replacement, games, threads, base_seed, turn);
 
     // THE VARIANCE-REDUCTION MEASUREMENT (section 10.4), reported before the
     // table, because it is what says whether the intervals in that table are
@@ -1354,6 +1482,13 @@ int grid(const std::filesystem::path& path, const std::filesystem::path& deck_pa
 }
 
 int main(int argc, char** argv) {
+    if (argc == 2 && std::strcmp(argv[1], "--version") == 0) {
+        print_view("%.*s", cs::version());
+        std::printf(" %.*s\n", static_cast<int>(cs::build_flavour().size()),
+                    cs::build_flavour().data());
+        return 0;
+    }
+
     std::filesystem::path path{"data/cards.json"};
     std::filesystem::path deck_path{"data/kinnan.deck.toml"};
     std::filesystem::path effects_path{"data/effects.toml"};
@@ -1367,12 +1502,12 @@ int main(int argc, char** argv) {
     int sampled_hands = 0;
     int grid_hands = 0;
     std::string only;
+    std::vector<std::string> request_ablations;
     // Section 4.1: the default objective is an early-turn CDF point, because the
     // tail cannot separate opening hands and this tool is a mulligan solver's
     // value function.
     int objective_turn = 3;
-    int threads = static_cast<int>(std::thread::hardware_concurrency());
-    threads = threads > 0 ? threads : 1;
+    int threads = default_thread_count();
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--games") == 0 && i + 1 < argc) {
             games = std::atoi(argv[++i]);
@@ -1401,6 +1536,7 @@ int main(int argc, char** argv) {
         } else if (std::strcmp(argv[i], "--ablate") == 0 && i + 1 < argc) {
             do_sweep = true;
             only = argv[++i];
+            request_ablations.push_back(only);
         } else if (std::strcmp(argv[i], "--threads") == 0 && i + 1 < argc) {
             threads = std::atoi(argv[++i]);
         } else if (std::strcmp(argv[i], "--turn") == 0 && i + 1 < argc) {
@@ -1412,7 +1548,8 @@ int main(int argc, char** argv) {
 
     if (!request_path.empty()) {
         return simulate_request(request_path, path, deck_path, effects_path, output_json,
-                                games, seed, objective_turn, scenario, do_sweep, only,
+                                games, seed, objective_turn, scenario, do_sweep,
+                                request_ablations,
                                 threads);
     }
 
@@ -1444,7 +1581,7 @@ int main(int argc, char** argv) {
                      objective_turn, only);
     }
     if (games > 0) {
-        return simulate(path, deck_path, effects_path, games, seed);
+        return simulate(path, deck_path, effects_path, games, seed, threads);
     }
     return summarise(path);
 }

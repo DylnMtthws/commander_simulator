@@ -1,0 +1,304 @@
+{
+  "ablation_results": [],
+  "assembly_cdf": [
+    {
+      "assembled_games": 0,
+      "probability": 0.0,
+      "turn": 1,
+      "wilson_95": {
+        "high": 0.007624340461552241,
+        "low": 4.336808689942018e-19
+      }
+    },
+    {
+      "assembled_games": 0,
+      "probability": 0.0,
+      "turn": 2,
+      "wilson_95": {
+        "high": 0.007624340461552241,
+        "low": 4.336808689942018e-19
+      }
+    },
+    {
+      "assembled_games": 4,
+      "probability": 0.008,
+      "turn": 3,
+      "wilson_95": {
+        "high": 0.020387035834105168,
+        "low": 0.00311531518006224
+      }
+    },
+    {
+      "assembled_games": 12,
+      "probability": 0.024,
+      "turn": 4,
+      "wilson_95": {
+        "high": 0.041477057463900756,
+        "low": 0.013781314655496986
+      }
+    },
+    {
+      "assembled_games": 24,
+      "probability": 0.048,
+      "turn": 5,
+      "wilson_95": {
+        "high": 0.07042719683589006,
+        "low": 0.03246520694135317
+      }
+    },
+    {
+      "assembled_games": 33,
+      "probability": 0.066,
+      "turn": 6,
+      "wilson_95": {
+        "high": 0.09123940116085351,
+        "low": 0.04737852635977387
+      }
+    },
+    {
+      "assembled_games": 35,
+      "probability": 0.07,
+      "turn": 7,
+      "wilson_95": {
+        "high": 0.09579718985191686,
+        "low": 0.0507597429450181
+      }
+    },
+    {
+      "assembled_games": 36,
+      "probability": 0.072,
+      "turn": 8,
+      "wilson_95": {
+        "high": 0.09806840401696253,
+        "low": 0.0524580314181262
+      }
+    },
+    {
+      "assembled_games": 37,
+      "probability": 0.074,
+      "turn": 9,
+      "wilson_95": {
+        "high": 0.10033475332223055,
+        "low": 0.054161184751011976
+      }
+    },
+    {
+      "assembled_games": 37,
+      "probability": 0.074,
+      "turn": 10,
+      "wilson_95": {
+        "high": 0.10033475332223055,
+        "low": 0.054161184751011976
+      }
+    },
+    {
+      "assembled_games": 39,
+      "probability": 0.078,
+      "turn": 11,
+      "wilson_95": {
+        "high": 0.10485354987338852,
+        "low": 0.05758139347616159
+      }
+    },
+    {
+      "assembled_games": 40,
+      "probability": 0.08,
+      "turn": 12,
+      "wilson_95": {
+        "high": 0.1071063165778513,
+        "low": 0.059298129409852594
+      }
+    }
+  ],
+  "candidate": {
+    "candidate_id": "ci-repro-fixture",
+    "deck_sha256": "sha256:b01cf02ff3b562aa61b989100a0a96d06eec1c744f1951ca2d4146911533bf7d"
+  },
+  "card_data": {
+    "cards_sha256": "db7ee1a8ab92b19bab602ed7475c4e0c52003777b5804cca047bfcede00c80f2",
+    "corpus_row_count": 100,
+    "manifest_hash": "sha256:52d44328e85488dd6def295ad046235b7ef3fcb8bbba5600b1f46f22e7b3b39e",
+    "max_content_updated_at": "2026-09-04T00:00:00+00:00",
+    "source_view": "test.repro_fixture"
+  },
+  "censored": {
+    "games": 460,
+    "rate": 0.92,
+    "wilson_95": {
+      "high": 0.9407018705901475,
+      "low": 0.8928936834221488
+    }
+  },
+  "coverage": {
+    "commander_cards": 1,
+    "inert_by_reason": {
+      "interaction": 16,
+      "no_object_in_model": 4,
+      "opponent_permanent": 4,
+      "opponent_trigger": 6,
+      "timing_only": 1
+    },
+    "inert_cards": 31,
+    "library_cards": 99,
+    "modeled_cards": 65,
+    "total_cards": 100,
+    "unauthored_cards": 4
+  },
+  "determinism": {
+    "result_digest": "9f4b2e718fdb8748",
+    "seed_scheme": "splitmix64(base_seed ^ splitmix64(game_index)) + xoshiro256++"
+  },
+  "metric": {
+    "does_not_measure": "deck strength, win rate, or card quality",
+    "id": "goldfish_turns_to_assembly",
+    "measures": "turns until a declared pattern is assembled, unopposed"
+  },
+  "percentiles": [
+    {
+      "interval_95": {
+        "high_turn": null,
+        "low_turn": null
+      },
+      "percentile": 0.1,
+      "status": "censored",
+      "turn": null
+    },
+    {
+      "interval_95": {
+        "high_turn": null,
+        "low_turn": null
+      },
+      "percentile": 0.25,
+      "status": "censored",
+      "turn": null
+    },
+    {
+      "interval_95": {
+        "high_turn": null,
+        "low_turn": null
+      },
+      "percentile": 0.5,
+      "status": "censored",
+      "turn": null
+    },
+    {
+      "interval_95": {
+        "high_turn": null,
+        "low_turn": null
+      },
+      "percentile": 0.75,
+      "status": "censored",
+      "turn": null
+    },
+    {
+      "interval_95": {
+        "high_turn": null,
+        "low_turn": null
+      },
+      "percentile": 0.9,
+      "status": "censored",
+      "turn": null
+    }
+  ],
+  "run_id": "run-7061325cda0d8ccb464d658b",
+  "schema_version": "cedh-simulation-result.v3",
+  "simulation": {
+    "games": 500,
+    "objective_turn": 3,
+    "requested_scenario": {
+      "id": "goldfish_assembly",
+      "version": "1.0.0"
+    },
+    "seed": 12345
+  },
+  "simulation_input_sha256": "sha256:7061325cda0d8ccb464d658b7f4e6939a7a18f76107789b512febcb05209d169",
+  "simulator": {
+    "build_flavour": "release",
+    "version": "0.2.0"
+  },
+  "strategy_pack": {
+    "assembly_objectives": [
+      "infinite_C_into_thrasios",
+      "infinite_C_outlet_in_hand",
+      "wide_colour_into_thrasios"
+    ],
+    "content_sha256": "sha256:62f1b6f4a74f37cb057bf412e978aec1aa11e0380c540284eaacc5d862810ee4",
+    "declared_table_assumptions": [
+      "goldfish with no simulated opponents",
+      "three-opponent card-text context",
+      "opponents collectively expose WUBRG for conditional mana sources",
+      "on the play"
+    ],
+    "derived": false,
+    "id": "kinnan-midrange-goldfish",
+    "inherited_patterns": [
+      "infinite_C_into_thrasios",
+      "infinite_C_outlet_in_hand",
+      "wide_colour_into_thrasios"
+    ],
+    "known_blind_spots": [
+      "no stack or live interaction",
+      "no combat or opponent-facing terminal kill",
+      "summoning sickness is not modeled",
+      "legend rule is not modeled",
+      "Hullbreaker Horror is knowingly misclassified inert",
+      "Sylvan Library, The One Ring, Thrasios activation, and Valley Floodcaller are unauthored"
+    ],
+    "patterns": [
+      {
+        "name": "infinite_C_into_thrasios",
+        "source": "library",
+        "terminal_state": "assembly_proxy"
+      },
+      {
+        "name": "infinite_C_outlet_in_hand",
+        "source": "library",
+        "terminal_state": "assembly_proxy"
+      },
+      {
+        "name": "wide_colour_into_thrasios",
+        "source": "library",
+        "terminal_state": "assembly_proxy"
+      }
+    ],
+    "play_policy": "authored-kinnan-policy.v1",
+    "rank_overrides": [],
+    "version": "1.0.0"
+  },
+  "timestamps": {
+    "completed_at": "2026-09-04T19:27:22Z",
+    "started_at": "2026-09-04T19:27:22Z"
+  },
+  "unsupported_assumptions": [
+    {
+      "code": "no_opponents",
+      "detail": "No opponents are simulated; table fields are declared card-text context only."
+    },
+    {
+      "code": "no_stack",
+      "detail": "The stack, priority, responses, and live interaction are unsupported."
+    },
+    {
+      "code": "no_combat",
+      "detail": "Combat, attacks, damage, and opponent-facing kills are unsupported."
+    },
+    {
+      "code": "assembly_proxy",
+      "detail": "A declared assembly state ends a game; it is not a demonstrated win."
+    },
+    {
+      "code": "not_general_rules_engine",
+      "detail": "Only explicitly authored effects execute; unlisted cards are reported unauthored."
+    }
+  ],
+  "warnings": [
+    "Assembly probability is not win rate, deck strength, or card quality.",
+    "31 cards are explicitly inert under this scenario.",
+    "Sylvan Library is unauthored and therefore dilutes draws without executing text.",
+    "The One Ring is unauthored and therefore dilutes draws without executing text.",
+    "Thrasios, Triton Hero is unauthored and therefore dilutes draws without executing text.",
+    "Valley Floodcaller is unauthored and therefore dilutes draws without executing text.",
+    "1 inert classification is explicitly disputed by the strategy-pack author.",
+    "No ablations were requested; ablation_results is empty."
+  ]
+}
