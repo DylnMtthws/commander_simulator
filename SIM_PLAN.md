@@ -4104,3 +4104,47 @@ Three things follow:
    the same version**, and today they are three versions apart — which makes
    this, in the end, another argument for §15A's provenance stamp rather than a
    result.
+
+---
+
+## 19. Versioned service boundary — landed after the Kinnan model
+
+The simulator now has a public boundary without widening the claim made by the
+core. Kinnan remains the first and only supported strategy pack:
+`kinnan-midrange-goldfish@1.0.0`. The pack declares its supported commander
+oracle ID, effect vocabulary, assembly objectives, authored policy
+implementation, table assumptions and blind spots in `data/kinnan.deck.toml`.
+
+Two Draft 2020-12 JSON Schemas are authoritative:
+
+- `cedh-deck-candidate.v1` identifies commanders and exactly 99 library cards by
+  `oracle_id` and quantity, pins a strategy-pack version, carries producer/card
+  data/corpus provenance, and includes a verified semantic-content SHA-256.
+- `cedh-simulation-result.v1` carries simulator/candidate/pack/card-data
+  provenance, the requested scenario and objective, effect coverage, Wilson
+  CDF intervals, censoring-aware percentiles, paired-CRN ablations when
+  requested, warnings, unsupported assumptions and the deterministic digest.
+
+`goldfish_assembly.v1` is the only supported scenario. It means exactly what
+the historical output meant: no simulated opponents, stack, combat or live
+interaction. A future controlled-disruption scenario needs a new scenario ID
+and version; it cannot silently change this one.
+
+The machine CLI writes only JSON to stdout and sends diagnostics to stderr:
+
+```bash
+cs --request candidate.json --cards data/cards.json \
+   --games 20000 --seed 12345 --output-json result.json
+```
+
+Unknown packs, pack-version mismatches, unsupported commander IDs, candidate
+hash failures and candidate/snapshot oracle-ID differences are fatal before a
+game starts. There is deliberately no generic fallback. The committed
+`unsupported-pack-candidate.v1.json` fixture proves that boundary with a
+schema-valid, compact 99-card candidate.
+
+The Python exporter gained `--candidate`: it resolves the candidate by
+`oracle_id`, queries only `mtg_v1.card_any_medium` and `mtg_v1.card_face`, and
+requires the database session role to be exactly `mtg_consumer`. The C++ core
+did not gain JSON, filesystem, database, network or model responsibilities;
+candidate/result work lives in `src/io` and orchestration remains in `src/cli`.

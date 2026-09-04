@@ -1,8 +1,10 @@
 # commander_simulator
 
-A Monte Carlo goldfishing simulator for one cEDH Commander deck — Kinnan, Bonder
-Prodigy. Design and findings live in [SIM_PLAN.md](SIM_PLAN.md), current status
-in [STATE.md](STATE.md); this file is how to build it and what it means.
+A versioned cEDH goldfish-simulation service boundary whose first and currently
+only supported strategy pack is Kinnan, Bonder Prodigy. It is not a general
+Magic rules engine. Design and findings live in [SIM_PLAN.md](SIM_PLAN.md),
+current status in [STATE.md](STATE.md); this file is how to build it and what it
+means.
 
 ## What this measures, and what it does not
 
@@ -94,8 +96,8 @@ recorded; the run prints that gap rather than inventing one.
 ---
 
 
-**Status:** Phases 0-7 landed except the ablation sweep. The card model is
-authored (94 of 100 cards; the four that remain each need an effect kind the
+**Status:** Phases 0-7 and the v1 service boundary are landed. The card model is
+authored (96 of 100 cards; the four that remain each need an effect kind the
 loop does not have), the mana system is real, the policy is authored and
 traceable, and the run report carries Wilson intervals and censored percentiles.
 
@@ -109,6 +111,51 @@ and a half.
 ./build/release/src/cli/cs --sweep --games 30000   # 98 ablations, ~45s on 8 cores
 ./build/release/src/cli/cs --ablate "Sol Ring"     # just one
 ```
+
+## Machine-readable service boundary
+
+The authoritative wire contracts are:
+
+- `contracts/cedh-deck-candidate.v1.schema.json`
+- `contracts/cedh-simulation-result.v1.schema.json`
+
+The normal subprocess form writes JSON only to stdout; diagnostics are stderr:
+
+```bash
+./build/release/src/cli/cs \
+  --request candidate.json \
+  --cards data/cards.json \
+  --games 20000 \
+  --seed 12345 \
+  --output-json - > result.json
+```
+
+Use `--output-json result.json` to let `cs` write the file. Optional
+`--turn 3` selects the reported objective, `--scenario goldfish_assembly.v1`
+names the only v1 scenario, and `--ablate "Sol Ring"` or `--sweep` adds paired
+common-random-number ablation results with uncertainty.
+
+Candidate libraries are keyed only by `oracle_id`; quantities must sum to
+exactly 99. `candidate_hash` is SHA-256 over compact JSON containing only the
+semantic fields documented in the candidate schema. Producer/card-data/corpus
+provenance travels beside the hash, while `user_constraints` is opaque and is
+never interpreted by the simulator.
+
+The loaded strategy pack must match both the requested pack version and the
+commander oracle IDs. Anything else is rejected. There is no generic fallback
+to Kinnan behavior. The current pack is:
+
+```text
+kinnan-midrange-goldfish@1.0.0
+commander oracle_id 8d11aa49-d4cd-48b1-aa0f-8548fa733416
+scenario goldfish_assembly.v1
+```
+
+Every result calls the metric `goldfish_turns_to_assembly`, carries card-data
+and simulator provenance, reports coverage and censored-aware statistics, and
+states explicitly that assembly probability is not win rate. See
+[`docs/integration-handoff.md`](docs/integration-handoff.md) for the producer and
+UI contract.
 
 ```bash
 ./build/release/src/cli/cs --hands 60 --games 4000   # sampled opening hands, raw
@@ -204,6 +251,17 @@ cd ..
 export/.venv/bin/mtgsim-export       # writes data/cards.json
 ./build/asan/src/cli/cs              # reads it
 ```
+
+To export the snapshot for a service candidate instead of the legacy
+name-based deck TOML:
+
+```bash
+export/.venv/bin/mtgsim-export --candidate candidate.json --out data/cards.json
+```
+
+That path resolves only `oracle_id` values and queries only the `mtg_v1`
+contract while connected as `mtg_consumer`; it refuses a more privileged
+database role. It never reads `mtg_internal`.
 
 `export/.env` is gitignored and holds the only credential in this repo.
 

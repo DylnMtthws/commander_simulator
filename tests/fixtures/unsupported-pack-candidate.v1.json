@@ -1,0 +1,32 @@
+{
+  "commander_oracle_ids": [
+    "00000000-0000-4000-8000-000000000001"
+  ],
+  "library": [
+    {
+      "oracle_id": "00000000-0000-4000-8000-000000000002",
+      "quantity": 99
+    }
+  ],
+  "schema_version": "cedh-deck-candidate.v1",
+  "strategy_pack_id": "unsupported-fixture-pack",
+  "strategy_pack_version": "1.0.0",
+  "candidate_id": "unsupported-pack-fixture",
+  "provenance": {
+    "producer": {
+      "name": "fixture",
+      "version": "1.0.0"
+    },
+    "card_data": {
+      "source": "fixture",
+      "snapshot_at": "2026-09-03T00:00:00Z",
+      "hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "corpus": {
+      "source": "fixture",
+      "snapshot_at": "2026-09-03T00:00:00Z",
+      "hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  },
+  "candidate_hash": "sha256:fb545417e059de3a1d89d5d948697db1e5df4f8161ac1f4cfd1aa523691da42f"
+}

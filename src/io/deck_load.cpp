@@ -229,6 +229,7 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db) {
     };
 
     const toml::table& deck_table = require_table("deck");
+    const toml::table& strategy_pack = require_table("strategy_pack");
     const toml::table& table_ctx = require_table("table");
     const toml::table& ablation = require_table("ablation");
 
@@ -245,6 +246,48 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db) {
 
     deck.commander = require_field(deck_table, "deck", "commander").value_or<std::string>("");
     deck.name = deck_table["name"].value_or<std::string>(path.stem().string());
+
+    const auto string_array = [&](const toml::table& table, const char* section,
+                                  const char* key) {
+        const toml::node& node = require_field(table, section, key);
+        const auto* array = node.as_array();
+        if (array == nullptr || array->empty()) {
+            fail(path.string() + ": [" + section + "] field '" + key +
+                 "' must be a non-empty array of strings");
+        }
+        std::vector<std::string> values;
+        for (const toml::node& value : *array) {
+            const auto text = value.value<std::string>();
+            if (!text || text->empty()) {
+                fail(path.string() + ": [" + section + "] field '" + key +
+                     "' must contain only non-empty strings");
+            }
+            values.push_back(*text);
+        }
+        return values;
+    };
+    deck.strategy_pack.id =
+        require_field(strategy_pack, "strategy_pack", "id").value_or<std::string>("");
+    deck.strategy_pack.version =
+        require_field(strategy_pack, "strategy_pack", "version").value_or<std::string>("");
+    deck.strategy_pack.supported_commander_oracle_ids =
+        string_array(strategy_pack, "strategy_pack", "supported_commander_oracle_ids");
+    deck.strategy_pack.supported_effect_definitions =
+        string_array(strategy_pack, "strategy_pack", "supported_effect_definitions");
+    deck.strategy_pack.assembly_objectives =
+        string_array(strategy_pack, "strategy_pack", "assembly_objectives");
+    deck.strategy_pack.play_policy_implementation =
+        require_field(strategy_pack, "strategy_pack", "play_policy_implementation")
+            .value_or<std::string>("");
+    deck.strategy_pack.declared_table_assumptions =
+        string_array(strategy_pack, "strategy_pack", "declared_table_assumptions");
+    deck.strategy_pack.known_blind_spots =
+        string_array(strategy_pack, "strategy_pack", "known_blind_spots");
+    if (deck.strategy_pack.id.empty() || deck.strategy_pack.version.empty() ||
+        deck.strategy_pack.play_policy_implementation.empty()) {
+        fail(path.string() + ": [strategy_pack] id, version, and play_policy_implementation "
+                             "must be non-empty");
+    }
     deck.table.opponents =
         static_cast<int>(require_field(table_ctx, "table", "opponents").value_or<int64_t>(-1));
     deck.table.on_the_play =

@@ -52,6 +52,15 @@ private:
 constexpr const char* kHeader = R"(
 [deck]
 commander = "Kinnan, Bonder Prodigy"
+[strategy_pack]
+id = "test-pack"
+version = "1.0.0"
+supported_commander_oracle_ids = ["8d11aa49-d4cd-48b1-aa0f-8548fa733416"]
+supported_effect_definitions = ["MANA_SOURCE"]
+assembly_objectives = ["state_a"]
+play_policy_implementation = "test-policy.v1"
+declared_table_assumptions = ["none"]
+known_blind_spots = ["test fixture"]
 [table]
 opponents = 3
 opponent_colors = ["G","U"]
@@ -87,6 +96,7 @@ flag = "INFINITE:C"
 in_play = ["Sol Ring"]
 )");
     REQUIRE(deck.commander == "Kinnan, Bonder Prodigy");
+    REQUIRE(deck.strategy_pack.id == "test-pack");
     REQUIRE(deck.table.opponents == 3);
     REQUIRE(deck.patterns.engines.size() == 1);
     REQUIRE(deck.patterns.patterns.size() == 1);
@@ -232,6 +242,15 @@ TEST_CASE("refuses a missing required [table] field", "[deck]") {
     const TempToml file(R"(
 [deck]
 commander = "Kinnan, Bonder Prodigy"
+[strategy_pack]
+id = "test-pack"
+version = "1.0.0"
+supported_commander_oracle_ids = ["8d11aa49-d4cd-48b1-aa0f-8548fa733416"]
+supported_effect_definitions = ["MANA_SOURCE"]
+assembly_objectives = ["state_a"]
+play_policy_implementation = "test-policy.v1"
+declared_table_assumptions = ["none"]
+known_blind_spots = ["test fixture"]
 [table]
 opponents = 3
 opponent_colors = ["G","U"]
@@ -256,6 +275,15 @@ TEST_CASE("a deck without provenance is refused", "[deck][provenance]") {
     const std::string no_block = R"(
 [deck]
 commander = "Kinnan, Bonder Prodigy"
+[strategy_pack]
+id = "test-pack"
+version = "1.0.0"
+supported_commander_oracle_ids = ["8d11aa49-d4cd-48b1-aa0f-8548fa733416"]
+supported_effect_definitions = ["MANA_SOURCE"]
+assembly_objectives = ["state_a"]
+play_policy_implementation = "test-policy.v1"
+declared_table_assumptions = ["none"]
+known_blind_spots = ["test fixture"]
 [table]
 opponents = 3
 opponent_colors = ["G","U"]
@@ -297,6 +325,15 @@ in_play = ["Sol Ring"]
         const std::string header = R"(
 [deck]
 commander = "Kinnan, Bonder Prodigy"
+[strategy_pack]
+id = "test-pack"
+version = "1.0.0"
+supported_commander_oracle_ids = ["8d11aa49-d4cd-48b1-aa0f-8548fa733416"]
+supported_effect_definitions = ["MANA_SOURCE"]
+assembly_objectives = ["state_a"]
+play_policy_implementation = "test-policy.v1"
+declared_table_assumptions = ["none"]
+known_blind_spots = ["test fixture"]
 [table]
 opponents = 3
 opponent_colors = ["G","U"]

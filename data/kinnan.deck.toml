@@ -8,6 +8,39 @@
 name      = "Kinnan cEDH"
 commander = "Kinnan, Bonder Prodigy"
 
+# Versioned strategy boundary. This is the first and currently only supported
+# pack; a candidate naming any other pack or commander is rejected rather than
+# being run through Kinnan's policy by accident.
+[strategy_pack]
+id      = "kinnan-midrange-goldfish"
+version = "1.0.0"
+supported_commander_oracle_ids = ["8d11aa49-d4cd-48b1-aa0f-8548fa733416"]
+supported_effect_definitions = [
+  "MANA_SOURCE", "DYNAMIC_MANA_SOURCE", "RITUAL", "MASS_UNTAP",
+  "DRAW", "SELECT", "TUTOR", "FETCH", "CLONE", "STATIC_MANA_MODIFIER",
+  "CARD_COST",
+]
+assembly_objectives = [
+  "infinite_C_into_thrasios",
+  "infinite_C_outlet_in_hand",
+  "wide_colour_into_thrasios",
+]
+play_policy_implementation = "authored-kinnan-policy.v1"
+declared_table_assumptions = [
+  "goldfish with no simulated opponents",
+  "three-opponent card-text context",
+  "opponents collectively expose WUBRG for conditional mana sources",
+  "on the play",
+]
+known_blind_spots = [
+  "no stack or live interaction",
+  "no combat or opponent-facing terminal kill",
+  "summoning sickness is not modeled",
+  "legend rule is not modeled",
+  "Hullbreaker Horror is knowingly misclassified inert",
+  "Sylvan Library, The One Ring, Thrasios activation, and Valley Floodcaller are unauthored",
+]
+
 # PROVENANCE. A DECK FILE WITHOUT A DATE IS A CLAIM ABOUT A LIST THAT MAY NOT
 # EXIST ANYMORE.
 #

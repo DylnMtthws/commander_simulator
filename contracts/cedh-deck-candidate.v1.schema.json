@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://commander-simulator.local/contracts/cedh-deck-candidate.v1.schema.json",
+  "title": "cEDH deck candidate v1",
+  "description": "A generator-produced Commander deck candidate accepted by commander_simulator. Schema validity is necessary but the service also verifies that library quantities sum to exactly 99, the candidate hash is correct, and the requested strategy pack supports the commander.",
+  "$comment": "candidate_hash is sha256:<lowercase hex> over compact UTF-8 JSON with lexicographically sorted object keys and these fields only: schema_version, commander_oracle_ids (sorted), library (coalesced by oracle_id and sorted), strategy_pack_id, strategy_pack_version. candidate_id, provenance, and user_constraints are intentionally excluded.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "candidate_id",
+    "commander_oracle_ids",
+    "library",
+    "strategy_pack_id",
+    "strategy_pack_version",
+    "provenance",
+    "candidate_hash"
+  ],
+  "properties": {
+    "schema_version": { "const": "cedh-deck-candidate.v1" },
+    "candidate_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "commander_oracle_ids": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/oracle_id" }
+    },
+    "library": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 99,
+      "items": { "$ref": "#/$defs/card_quantity" }
+    },
+    "strategy_pack_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+    "strategy_pack_version": { "$ref": "#/$defs/semver" },
+    "provenance": { "$ref": "#/$defs/provenance" },
+    "candidate_hash": { "$ref": "#/$defs/sha256" },
+    "user_constraints": {
+      "description": "Opaque producer/UI constraints retained for audit. The simulator must not interpret this object or let it affect mechanics.",
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "oracle_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "card_quantity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["oracle_id", "quantity"],
+      "properties": {
+        "oracle_id": { "$ref": "#/$defs/oracle_id" },
+        "quantity": { "type": "integer", "minimum": 1, "maximum": 99 }
+      }
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "data_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "snapshot_at", "hash"],
+      "properties": {
+        "source": { "type": "string", "minLength": 1 },
+        "snapshot_at": { "type": "string", "format": "date-time" },
+        "hash": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["producer", "card_data", "corpus"],
+      "properties": {
+        "producer": { "$ref": "#/$defs/producer" },
+        "card_data": { "$ref": "#/$defs/data_source" },
+        "corpus": { "$ref": "#/$defs/data_source" }
+      }
+    }
+  }
+}

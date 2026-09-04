@@ -6,8 +6,10 @@ when an item completes.
 
 ## Position
 
-**Phases 0–7 complete, including R3.** The model executes Kinnan's dig rather
-than detecting it, which was the last known missing verb on the deck's main line.
+**Phases 0–7 and the v1 service boundary are complete, including R3.** The model
+executes Kinnan's dig rather than detecting it, which was the last known missing
+verb on the deck's main line. `kinnan-midrange-goldfish@1.0.0` is the first and
+only installed strategy pack; unsupported packs and commanders are refused.
 
 The current headline, 60,000 games, `data/kinnan.deck.toml` (list A, snapshot
 2026-09-01, 99 sha256 `f3919eaf`):
@@ -36,10 +38,19 @@ deck**, and the model cannot see 31 of the 99 cards.
 - **Two mechanical checks in CI** — `check_core_is_sealed.sh` and
   `check_effects_are_read.sh`. The second caught a field added in the same
   session that added the check.
+- **Two public JSON contracts** — `cedh-deck-candidate.v1` and
+  `cedh-simulation-result.v1`, with schema fixtures, executable 99-card/hash
+  checks, stable JSON-only stdout, provenance/coverage warnings, and explicit
+  rejection of an unsupported-pack fixture.
+- **Oracle-ID exporter input** — `mtgsim-export --candidate`, constrained to
+  `mtg_v1` and the `mtg_consumer` role.
 
 ## In flight
 
-Nothing uncommitted.
+No implementation phase is currently in flight. The next work must be chosen
+explicitly from the deferred items below; the service boundary does not imply
+that a second strategy or an opponent model already exists. The historical
+Kinnan measurements and human-readable CLI remain unchanged in meaning.
 
 ## Where the chart stands
 
@@ -100,4 +111,5 @@ be the least defensible number in the document.
   differs by 29 cards. Re-authoring would discard every measurement in §16 and
   produce a document describing neither list.
 - **Not in v1, deliberately**: the mulligan recursion, opposition profiles, a
-  second deck, pairwise ablation, Thrasios's scry.
+  supported second strategy pack, controlled disruption, pairwise ablation,
+  Thrasios's scry, or a general Magic rules engine.

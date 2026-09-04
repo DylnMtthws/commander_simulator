@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #include "core/card.hpp"
 #include "core/effects.hpp"
@@ -43,9 +44,24 @@ struct Provenance {
     std::string cards_sha256;
 };
 
+// Commander/deck-specific strategy, explicitly versioned. The mechanics stay
+// in core; this metadata says which authored policy/pattern package may use
+// them and makes accidental Kinnan fallback rejectable at the service edge.
+struct StrategyPack {
+    std::string id;
+    std::string version;
+    std::vector<std::string> supported_commander_oracle_ids;
+    std::vector<std::string> supported_effect_definitions;
+    std::vector<std::string> assembly_objectives;
+    std::string play_policy_implementation;
+    std::vector<std::string> declared_table_assumptions;
+    std::vector<std::string> known_blind_spots;
+};
+
 struct DeckFile {
     std::string name;
     std::string commander;
+    StrategyPack strategy_pack;
     Provenance provenance;
     DeckTable table;
     std::string ablation_replacement;

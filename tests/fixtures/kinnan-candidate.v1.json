@@ -1,0 +1,427 @@
+{
+  "commander_oracle_ids": [
+    "8d11aa49-d4cd-48b1-aa0f-8548fa733416"
+  ],
+  "library": [
+    {
+      "oracle_id": "0259f063-3e3f-4e07-9066-f748d4819829",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "0895c9b7-ae7d-4bb3-af17-3b75deb50a25",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "08afc0d7-192f-4ab6-b6a0-c4265cf5e225",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "08d64b16-9221-4532-890c-d5cdbf181e28",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "09dd85aa-47bc-4713-a9b9-8b52ff2285ed",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "0a356d04-2e86-435b-9766-27b93b468a61",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "0bc7f093-bef0-4f1a-852c-4b75ebf54838",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "1869eb1e-7786-4fea-8a92-2bd839de47df",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "1a0770e6-b093-4439-baff-6889a50ba12e",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "20283c4a-f1f0-42f0-bc08-6da87474426b",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "2167ac25-d042-4b48-b770-8b94acc1a965",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "21d90735-5e04-4a8c-a546-ff26d4d5998d",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "229d6627-1292-4ae1-8849-b0f956fa6540",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "23467047-6dba-4498-b783-1ebc4f74b8c2",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "234a734b-ba28-4f1b-9d01-3c3e7d516590",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "27b047e3-0d41-45e2-98e9-9391d7923a1e",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "28c1a4a0-f58c-4d07-a918-51ff8a74f050",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "2912d93d-ed51-41ef-b64f-3cb6581c09e5",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "29737a60-3ebd-40d9-b935-c4f54b90d45d",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "2bace3ea-7d28-4a1c-857a-d3c3a1c11b59",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "311a449d-dc74-46e6-9a47-6a597931f736",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "32e5339e-9e4f-46f8-b305-f9d6d3ba8bb5",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "3577c47e-76d3-4659-b922-31c4b74be3a0",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "3aa83ed2-f48b-4ce6-a614-2c54ddf50538",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "3d867016-2601-4a37-a73d-308898d3bd37",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "3f3b2c10-21f8-4e13-be83-4ef3fa36e123",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "40b36bc6-c185-4bda-99e7-0118953c2c97",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "48712d36-5c13-4ded-87a4-68106da4a5cd",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "4879c8f0-8832-4290-bc71-9838940f75cd",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "4e7a8817-1a66-45c3-ade9-eac79b40b89f",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "53236dd7-845a-444c-96d5-f41ed7325d8f",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "6587a463-a108-4854-b6d1-944e89b8c8a4",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "66ae2562-68e9-4c77-ba0a-57f8ff37f656",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "6789a170-f2c5-4fc0-8a45-2b2361e67410",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "67d60b24-d429-4ded-90d9-06e49f28c396",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "68954295-54e3-4303-a6bc-fc4547a4e3a3",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "69872a9a-fe54-4e58-940c-89395af71acd",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "6a84eda1-7e72-4b5a-849f-b6e177565aeb",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "6ad8011d-3471-4369-9d68-b264cc027487",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "6b0e23cf-7d68-4329-86db-7adc26abd86b",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "6b8cf2a0-b045-4d91-9d91-c602d40c6237",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "6d7be242-a072-40ce-b540-95880506cccd",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "6ee51134-c4ad-4101-8ce2-23dde9359cd4",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "70fa2eba-565e-4fed-adc9-7f5d9fcbf1fa",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "736892cb-a34b-4bb9-b56c-e26e3db207a2",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "74b7fe23-5d3a-4092-8d78-7c0eba8f6f73",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "79a71fe5-38ce-4bb5-aea0-c9b9a856d397",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "7a43bd27-fdd8-41f0-9bc4-92568f3408f1",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "7de04284-dcaa-4b63-a734-fcfe2698f83c",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "80bc56a9-40e0-48da-ae86-190e39c8a4a3",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "86bf58f2-7f25-4e10-b797-25e0e8e67769",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "871e4c4e-8105-4cb9-b1cd-53c5f8e64494",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "87bc0b1f-49ef-4c06-9049-2c148b467882",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "88f8f683-738e-48f3-afff-c8f73f1033a2",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "8a52f3c0-2552-4425-b2e3-5496eb2232a7",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "8c34b089-aad1-476e-958a-3077bf1bbb51",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "8ddfc283-c9b4-41a5-af88-cf0068e986cc",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "8f878efc-850f-43d2-a6fe-5ea8d1dd5afb",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "92eed395-62ca-4293-882b-8565c40daab5",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "95560508-7ac9-4be9-8a3f-3c7d5b52807b",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "956381ba-6d37-4a8a-846c-bad79222dbee",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "a50737d7-dd2d-40da-817c-f913f76b5011",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "a92ae7b0-cbbb-44a8-bfd8-2a68f4c1ce1a",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "a984db23-40ea-428d-829f-e944267280f8",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "ac2173f9-f223-440a-9231-fd98762bdc6f",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "ad7d854b-d303-40eb-acd6-03a8023e05e7",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "b2c6aa39-2d2a-459c-a555-fb48ba993373",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "b34bb2dc-c1af-4d77-b0b3-a0fb342a5fc6",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "b9df2cdf-397c-458d-89cf-911568737ffa",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "bcc6eece-75ea-494c-b33a-d4477d504e0b",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "bdeb440d-a714-40e8-9038-f651e6ae45fb",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "bf1341dd-41a3-49f6-87ec-63170dde4324",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "c0adbddc-b070-4c5f-afe0-0474c72a9251",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "c39e5fb0-6de3-4105-ad3c-0ecb8951a1d5",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "c85d824b-c190-4d04-ab99-918ad0e6516c",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "cb027150-848c-4a66-88ad-e20222304dd8",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "ce19962d-94f9-4b2b-b668-963c0acce308",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "d09c9cba-fdd2-479b-ad5d-d05181c3e3f9",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "d0ee5bdc-2b69-4b73-9a20-ffcc18783b29",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "d1620449-930a-4895-a143-fd2a0a3c8b17",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "d3a0b660-358c-41bd-9cd2-41fbf3491b1a",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "d4a84e78-d9b9-4c67-8a4b-4329e65f0f15",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "d4ec0df9-a4a3-48cf-a0aa-b1aea5c49142",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "da46904c-8fb8-44c2-b2ab-775a1cc12ec3",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "dbe792f9-22be-4972-b418-99a6190c4421",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "de2440de-e948-4811-903c-0bbe376ff64d",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "df317532-7d36-40fd-938f-e972749c8792",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "e31808bb-fb6e-487b-a973-db44961c84ee",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "e5ddacfb-e5a8-4885-a4c9-fa117f321293",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "e88de17c-086d-4e2a-b5b2-2f9f57ca7c0f",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "e9b6a394-691c-425a-9307-76d8edc7375e",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "ec3d4466-547c-4e02-b1b5-a156ec4637e9",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "ef86989d-ce80-4e55-aece-7d11710eeffa",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "f25351e3-539b-4bbc-b92d-6480acf4d722",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "f3c5978a-70fa-431f-933b-b954bd0db0ea",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "f3c7af78-a77d-4134-82a2-a5ce84285a84",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "f3e213a4-ba5a-468a-93b3-c0a34e1bd725",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "f434e266-d9d6-4058-96ff-a1bd4029d8dc",
+      "quantity": 1
+    },
+    {
+      "oracle_id": "f9d3b046-0b95-4103-a630-4b3fb88bb60b",
+      "quantity": 1
+    }
+  ],
+  "schema_version": "cedh-deck-candidate.v1",
+  "strategy_pack_id": "kinnan-midrange-goldfish",
+  "strategy_pack_version": "1.0.0",
+  "candidate_id": "kinnan-snapshot-a",
+  "provenance": {
+    "producer": {
+      "name": "commander-generator-fixture",
+      "version": "1.0.0"
+    },
+    "card_data": {
+      "source": "mtg_v1.card_any_medium",
+      "snapshot_at": "2026-09-01T21:20:19.430220+00:00",
+      "hash": "sha256:0ca3ccc3de4f063d601e0587afc98ae34953a5a0b596a08e73c9f700374471b6"
+    },
+    "corpus": {
+      "source": "Scryfall default cards via mtg_v1",
+      "snapshot_at": "2026-09-01T21:20:19.430220+00:00",
+      "hash": "sha256:0ca3ccc3de4f063d601e0587afc98ae34953a5a0b596a08e73c9f700374471b6"
+    }
+  },
+  "candidate_hash": "sha256:848d1047a601f6aa31734a526260dfc801311a94cb8bf11bd754cfcbfb645a52",
+  "user_constraints": {
+    "fixture_note": "opaque; ignored by simulator semantics"
+  }
+}

@@ -11,7 +11,7 @@
 #include "core/version.hpp"
 
 TEST_CASE("core is linkable and reports its version", "[smoke]") {
-    STATIC_REQUIRE(cs::version() == "0.1.0");
+    STATIC_REQUIRE(cs::version() == "0.2.0");
     REQUIRE_FALSE(cs::build_flavour().empty());
 }
 

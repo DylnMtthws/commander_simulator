@@ -54,7 +54,7 @@ constexpr const char* kFace =
     R"("mana_value":1,"cost":{"generic":1,"pips":[],"variable":0,"phyrexian":[]}})";
 
 std::string one_card(const std::string& faces = std::string("[") + kFace + "]") {
-    return R"({"export_index":0,"listed_name":"Sol Ring","name":"Sol Ring","layout":"normal",)"
+    return R"({"export_index":0,"oracle_id":"00000000-0000-0000-0000-000000000001","listed_name":"Sol Ring","name":"Sol Ring","layout":"normal",)"
            R"("mana_value":1,"castable_cmcs":[1],"all_types":["Artifact"],"color_identity":[],)"
            R"("has_land_face":false,"is_commander":false,"faces":)" +
            faces + "}";
@@ -181,7 +181,8 @@ TEST_CASE("refuses a structurally wrong document", "[load]") {
 
 TEST_CASE("refuses a card with a missing or mistyped field", "[load]") {
     SECTION("missing field is named") {
-        const TempJson file(minimal(R"({"export_index":0,"listed_name":"Sol Ring"})"));
+        const TempJson file(minimal(
+            R"({"export_index":0,"oracle_id":"00000000-0000-0000-0000-000000000001","listed_name":"Sol Ring"})"));
         REQUIRE_THROWS_MATCHES(
             cs::io::load_card_db(file.path()), cs::io::LoadError,
             Catch::Matchers::MessageMatches(ContainsSubstring("missing required field 'name'")));

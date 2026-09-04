@@ -6,6 +6,7 @@
 
 #include <cstdio>
 #include <filesystem>
+#include <fstream>
 #include <string>
 
 #include <algorithm>
@@ -25,6 +26,7 @@
 #include "io/card_db_load.hpp"
 #include "io/deck_load.hpp"
 #include "io/effects_load.hpp"
+#include "io/service.hpp"
 #include "io/trace.hpp"
 
 namespace {
@@ -598,6 +600,108 @@ int simulate(const std::filesystem::path& path, const std::filesystem::path& dec
         cs::simulate_batch(db, effects, deck.patterns, config, policy, base_seed, 0, games);
     print_report(db, deck, run, config, policy);
     return 0;
+}
+
+// Versioned service boundary. Unlike the human report, stdout contains exactly
+// one JSON document; all diagnostics go to stderr so a subprocess can parse it
+// without stripping banners or progress text.
+int simulate_request(const std::filesystem::path& request_path,
+                     const std::filesystem::path& cards_path,
+                     const std::filesystem::path& pack_path,
+                     const std::filesystem::path& effects_path,
+                     const std::filesystem::path& output_path, int games,
+                     std::uint64_t seed, int objective_turn,
+                     const std::string& scenario, bool do_ablation,
+                     const std::string& only, int threads) {
+    if (games <= 0) {
+        std::fprintf(stderr, "error: --request requires --games greater than zero\n");
+        return 2;
+    }
+    if (objective_turn < 1) {
+        std::fprintf(stderr, "error: --turn must be at least 1\n");
+        return 2;
+    }
+    if (scenario != "goldfish_assembly.v1") {
+        std::fprintf(stderr,
+                     "error: unsupported scenario '%s'; supported: goldfish_assembly.v1. "
+                     "Controlled disruption is reserved for a future version.\n",
+                     scenario.c_str());
+        return 2;
+    }
+
+    try {
+        const cs::io::ServiceRunMetadata started{
+            .games = games,
+            .seed = seed,
+            .objective_turn = objective_turn,
+            .scenario_id = cs::io::kGoldfishScenarioId,
+            .scenario_version = cs::io::kGoldfishScenarioVersion,
+            .started_at = cs::io::utc_timestamp_now(),
+            .completed_at = {}};
+        const cs::CardDb db = cs::io::load_card_db(cards_path);
+        const cs::io::DeckFile pack = cs::io::load_deck(pack_path, db);
+        const cs::EffectDb effects = cs::io::load_effects(effects_path, db);
+        const cs::io::CandidateRequest request = cs::io::load_candidate_request(request_path);
+        cs::io::validate_candidate_for_pack(request, db, pack);
+
+        const cs::AuthoredPolicy policy(pack.weights);
+        const cs::GameConfig config = make_config(pack);
+        if (objective_turn > config.turn_cap) {
+            std::fprintf(stderr, "error: --turn %d exceeds this pack's turn cap %d\n",
+                         objective_turn, config.turn_cap);
+            return 2;
+        }
+        const cs::RunSummary run =
+            cs::simulate_batch(db, effects, pack.patterns, config, policy, seed, 0, games);
+        std::vector<cs::io::ServiceAblationResult> ablations;
+        if (do_ablation) {
+            const int replacement = cs::slot_of_listed(db, pack.ablation_replacement);
+            if (replacement < 0) {
+                throw std::runtime_error("strategy pack's ablation replacement is absent");
+            }
+            for (const cs::Card& card : db.cards) {
+                if (card.is_commander || card.export_index == replacement ||
+                    (!only.empty() && card.listed_name != only)) {
+                    continue;
+                }
+                const AblationResult measured = measure_ablation(
+                    db, effects, pack, config, card.export_index, replacement, games,
+                    threads, seed, objective_turn);
+                ablations.push_back({
+                    .oracle_id = card.oracle_id,
+                    .replacement_oracle_id =
+                        db.cards[static_cast<std::size_t>(replacement)].oracle_id,
+                    .objective_turn = objective_turn,
+                    .delta = measured.paired.delta,
+                    .interval_low = measured.paired.low,
+                    .interval_high = measured.paired.high});
+            }
+            if (ablations.empty()) {
+                throw std::runtime_error("no ablation target matched the request");
+            }
+        }
+        cs::io::ServiceRunMetadata finished = started;
+        finished.completed_at = cs::io::utc_timestamp_now();
+        const std::string result = cs::io::build_simulation_result_json(
+            request, db, pack, effects, config, run, finished, ablations);
+
+        if (output_path.empty() || output_path == "-") {
+            std::fwrite(result.data(), 1, result.size(), stdout);
+        } else {
+            std::ofstream output(output_path);
+            if (!output) {
+                std::fprintf(stderr, "error: cannot open JSON output %s\n",
+                             output_path.c_str());
+                return 1;
+            }
+            output << result;
+            std::fprintf(stderr, "wrote %s\n", output_path.c_str());
+        }
+        return 0;
+    } catch (const std::runtime_error& error) {
+        std::fprintf(stderr, "error: %s\n", error.what());
+        return 1;
+    }
 }
 
 // The leave-one-out sweep, and the CRN measurement section 10.4 requires.
@@ -1214,17 +1318,12 @@ int grid(const std::filesystem::path& path, const std::filesystem::path& deck_pa
 }
 
 int main(int argc, char** argv) {
-    const auto v = cs::version();
-    const auto flavour = cs::build_flavour();
-    std::printf("commander_simulator ");
-    print_view("%.*s", v);
-    std::printf(" (");
-    print_view("%.*s", flavour);
-    std::printf(" build)\n\n");
-
     std::filesystem::path path{"data/cards.json"};
     std::filesystem::path deck_path{"data/kinnan.deck.toml"};
     std::filesystem::path effects_path{"data/effects.toml"};
+    std::filesystem::path request_path;
+    std::filesystem::path output_json{"-"};
+    std::string scenario{"goldfish_assembly.v1"};
     int games = 0;
     long long trace_seed = -1;
     std::uint64_t seed = 1;
@@ -1245,6 +1344,14 @@ int main(int argc, char** argv) {
             trace_seed = std::atoll(argv[++i]);
         } else if (std::strcmp(argv[i], "--deck") == 0 && i + 1 < argc) {
             deck_path = argv[++i];
+        } else if (std::strcmp(argv[i], "--request") == 0 && i + 1 < argc) {
+            request_path = argv[++i];
+        } else if (std::strcmp(argv[i], "--cards") == 0 && i + 1 < argc) {
+            path = argv[++i];
+        } else if (std::strcmp(argv[i], "--output-json") == 0 && i + 1 < argc) {
+            output_json = argv[++i];
+        } else if (std::strcmp(argv[i], "--scenario") == 0 && i + 1 < argc) {
+            scenario = argv[++i];
         } else if (std::strcmp(argv[i], "--effects") == 0 && i + 1 < argc) {
             effects_path = argv[++i];
         } else if (std::strcmp(argv[i], "--seed") == 0 && i + 1 < argc) {
@@ -1266,6 +1373,20 @@ int main(int argc, char** argv) {
             path = argv[i];
         }
     }
+
+    if (!request_path.empty()) {
+        return simulate_request(request_path, path, deck_path, effects_path, output_json,
+                                games, seed, objective_turn, scenario, do_sweep, only,
+                                threads);
+    }
+
+    const auto v = cs::version();
+    const auto flavour = cs::build_flavour();
+    std::printf("commander_simulator ");
+    print_view("%.*s", v);
+    std::printf(" (");
+    print_view("%.*s", flavour);
+    std::printf(" build)\n\n");
 
     // The metric banner is FIRST and unconditional (section 9.5, rule 1) - so
     // the card-database summary, which is numbers, cannot precede it. It used

@@ -29,6 +29,7 @@ from typing import Any
 import psycopg
 from psycopg.rows import dict_row
 
+from mtgsim_export.candidate import Candidate
 from mtgsim_export.deck import Deck
 from mtgsim_export.mana import check_against_mana_value, parse_cost
 
@@ -49,9 +50,61 @@ WHERE oracle_id = ANY(%(ids)s)
 ORDER BY oracle_id, face_index
 """
 
+_CARD_BY_ID_QUERY = f"""
+SELECT oracle_id, name
+FROM {SOURCE_VIEW}
+WHERE oracle_id = ANY(%(ids)s)
+"""
+
 
 class ExportError(RuntimeError):
     """An export that must not produce a file. Always names what is missing."""
+
+
+def _assert_consumer_role(conn: psycopg.Connection[dict[str, Any]]) -> None:
+    """Make the data boundary executable, not just documented."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        row = cur.execute("SELECT current_user AS role").fetchone()
+    role = str(row["role"]) if row else ""
+    if role != "mtg_consumer":
+        raise ExportError(
+            f"database role is {role!r}, expected 'mtg_consumer'. The exporter reads only "
+            "the mtg_v1 consumer contract and must not run with pipeline privileges."
+        )
+
+
+def deck_from_candidate(
+    conn: psycopg.Connection[dict[str, Any]], candidate: Candidate
+) -> Deck:
+    """Resolve oracle IDs to the listed names the existing snapshot builder uses."""
+    _assert_consumer_role(conn)
+    requested = set(candidate.all_oracle_ids)
+    with conn.cursor(row_factory=dict_row) as cur:
+        rows = cur.execute(_CARD_BY_ID_QUERY, {"ids": list(requested)}).fetchall()
+    by_id = {str(row["oracle_id"]): str(row["name"]) for row in rows}
+    missing = sorted(requested - set(by_id))
+    if missing:
+        raise ExportError(
+            f"{len(missing)} candidate oracle_id(s) did not resolve in {SOURCE_VIEW}: {missing}"
+        )
+    commander_names = [by_id[value] for value in candidate.commander_oracle_ids]
+    if len(commander_names) != 1:
+        raise ExportError(
+            "the exporter contract permits partner candidates, but no installed strategy pack "
+            "supports one yet; refusing to invent commander semantics"
+        )
+    mainboard: list[str] = []
+    for card in candidate.library:
+        mainboard.extend([by_id[card.oracle_id]] * card.quantity)
+    return Deck(
+        name=candidate.candidate_id,
+        commander=commander_names[0],
+        mainboard=tuple(mainboard),
+        opponents=0,
+        opponent_colors=(),
+        on_the_play=True,
+        replacement="",
+    )
 
 
 def _oracle_hash(row: dict[str, Any], faces: list[dict[str, Any]]) -> str:
@@ -163,6 +216,7 @@ def _face_documents(
 
 
 def build_export(conn: psycopg.Connection[dict[str, Any]], deck: Deck) -> dict[str, Any]:
+    _assert_consumer_role(conn)
     names = list(deck.all_cards)
 
     with conn.cursor(row_factory=dict_row) as cur:

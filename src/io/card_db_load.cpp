@@ -119,6 +119,7 @@ Card parse_card(const json& node) {
     const std::string listed = require_string(node, "listed_name", "card");
     Card card;
     card.export_index = require_int(node, "export_index", listed);
+    card.oracle_id = require_string(node, "oracle_id", listed);
     card.listed_name = listed;
     card.name = require_string(node, "name", listed);
     card.layout = require_string(node, "layout", listed);

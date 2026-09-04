@@ -9,7 +9,7 @@ namespace cs {
 
 // consteval, so a caller cannot accidentally pay for this at runtime and the
 // value is guaranteed to be a compile-time constant.
-[[nodiscard]] consteval std::string_view version() noexcept { return "0.1.0"; }
+[[nodiscard]] consteval std::string_view version() noexcept { return "0.2.0"; }
 
 // Not consteval: something has to live in version.cpp, or cs_core is a library
 // with no translation unit and CMake has nothing to compile.

@@ -11,8 +11,8 @@
 cmake_minimum_required(VERSION 3.25)
 
 project(commander_simulator
-    VERSION 0.1.0
-    DESCRIPTION "Monte Carlo goldfishing simulator for one cEDH Commander deck"
+    VERSION 0.2.0
+    DESCRIPTION "Versioned cEDH goldfish simulation service with a Kinnan strategy pack"
     LANGUAGES CXX)
 
 # --- Language level -------------------------------------------------------

@@ -68,6 +68,7 @@ struct Card {
     // ordering in the policy total (section 6.5), and the bit position this
     // card occupies in the zone bitsets (section 11).
     int export_index = 0;
+    std::string oracle_id;     // stable card identity at the service boundary
     std::string listed_name;   // as written on a decklist
     std::string name;          // as stored, e.g. "A // B"
     std::string layout;
