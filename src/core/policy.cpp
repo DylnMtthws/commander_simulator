@@ -69,7 +69,14 @@ int StubPolicyDoNotUseForResults::choose_land(const Context& context, GameStats&
 
 int StubPolicyDoNotUseForResults::choose_spell(const Context& context, GameStats& stats) const {
     int chosen = -1;
-    const Zone castable_from = context.state.hand | context.state.command_zone;
+    Zone castable_from = context.state.hand | context.state.command_zone;
+    if (context.effects != nullptr) {
+        context.state.graveyard.for_each([&](int slot) {
+            if (escape_exile_cost(context.db, *context.effects, context.state, slot) >= 0) {
+                castable_from.set(slot);
+            }
+        });
+    }
     castable_from.for_each([&](int slot) {
         if (chosen != -1) {
             return;
@@ -105,6 +112,12 @@ int StubPolicyDoNotUseForResults::choose_clone(const Context&, std::span<const i
 int StubPolicyDoNotUseForResults::choose_card_cost(const Context&,
                                                    std::span<const int> candidates,
                                                    GameStats&) const {
+    return candidates.empty() ? -1 : candidates.front();
+}
+
+int StubPolicyDoNotUseForResults::choose_escape_cost(const Context&,
+                                                     std::span<const int> candidates,
+                                                     GameStats&) const {
     return candidates.empty() ? -1 : candidates.front();
 }
 
@@ -183,6 +196,15 @@ Consideration AuthoredPolicy::score(const Context& context, int slot, bool as_la
                     usable += candidate == slot ? 0 : 1;
                 }
                 if (usable < entry.card_cost.cards) {
+                    result.castable = false;
+                }
+            }
+            if (context.state.graveyard.test(slot)) {
+                const int exile_cards =
+                    escape_exile_cost(context.db, *context.effects, context.state, slot);
+                std::vector<int> payable;
+                escape_cost_candidates(context.state, slot, payable);
+                if (exile_cards < 0 || static_cast<int>(payable.size()) < exile_cards) {
                     result.castable = false;
                 }
             }
@@ -334,7 +356,14 @@ int AuthoredPolicy::choose_land(const Context& context, GameStats& stats) const 
 
 int AuthoredPolicy::choose_spell(const Context& context, GameStats& stats) const {
     std::vector<Consideration> candidates;
-    const Zone castable_from = context.state.hand | context.state.command_zone;
+    Zone castable_from = context.state.hand | context.state.command_zone;
+    if (context.effects != nullptr) {
+        context.state.graveyard.for_each([&](int slot) {
+            if (escape_exile_cost(context.db, *context.effects, context.state, slot) >= 0) {
+                castable_from.set(slot);
+            }
+        });
+    }
     castable_from.for_each([&](int slot) {
         if (context.db.cards[static_cast<std::size_t>(slot)].castable_face() != nullptr) {
             candidates.push_back(score(context, slot, /*as_land=*/false, stats));
@@ -346,6 +375,26 @@ int AuthoredPolicy::choose_spell(const Context& context, GameStats& stats) const
     // Floor of 0: an uncastable card carries a large negative term, so it can
     // never be chosen, and there is no second code path deciding castability.
     return best_of(candidates, 0);
+}
+
+int AuthoredPolicy::choose_escape_cost(const Context& context,
+                                       std::span<const int> candidates,
+                                       GameStats& stats) const {
+    std::vector<Consideration> scored;
+    scored.reserve(candidates.size());
+    for (const int slot : candidates) {
+        scored.push_back(score_arrival(context, slot, /*to_hand=*/true, stats));
+    }
+    int worst = -1;
+    int worst_score = 0;
+    for (const Consideration& candidate : scored) {
+        if (worst < 0 || candidate.score < worst_score ||
+            (candidate.score == worst_score && candidate.slot < worst)) {
+            worst = candidate.slot;
+            worst_score = candidate.score;
+        }
+    }
+    return worst;
 }
 
 int AuthoredPolicy::choose_card_cost(const Context& context, std::span<const int> candidates,

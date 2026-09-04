@@ -331,6 +331,31 @@ void card_cost_candidates(const CardCostEffect& cost, const CardDb& db, const Ga
     });
 }
 
+int escape_exile_cost(const CardDb& db, const EffectDb& effects, const GameState& state,
+                       int slot) noexcept {
+    if (!state.graveyard.test(slot) || db.cards[static_cast<std::size_t>(slot)].plays_as_land()) {
+        return -1;
+    }
+    int cost = -1;
+    state.battlefield.for_each([&](int permanent) {
+        const CardEffects& entry =
+            effects.by_slot[static_cast<std::size_t>(state.effective(permanent))];
+        if (entry.has_escape && (cost < 0 || entry.escape.exile_cards < cost)) {
+            cost = entry.escape.exile_cards;
+        }
+    });
+    return cost;
+}
+
+void escape_cost_candidates(const GameState& state, int escaping, std::vector<int>& out) {
+    out.clear();
+    state.graveyard.for_each([&](int slot) {
+        if (slot != escaping) {
+            out.push_back(slot);
+        }
+    });
+}
+
 void enter_battlefield(const CardDb& db, const EffectDb& effects, GameState& state,
                        const TableContext& table, int slot) {
     state.battlefield.set(slot);

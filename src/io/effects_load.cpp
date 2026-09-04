@@ -356,6 +356,15 @@ EffectDb load_effects(const std::filesystem::path& path, const CardDb& db,
                 target.has_mill = true;
                 target.mill.cards = static_cast<int>(*card_count);
                 target.mill.times_storm = *times_storm;
+            } else if (kind == "ESCAPE") {
+                const auto exile_cards = (*effect)["exile_cards"].value<int64_t>();
+                if (!exile_cards || *exile_cards < 0) {
+                    fail(context +
+                         ": ESCAPE requires non-negative integer 'exile_cards'; the "
+                         "graveyard payment has no silent default.");
+                }
+                target.has_escape = true;
+                target.escape.exile_cards = static_cast<int>(*exile_cards);
             } else if (kind == "MASS_UNTAP") {
                 MassUntapEffect untap;
                 untap.nonland_only = (*effect)["nonland_only"].value_or<bool>(true);

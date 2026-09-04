@@ -177,6 +177,24 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
             if (spell < 0) {
                 break;
             }
+            const bool escaped = state.graveyard.test(spell);
+            const int escape_cards =
+                escaped ? escape_exile_cost(db, effects, state, spell) : 0;
+            if (escaped) {
+                for (int paid = 0; paid < escape_cards; ++paid) {
+                    std::vector<int> candidates;
+                    escape_cost_candidates(state, spell, candidates);
+                    const Context escape_context{db, patterns, state, sources, observer, &effects};
+                    const int exiled =
+                        policy.choose_escape_cost(escape_context, candidates, result.stats);
+                    if (exiled < 0) {
+                        break;  // choose_spell already proved the full cost exists
+                    }
+                    state.graveyard.clear(exiled);
+                    state.exile.set(exiled);
+                }
+                state.graveyard.clear(spell);
+            }
             state.hand.clear(spell);
             state.command_zone.clear(spell);
             enter_battlefield(db, effects, state, config.table, spell);

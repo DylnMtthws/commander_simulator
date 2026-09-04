@@ -845,6 +845,23 @@ authored_from = "57a5c23ca0ce650d88909f5b4379977a1072cd74f42daa1c2c124fb5048ed97
 # that count is the original spell plus one copy per earlier spell.
 effects = [ { kind = "MILL", cards = 3, times_storm = true } ]
 
+[cards."Underworld Breach"]
+status = "modeled"
+authored_from = "971b8c51d35c637e51f54a251e928663012777c716b574e864994389ebe479e6"
+# "Each nonland card in your graveyard has escape. The escape cost is equal to
+# the card's mana cost plus exile three other cards from your graveyard."
+# Sacrifice at the end step is outside the relevant combo turn and is not
+# represented; every escape payment is executed.
+effects = [ { kind = "ESCAPE", exile_cards = 3 } ]
+
+[cards."Lion's Eye Diamond"]
+status = "modeled"
+authored_from = "e1f8d442713061989ed30ea5f70a7f2338bacd12c0a6d4baa475ee4606d3bb3b"
+# "Sacrifice Lion's Eye Diamond, Discard your hand: Add three mana of any one
+# color." The sacrifice and mana are represented by RITUAL. Discarding the hand
+# is not; this overstates lines that activate LED before committing their hand.
+effects = [ { kind = "RITUAL", colors = ["W","U","B","R","G"], amount = 3, from_zone = "battlefield" } ]
+
 [cards."Thassa's Oracle"]
 status = "unauthored"
 authored_from = "6a2a0571a5c0efc1745ba0a2a20cc047afbf1b0d34616c959168ee9f35e4135f"

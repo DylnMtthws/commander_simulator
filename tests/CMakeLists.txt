@@ -44,7 +44,8 @@ target_sources(cs_tests PRIVATE
     unit/test_service.cpp
     unit/test_effects_boundary.cpp
     unit/test_exile_library.cpp
-    unit/test_mill.cpp)
+    unit/test_mill.cpp
+    unit/test_escape.cpp)
 
 # Catch2WithMain supplies main(), so no test file writes one.
 # cs_core arrives transitively via cs_io's PUBLIC link.

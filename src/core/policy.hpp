@@ -77,6 +77,14 @@ public:
                                                std::span<const int> candidates,
                                                GameStats& stats) const = 0;
 
+    // Which graveyard card to exile as an escape cost. Like CARD_COST this is
+    // a lowest-score choice, but it reads a different zone and has a different
+    // destination, so keeping it explicit makes the trace and policy boundary
+    // honest.
+    [[nodiscard]] virtual int choose_escape_cost(const Context& context,
+                                                 std::span<const int> candidates,
+                                                 GameStats& stats) const = 0;
+
     // Which land to fetch from a set of candidates, or -1 for none.
     //
     // A fetch IS a tutor with a small candidate set, so it goes through the
@@ -119,6 +127,8 @@ public:
                                    GameStats& stats) const override;
     [[nodiscard]] int choose_card_cost(const Context& context, std::span<const int> candidates,
                                        GameStats& stats) const override;
+    [[nodiscard]] int choose_escape_cost(const Context& context, std::span<const int> candidates,
+                                         GameStats& stats) const override;
     [[nodiscard]] int choose_select(const Context& context, std::span<const int> revealed,
                                     GameStats& stats) const override;
     [[nodiscard]] const char* name() const override {
@@ -185,6 +195,8 @@ public:
                                    GameStats& stats) const override;
     [[nodiscard]] int choose_card_cost(const Context& context, std::span<const int> candidates,
                                        GameStats& stats) const override;
+    [[nodiscard]] int choose_escape_cost(const Context& context, std::span<const int> candidates,
+                                         GameStats& stats) const override;
     [[nodiscard]] int choose_select(const Context& context, std::span<const int> revealed,
                                     GameStats& stats) const override;
     [[nodiscard]] const char* name() const override {

@@ -683,6 +683,19 @@ the first user. The readable `in_graveyard` and `storm_count_gte` pattern terms
 remain conjunctive and opponent-free. Kinnan's existing objectives name none of
 this state, so their meaning is unchanged.
 
+#### 2026-09-03 re-audit — `ESCAPE`
+
+`ESCAPE` adds the missing cast-from-graveyard verb. The printed mana cost still
+goes through ordinary payment; the new effect grants permission and charges the
+explicit exile-other-cards cost. Re-auditing every existing authored card found
+one prior entry whose text mentions the mechanic: *Nature's Rhythm* has
+Harmonize, a cast-from-graveyard ability. It remains represented only by its
+front-face `TUTOR`; enabling Harmonize would change Kinnan pack 1.0.0's measured
+capability, so that omission stays documented rather than silently widening the
+scenario. *Underworld Breach* is the first `ESCAPE` user. Together with the new
+`MILL` user *Brain Freeze* and the existing `RITUAL` representation used for
+*Lion's Eye Diamond*, the loop can now consume and replenish a real graveyard.
+
 #### SCOPE NOTE — the scorer is thinly validated by this deck
 
 **This deck has no cantrips.** No *Brainstorm*, no *Ponder*, no *Preordain*.

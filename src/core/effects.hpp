@@ -215,6 +215,13 @@ struct MillEffect {
     bool times_storm = false;
 };
 
+// ESCAPE grants the verb "cast a nonland card from your graveyard" and pays
+// its non-mana cost by exiling other graveyard cards. Underworld Breach is the
+// first user. The spell's printed mana cost remains the mana cost.
+struct EscapeEffect {
+    int exile_cards = 0;
+};
+
 enum class ModifierMode : std::uint8_t { Multiply, GrantCreatureMana };
 
 struct ModifierEffect {
@@ -251,6 +258,8 @@ struct CardEffects {
     ExileLibraryEffect exile_library;
     bool has_mill = false;
     MillEffect mill;
+    bool has_escape = false;
+    EscapeEffect escape;
 
     // CONVOKE is a property of the COST, not an effect, which is why it is a
     // card-level flag and not a member of the closed kind set. Section 4.2's
@@ -405,6 +414,14 @@ void convoke_slots(const CardDb& db, const EffectDb& effects, const GameState& s
 // output distinguishes a free Chrome Mox from a paid one.
 void card_cost_candidates(const CardCostEffect& cost, const CardDb& db, const GameState& state,
                           std::vector<int>& out);
+
+// Returns the number of OTHER graveyard cards required to escape `slot`, or
+// -1 when no active effect grants permission.
+[[nodiscard]] int escape_exile_cost(const CardDb& db, const EffectDb& effects,
+                                    const GameState& state, int slot) noexcept;
+
+void escape_cost_candidates(const GameState& state, int escaping,
+                            std::vector<int>& out);
 
 // Puts a permanent onto the battlefield, with everything that entails.
 //
