@@ -345,6 +345,17 @@ EffectDb load_effects(const std::filesystem::path& path, const CardDb& db,
                 }
                 target.has_exile_library = true;
                 target.exile_library.leave = static_cast<int>(*leave);
+            } else if (kind == "MILL") {
+                const auto card_count = (*effect)["cards"].value<int64_t>();
+                const auto times_storm = (*effect)["times_storm"].value<bool>();
+                if (!card_count || *card_count <= 0 || !times_storm.has_value()) {
+                    fail(context +
+                         ": MILL requires positive integer 'cards' and explicit boolean "
+                         "'times_storm'; neither field has a silent default.");
+                }
+                target.has_mill = true;
+                target.mill.cards = static_cast<int>(*card_count);
+                target.mill.times_storm = *times_storm;
             } else if (kind == "MASS_UNTAP") {
                 MassUntapEffect untap;
                 untap.nonland_only = (*effect)["nonland_only"].value_or<bool>(true);

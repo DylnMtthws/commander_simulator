@@ -20,10 +20,10 @@ namespace {
 // too, or the pattern quietly never fires - the same failure class as a
 // mechanism not running.
 constexpr std::string_view kZoneTerms[] = {"in_play", "in_hand", "in_play_or_hand", "untapped",
-                                           "any_of", "resolved"};
+                                           "any_of", "resolved", "in_graveyard"};
 constexpr std::string_view kScalarTerms[] = {"turn_gte", "creature_count_gte",
                                             "library_size_lte", "loop_entry_cost",
-                                            "activations"};
+                                            "activations", "storm_count_gte"};
 constexpr std::string_view kOtherTerms[] = {"flag", "flags", "entry_pips"};
 constexpr std::string_view kBoolTerms[] = {"devotion_gte_library"};
 
@@ -100,6 +100,7 @@ Requirement parse_requirement(const toml::table& table, const CardDb& db, Patter
             else if (name == "in_play_or_hand") requirement.in_play_or_hand = zone;
             else if (name == "untapped") requirement.untapped = zone;
             else if (name == "resolved") requirement.resolved = zone;
+            else if (name == "in_graveyard") requirement.in_graveyard = zone;
             else { requirement.any_of = zone; requirement.has_any_of = true; }
         } else if (contains(kScalarTerms, name)) {
             const auto number = value.value<int64_t>();
@@ -115,6 +116,8 @@ Requirement parse_requirement(const toml::table& table, const CardDb& db, Patter
                 requirement.activations = static_cast<int>(*number);
                 saw_activations = true;
             }
+            else if (name == "storm_count_gte")
+                requirement.storm_count_gte = static_cast<int>(*number);
             else requirement.library_size_lte = static_cast<int>(*number);
         } else if (contains(kBoolTerms, name)) {
             const auto enabled = value.value<bool>();
@@ -384,7 +387,7 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db) {
             set.named_slots = set.named_slots | engine.requires_.in_play |
                               engine.requires_.in_hand | engine.requires_.in_play_or_hand |
                               engine.requires_.untapped | engine.requires_.any_of |
-                              engine.requires_.resolved;
+                              engine.requires_.resolved | engine.requires_.in_graveyard;
             set.engines.push_back(std::move(engine));
         }
     }
@@ -406,7 +409,7 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db) {
             set.named_slots = set.named_slots | pattern.requires_.in_play |
                               pattern.requires_.in_hand | pattern.requires_.in_play_or_hand |
                               pattern.requires_.untapped | pattern.requires_.any_of |
-                              pattern.requires_.resolved;
+                              pattern.requires_.resolved | pattern.requires_.in_graveyard;
             set.patterns.push_back(std::move(pattern));
         }
     }

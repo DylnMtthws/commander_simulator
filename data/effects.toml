@@ -837,6 +837,14 @@ authored_from = "3f32f4fa185edb6907f666b933483b02d8b1b85ef8b00c54e88c4023e747637
 # empty library; that policy choice is the authored line this effect represents.
 effects = [ { kind = "EXILE_LIBRARY", leave = 0 } ]
 
+[cards."Brain Freeze"]
+status = "modeled"
+authored_from = "57a5c23ca0ce650d88909f5b4379977a1072cd74f42daa1c2c124fb5048ed977"
+# "Target player mills three cards. Storm." In goldfish mode the authored
+# target is this deck. storm_count includes Brain Freeze itself, so three times
+# that count is the original spell plus one copy per earlier spell.
+effects = [ { kind = "MILL", cards = 3, times_storm = true } ]
+
 [cards."Thassa's Oracle"]
 status = "unauthored"
 authored_from = "6a2a0571a5c0efc1745ba0a2a20cc047afbf1b0d34616c959168ee9f35e4135f"

@@ -208,6 +208,13 @@ struct ExileLibraryEffect {
     int leave = 0;
 };
 
+// MILL moves cards from library to graveyard. Scaling by the current per-turn
+// storm count is a quantity flag on that verb, not another effect kind.
+struct MillEffect {
+    int cards = 0;
+    bool times_storm = false;
+};
+
 enum class ModifierMode : std::uint8_t { Multiply, GrantCreatureMana };
 
 struct ModifierEffect {
@@ -242,6 +249,8 @@ struct CardEffects {
     SelectEffect select;
     bool has_exile_library = false;
     ExileLibraryEffect exile_library;
+    bool has_mill = false;
+    MillEffect mill;
 
     // CONVOKE is a property of the COST, not an effect, which is why it is a
     // card-level flag and not a member of the closed kind set. Section 4.2's

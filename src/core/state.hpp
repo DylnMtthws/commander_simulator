@@ -168,6 +168,7 @@ struct GameState {
     int life = 40;
 
     std::uint8_t turn = 0;
+    int storm_count = 0;
     bool land_played_this_turn = false;
     int commander_slot = -1;
 
@@ -195,6 +196,9 @@ struct GameState {
 
 // Draws the top card, returning its slot, or -1 if the library is empty.
 [[nodiscard]] int draw_one(GameState& state, Rng& rng) noexcept;
+
+// Moves the top card from library to graveyard without passing through hand.
+[[nodiscard]] int mill_one(GameState& state, Rng& rng) noexcept;
 
 // LOOKS AT the top `count` cards without drawing them.
 //

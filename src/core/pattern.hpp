@@ -44,11 +44,13 @@ struct Requirement {
     Zone untapped;          // all of these present AND untapped
     Zone any_of;            // at least one of these on the battlefield
     Zone resolved;          // all of these resolved at least once this game
+    Zone in_graveyard;      // all of these currently in the graveyard
     bool has_any_of = false;
     FlagMask flags = 0;     // all of these flags set by some engine this turn
     int turn_gte = 0;
     int creature_count_gte = 0;
     int library_size_lte = -1;  // -1 == not required
+    int storm_count_gte = 0;
     bool devotion_gte_library = false;  // blue devotion, for Thassa's Oracle
 
     // The cost, in generic mana, of ENTERING a self-untap loop.

@@ -673,6 +673,16 @@ explicitly unauthored for its selection text while its terminal condition is
 represented by the `resolved` and `devotion_gte_library` pattern terms. This
 does not change any objective in `kinnan-midrange-goldfish@1.0.0`.
 
+#### 2026-09-03 re-audit — `MILL` and per-turn storm state
+
+`MILL` is a new verb: cards move from library to graveyard without entering
+hand. `times_storm` is a quantity flag on that verb, while storm count itself is
+per-turn state reset by the loop. Re-auditing every prior entry found **no
+Kinnan list A card to reclassify**: none mills its controller. *Brain Freeze* is
+the first user. The readable `in_graveyard` and `storm_count_gte` pattern terms
+remain conjunctive and opponent-free. Kinnan's existing objectives name none of
+this state, so their meaning is unchanged.
+
 #### SCOPE NOTE — the scorer is thinly validated by this deck
 
 **This deck has no cantrips.** No *Brainstorm*, no *Ponder*, no *Preordain*.

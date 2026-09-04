@@ -23,6 +23,15 @@ int draw_one(GameState& state, Rng& rng) noexcept {
     return slot;
 }
 
+int mill_one(GameState& state, Rng& rng) noexcept {
+    const int slot = draw_one(state, rng);
+    if (slot >= 0) {
+        state.hand.clear(slot);
+        state.graveyard.set(slot);
+    }
+    return slot;
+}
+
 void begin_game(GameState& state, int deck_slots, int commander_slot, int hand_size,
                 Rng& rng) noexcept {
     state = GameState{};

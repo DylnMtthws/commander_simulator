@@ -36,6 +36,9 @@ bool requirement_holds(const Requirement& requirement, const PatternSet& set,
     if (!state.resolved.contains(requirement.resolved)) {
         return false;
     }
+    if (!state.graveyard.contains(requirement.in_graveyard)) {
+        return false;
+    }
     if (!requirement.untapped.empty()) {
         if (!board.contains(requirement.untapped)) {
             return false;
@@ -54,6 +57,9 @@ bool requirement_holds(const Requirement& requirement, const PatternSet& set,
     }
     if (requirement.library_size_lte >= 0 &&
         state.library_size() > requirement.library_size_lte) {
+        return false;
+    }
+    if (state.storm_count < requirement.storm_count_gte) {
         return false;
     }
     if (requirement.devotion_gte_library) {

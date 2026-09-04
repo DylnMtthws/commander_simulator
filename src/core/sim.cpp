@@ -27,6 +27,7 @@ std::uint64_t digest_state(const GameState& state) noexcept {
     }
     mix(state.drawn);
     mix(state.turn);
+    mix(static_cast<std::uint64_t>(state.storm_count));
     mix(static_cast<std::uint64_t>(state.life));
     const auto mix_zone = [&](const Zone& zone) {
         zone.for_each([&](int slot) { mix(static_cast<std::uint64_t>(slot)); });
@@ -71,6 +72,7 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
 
     for (std::uint8_t turn = 1; turn <= config.turn_cap; ++turn) {
         state.turn = turn;
+        state.storm_count = 0;
         state.land_played_this_turn = false;
 
         // Untap - except the cards whose text says they do not. Basalt
@@ -179,6 +181,7 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
             state.command_zone.clear(spell);
             enter_battlefield(db, effects, state, config.table, spell);
             ++result.stats.spells_cast;
+            ++state.storm_count;
 
             // Announced BEFORE its consequences. The fetch had this bug and so
             // did this: a trace read "TUTOR: Nature's Rhythm -> ..." and then
@@ -277,6 +280,15 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
 
             if (cast_entry.has_exile_library) {
                 exile_library_until(state, cast_entry.exile_library.leave);
+            }
+
+            if (cast_entry.has_mill) {
+                const int multiplier = cast_entry.mill.times_storm ? state.storm_count : 1;
+                for (int i = 0; i < cast_entry.mill.cards * multiplier; ++i) {
+                    if (mill_one(state, rng) < 0) {
+                        break;
+                    }
+                }
             }
 
             // CARD_COST, paid in cards from hand rather than in mana. Chrome
