@@ -11,17 +11,18 @@ import argparse
 import copy
 import hashlib
 import json
+import sys
 import uuid
 from pathlib import Path
 from typing import Any
 
-import sys
 import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "export" / "src"))
 
-from mtgsim_export.hashes import deck_sha256  # noqa: E402
+from mtgsim_export.hashes import deck_sha256
+
 NAMESPACE = uuid.UUID("86b6bd22-e564-44d0-a374-c52a021d6a84")
 
 
