@@ -124,6 +124,10 @@ struct Engine {
 
 struct WinPattern {
     std::string name;
+    // Declared by the pattern author. This is reporting metadata, not a rule:
+    // `in_model_win` means the conjunction represents a card-text win;
+    // `assembly_proxy` means simulation stops at an authored proxy state.
+    std::string terminal_state;
     Requirement requires_;
 };
 
@@ -140,6 +144,10 @@ struct PatternSet {
     // Union of every card slot named by a requirement. The effects loader uses
     // it to distinguish a harmless unlisted card from an unlisted combo piece.
     Zone named_slots;
+
+    // Names of library patterns inherited because every card in their explicit
+    // `cards` eligibility key occurs in this deck. Kept in declaration order.
+    std::vector<std::string> inherited_pattern_names;
 };
 
 [[nodiscard]] bool requirement_holds(const Requirement& requirement, const PatternSet& set,

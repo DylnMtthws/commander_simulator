@@ -326,6 +326,17 @@ std::string build_simulation_result_json(const CandidateRequest& request, const 
         inert_by_reason[effects.inert_categories[i]] = effects.inert_counts[i];
     }
 
+    json pattern_json = json::array();
+    for (const WinPattern& pattern : pack.patterns.patterns) {
+        const bool inherited = std::find(pack.patterns.inherited_pattern_names.begin(),
+                                         pack.patterns.inherited_pattern_names.end(),
+                                         pattern.name) !=
+                               pack.patterns.inherited_pattern_names.end();
+        pattern_json.push_back({{"name", pattern.name},
+                                {"source", inherited ? "library" : "pack"},
+                                {"terminal_state", pattern.terminal_state}});
+    }
+
     json assumptions = json::array();
     const auto add_assumption = [&](const char* code, const std::string& detail) {
         assumptions.push_back({{"code", code}, {"detail", detail}});
@@ -391,8 +402,12 @@ std::string build_simulation_result_json(const CandidateRequest& request, const 
         {"candidate", {{"candidate_id", request.candidate_id}, {"candidate_hash", request.candidate_hash}}},
         {"strategy_pack", {{"id", pack.strategy_pack.id},
                            {"version", pack.strategy_pack.version},
+                           {"derived", pack.derived},
                            {"play_policy", pack.strategy_pack.play_policy_implementation},
                            {"assembly_objectives", pack.strategy_pack.assembly_objectives},
+                           {"patterns", pattern_json},
+                           {"inherited_patterns", pack.patterns.inherited_pattern_names},
+                           {"rank_overrides", pack.rank_override_names},
                            {"declared_table_assumptions", pack.strategy_pack.declared_table_assumptions},
                            {"known_blind_spots", pack.strategy_pack.known_blind_spots}}},
         {"card_data", {{"manifest_hash", manifest_hash(db.manifest)},

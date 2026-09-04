@@ -68,6 +68,8 @@ struct DeckFile {
     PatternSet patterns;
     PolicyWeights weights;
     int life_floor = 10;
+    bool derived = false;
+    std::vector<std::string> rank_override_names;
 };
 
 // Parses and validates against a loaded card database. The database is required

@@ -1,0 +1,19 @@
+# The loop is represented as the state it reaches, not as an opponent-facing
+# Brain Freeze kill. It remains an assembly proxy in goldfish_assembly.v1.
+
+[[engine]]
+name = "breach_freeze_led_library_loop"
+cards = ["Underworld Breach", "Brain Freeze", "Lion's Eye Diamond"]
+sets = ["BREACH_LIBRARY_LOOP"]
+[engine.requires]
+in_play = ["Underworld Breach"]
+resolved = ["Brain Freeze", "Lion's Eye Diamond"]
+library_size_lte = 0
+storm_count_gte = 3
+
+[[win]]
+name = "breach_freeze_led_empty_library"
+cards = ["Underworld Breach", "Brain Freeze", "Lion's Eye Diamond"]
+terminal_state = "assembly_proxy"
+[win.requires]
+flag = "BREACH_LIBRARY_LOOP"

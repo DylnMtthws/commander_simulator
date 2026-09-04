@@ -3861,6 +3861,24 @@ disagreement about the copy.
 
 ---
 
+### 16.15 Generalisation phases A-C — regression diff
+
+The pack-registry boundary, the first common engine verbs, and the card-set
+pattern library were added without changing the Kinnan 1.0.0 assembly claim.
+At 20,000 games and seed 1 the checkpoint remains **1.41% / 21.13% / 76.79%**
+at turns 3 / 6 / 12, exactly the authored-rank baseline and inside its Wilson
+intervals. Moving the three Kinnan patterns into `data/patterns/kinnan.toml`
+also leaves the run digest at `00e39d693a5a54f3` relative to the immediately
+preceding Phase-B state.
+
+The digest did move from the pre-generalisation `be1cc7321eba82bf`, while the
+CDF did not. That is expected and attributable: resolved spells, exile,
+graveyard, storm and imprint were added to the state fingerprint so two runs
+that differ in newly readable state cannot claim the same deterministic
+result. The 30,000-game turn-3 sweep still places *Thrasios* and *Basalt
+Monolith* first and second; all 31 inert cards remain inside the measured null
+band of ±0.037 points after replacement bias.
+
 ## 17. The pilot's revealed preferences, against the model's measurements
 
 **An external check the sweep cannot provide for itself.** A is a snapshot; B is
@@ -4180,10 +4198,10 @@ Three things follow:
 
 ## 19. Versioned service boundary — landed after the Kinnan model
 
-The simulator now has a public boundary without widening the claim made by the
-core. Kinnan remains the first and only supported strategy pack:
-`kinnan-midrange-goldfish@1.0.0`. The pack declares its supported commander
-oracle ID, effect vocabulary, assembly objectives, authored policy
+The simulator has a public boundary without widening the claim made by the
+core. Installed strategy packs are discovered from exact `*.deck.toml` id and
+version matches; unknown named packs remain fatal. Each pack declares its
+supported commander oracle IDs, effect vocabulary, assembly objectives, authored policy
 implementation, table assumptions and blind spots in `data/kinnan.deck.toml`.
 
 Two Draft 2020-12 JSON Schemas are authoritative:
@@ -4191,10 +4209,11 @@ Two Draft 2020-12 JSON Schemas are authoritative:
 - `cedh-deck-candidate.v1` identifies commanders and exactly 99 library cards by
   `oracle_id` and quantity, pins a strategy-pack version, carries producer/card
   data/corpus provenance, and includes a verified semantic-content SHA-256.
-- `cedh-simulation-result.v1` carries simulator/candidate/pack/card-data
+- `cedh-simulation-result.v2` carries simulator/candidate/pack/card-data
   provenance, the requested scenario and objective, effect coverage, Wilson
   CDF intervals, censoring-aware percentiles, paired-CRN ablations when
-  requested, warnings, unsupported assumptions and the deterministic digest.
+  requested, inherited patterns and their terminal-state classification,
+  rank overrides, warnings, unsupported assumptions and the deterministic digest.
 
 `goldfish_assembly.v1` is the only supported scenario. It means exactly what
 the historical output meant: no simulated opponents, stack, combat or live
@@ -4208,9 +4227,10 @@ cs --request candidate.json --cards data/cards.json \
    --games 20000 --seed 12345 --output-json result.json
 ```
 
-Unknown packs, pack-version mismatches, unsupported commander IDs, candidate
+Unknown named packs, pack-version mismatches, unsupported commander IDs, candidate
 hash failures and candidate/snapshot oracle-ID differences are fatal before a
-game starts. There is deliberately no generic fallback. The committed
+game starts. Generic execution is available only through the reserved,
+explicit `derived-generic@1.0.0` selection; it never acts as fallback. The committed
 `unsupported-pack-candidate.v1.json` fixture proves that boundary with a
 schema-valid, compact 99-card candidate.
 

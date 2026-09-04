@@ -91,6 +91,7 @@ in_play = ["Kinnan, Bonder Prodigy", "Sol Ring"]
 
 [[win]]
 name = "infinite_C_into_something"
+terminal_state = "assembly_proxy"
 [win.requires]
 flag = "INFINITE:C"
 in_play = ["Sol Ring"]
@@ -103,6 +104,42 @@ in_play = ["Sol Ring"]
     REQUIRE(deck.patterns.patterns[0].name == "infinite_C_into_something");
 }
 
+TEST_CASE("a deck inherits exactly the library patterns whose card keys it contains",
+          "[deck][pattern-library]") {
+    static int counter = 0;
+    const std::filesystem::path directory =
+        std::filesystem::temp_directory_path() /
+        ("cs_pattern_library_" + std::to_string(++counter));
+    std::filesystem::create_directories(directory / "patterns");
+    const std::filesystem::path deck_path = directory / "fixture.deck.toml";
+    const std::filesystem::path library_path = directory / "patterns" / "shared.toml";
+    std::ofstream(deck_path) << kHeader;
+    std::ofstream(library_path) << R"(
+[[win]]
+name = "sol_ring_available"
+cards = ["Sol Ring"]
+terminal_state = "assembly_proxy"
+[win.requires]
+in_play = ["Sol Ring"]
+
+[[win]]
+name = "absent_card_state"
+cards = ["Definitely Absent"]
+terminal_state = "assembly_proxy"
+[win.requires]
+in_play = ["Definitely Absent"]
+)";
+
+    const cs::io::DeckFile deck = cs::io::load_deck(deck_path, fixture_db());
+    REQUIRE(deck.patterns.patterns.size() == 1);
+    REQUIRE(deck.patterns.inherited_pattern_names ==
+            std::vector<std::string>{"sol_ring_available"});
+    REQUIRE(deck.patterns.patterns[0].terminal_state == "assembly_proxy");
+
+    std::error_code ignored;
+    std::filesystem::remove_all(directory, ignored);
+}
+
 TEST_CASE("refuses a pattern naming a card that is not in the deck", "[deck]") {
     // The case asked for by name. A misspelled or absent card produces a
     // requirement that can never hold, and the pattern reports zero for the
@@ -111,6 +148,7 @@ TEST_CASE("refuses a pattern naming a card that is not in the deck", "[deck]") {
     REQUIRE_THROWS_MATCHES(load(R"(
 [[win]]
 name = "state_with_a_typo"
+terminal_state = "assembly_proxy"
 [win.requires]
 in_play = ["Basalt Monolithh"]
 )"),
@@ -126,6 +164,7 @@ TEST_CASE("refuses a card that exists in Magic but not in this deck", "[deck]") 
         load(R"(
 [[win]]
 name = "state_naming_an_absent_card"
+terminal_state = "assembly_proxy"
 [win.requires]
 in_play = ["Black Lotus"]
 )"),
@@ -139,6 +178,7 @@ TEST_CASE("refuses an unknown pattern term", "[deck]") {
     REQUIRE_THROWS_MATCHES(load(R"(
 [[win]]
 name = "state_with_a_bad_term"
+terminal_state = "assembly_proxy"
 [win.requires]
 in_grabeyard = ["Sol Ring"]
 )"),
@@ -154,6 +194,7 @@ TEST_CASE("refuses a term that is planned but not implemented", "[deck]") {
     REQUIRE_THROWS_MATCHES(load(R"(
 [[win]]
 name = "state_needing_mana"
+terminal_state = "assembly_proxy"
 [win.requires]
 attached = ["Sol Ring", "Forest"]
 )"),
@@ -165,6 +206,7 @@ TEST_CASE("refuses a pattern requiring a flag no engine sets", "[deck]") {
     REQUIRE_THROWS_MATCHES(load(R"(
 [[win]]
 name = "state_needing_a_missing_flag"
+terminal_state = "assembly_proxy"
 [win.requires]
 flag = "INFINITE:C"
 )"),
@@ -186,6 +228,7 @@ flag = "B"
 
 [[win]]
 name = "state_a"
+terminal_state = "assembly_proxy"
 [win.requires]
 flag = "A"
 )"),
@@ -211,6 +254,7 @@ TEST_CASE("accepts a state-shaped name that merely contains the letters", "[deck
     REQUIRE_NOTHROW(load(R"(
 [[win]]
 name = "windfall_engine_online"
+terminal_state = "assembly_proxy"
 [win.requires]
 in_play = ["Sol Ring"]
 )"));
@@ -231,6 +275,7 @@ in_play = ["Sol Ring"]
 
 [[win]]
 name = "state_a"
+terminal_state = "assembly_proxy"
 [win.requires]
 in_play = ["Sol Ring"]
 )"),
@@ -258,6 +303,7 @@ opponent_colors = ["G","U"]
 replacement = "Forest"
 [[win]]
 name = "state_a"
+terminal_state = "assembly_proxy"
 [win.requires]
 in_play = ["Sol Ring"]
 )");
@@ -294,6 +340,7 @@ replacement = "Forest"
 mainboard = ["Sol Ring"]
 [[win]]
 name = "has_sol_ring"
+terminal_state = "assembly_proxy"
 [win.requires]
 in_play = ["Sol Ring"]
 )";
@@ -312,6 +359,7 @@ TEST_CASE("an unrecorded source_url must be written down, not left off",
 mainboard = ["Sol Ring"]
 [[win]]
 name = "has_sol_ring"
+terminal_state = "assembly_proxy"
 [win.requires]
 in_play = ["Sol Ring"]
 )";

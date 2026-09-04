@@ -1,0 +1,11 @@
+# This is an assembly proxy. `available_mana` proves the entry payment, while
+# imprint proves the card pair; the loop itself is recognized, not iterated.
+
+[[win]]
+name = "scepter_reversal_loop_available"
+cards = ["Isochron Scepter", "Dramatic Reversal"]
+terminal_state = "assembly_proxy"
+[win.requires]
+in_play = ["Isochron Scepter"]
+imprinted = ["Isochron Scepter", "Dramatic Reversal"]
+available_mana = { generic = 3 }

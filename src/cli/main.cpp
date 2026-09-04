@@ -171,6 +171,13 @@ void print_header(const cs::CardDb& db, const cs::io::DeckFile& deck, const cs::
     std::printf("deck: %s   cards: %zu   modelled: %d   inert: %d   patterns: %zu\n",
                 deck_path.filename().c_str(), db.size(), effects.modeled, effects.inert,
                 deck.patterns.patterns.size());
+    if (!deck.patterns.inherited_pattern_names.empty()) {
+        std::printf("inherited patterns:");
+        for (const std::string& name : deck.patterns.inherited_pattern_names) {
+            std::printf(" %s", name.c_str());
+        }
+        std::printf("\n");
+    }
     std::printf("data: manifest %s (%s)\n", db.manifest.cards_sha256.substr(0, 8).c_str(),
                 db.manifest.max_content_updated_at.substr(0, 10).c_str());
     // The DECKLIST's provenance, separately from the card data's. They answer

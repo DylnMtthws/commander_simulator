@@ -14,7 +14,7 @@
 namespace cs::io {
 
 inline constexpr const char* kCandidateSchemaVersion = "cedh-deck-candidate.v1";
-inline constexpr const char* kResultSchemaVersion = "cedh-simulation-result.v1";
+inline constexpr const char* kResultSchemaVersion = "cedh-simulation-result.v2";
 inline constexpr const char* kGoldfishScenarioId = "goldfish_assembly";
 inline constexpr const char* kGoldfishScenarioVersion = "1.0.0";
 inline constexpr const char* kDerivedStrategyPackId = "derived-generic";

@@ -1,6 +1,7 @@
 #include "io/deck_load.hpp"
 
 #include <algorithm>
+#include <filesystem>
 #include <string_view>
 #include <vector>
 
@@ -259,6 +260,28 @@ void reject_outcome_naming(const std::string& name) {
     }
 }
 
+bool deck_contains(const CardDb& db, const std::string& name) {
+    return std::any_of(db.cards.begin(), db.cards.end(), [&](const Card& card) {
+        return card.listed_name == name || card.name == name;
+    });
+}
+
+bool library_entry_applies(const toml::table& entry, const CardDb& db,
+                           const std::string& context) {
+    const auto* cards = entry["cards"].as_array();
+    if (cards == nullptr || cards->empty()) {
+        fail(context + ": library entries require a non-empty `cards` eligibility array");
+    }
+    for (const toml::node& node : *cards) {
+        const auto name = node.value<std::string>();
+        if (!name || name->empty()) {
+            fail(context + ": `cards` must contain only non-empty card names");
+        }
+        if (!deck_contains(db, *name)) return false;
+    }
+    return true;
+}
+
 }  // namespace
 
 DeckFile load_deck(const std::filesystem::path& path, const CardDb& db) {
@@ -402,7 +425,9 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db) {
         }
     }
 
-    if (const auto* engines = root["engine"].as_array()) {
+    const auto append_patterns = [&](const toml::table& document, bool inherited,
+                                     const std::string& source) {
+    if (const auto* engines = document["engine"].as_array()) {
         for (const toml::node& node : *engines) {
             const auto* entry = node.as_table();
             if (entry == nullptr) fail("each [[engine]] must be a table");
@@ -410,6 +435,9 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db) {
             engine.name = (*entry)["name"].value_or<std::string>("");
             if (engine.name.empty()) fail("every [[engine]] needs a name");
             const std::string context = "engine '" + engine.name + "'";
+            if (inherited && !library_entry_applies(*entry, db, source + ": " + context)) {
+                continue;
+            }
 
             const auto* sets = (*entry)["sets"].as_array();
             if (sets == nullptr || sets->empty()) {
@@ -430,7 +458,7 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db) {
         }
     }
 
-    if (const auto* wins = root["win"].as_array()) {
+    if (const auto* wins = document["win"].as_array()) {
         for (const toml::node& node : *wins) {
             const auto* entry = node.as_table();
             if (entry == nullptr) fail("each [[win]] must be a table");
@@ -438,17 +466,56 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db) {
             pattern.name = (*entry)["name"].value_or<std::string>("");
             if (pattern.name.empty()) fail("every [[win]] needs a name");
             reject_outcome_naming(pattern.name);
+            const std::string context = "pattern '" + pattern.name + "'";
+            if (inherited && !library_entry_applies(*entry, db, source + ": " + context)) {
+                continue;
+            }
+            pattern.terminal_state =
+                (*entry)["terminal_state"].value_or<std::string>("");
+            if (pattern.terminal_state != "in_model_win" &&
+                pattern.terminal_state != "assembly_proxy") {
+                fail(context +
+                     ": terminal_state must be explicitly 'in_model_win' or 'assembly_proxy'");
+            }
             const auto* requires_table = (*entry)["requires"].as_table();
             if (requires_table == nullptr) {
                 fail("pattern '" + pattern.name + "': missing 'requires'");
             }
             pattern.requires_ =
-                parse_requirement(*requires_table, db, set, "pattern '" + pattern.name + "'", true);
+                parse_requirement(*requires_table, db, set, context, true);
             set.named_slots = set.named_slots | pattern.requires_.in_play |
                               pattern.requires_.in_hand | pattern.requires_.in_play_or_hand |
                               pattern.requires_.untapped | pattern.requires_.any_of |
                               pattern.requires_.resolved | pattern.requires_.in_graveyard;
+            if (inherited) set.inherited_pattern_names.push_back(pattern.name);
             set.patterns.push_back(std::move(pattern));
+        }
+    }
+    };
+
+    append_patterns(root, false, path.string());
+
+    // A pack may still declare local patterns for fixtures and migrations, but
+    // production patterns live beside the registry in data/patterns/*.toml.
+    // Lexical filename order is part of the deterministic first-match tie-break.
+    const std::filesystem::path library_dir = path.parent_path() / "patterns";
+    if (std::filesystem::is_directory(library_dir)) {
+        std::vector<std::filesystem::path> files;
+        for (const auto& entry : std::filesystem::directory_iterator(library_dir)) {
+            if (entry.is_regular_file() && entry.path().extension() == ".toml") {
+                files.push_back(entry.path());
+            }
+        }
+        std::sort(files.begin(), files.end());
+        for (const std::filesystem::path& library_path : files) {
+            toml::table library;
+            try {
+                library = toml::parse_file(library_path.string());
+            } catch (const toml::parse_error& error) {
+                fail("cannot parse " + library_path.string() + ": " +
+                     std::string(error.description()));
+            }
+            append_patterns(library, true, library_path.string());
         }
     }
 

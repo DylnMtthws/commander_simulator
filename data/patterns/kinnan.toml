@@ -1,0 +1,162 @@
+# Shared Kinnan engine and assembly-state patterns.
+# `cards` is eligibility metadata: a deck inherits an entry only when it
+# contains every named card. Requirements remain conjunctive.
+
+[[engine]]
+name = "kinnan_basalt"
+cards = ["Kinnan, Bonder Prodigy", "Basalt Monolith"]
+sets = ["INFINITE:C"]
+# Basalt taps for {C}{C}{C}, Kinnan adds one {C}, {3} untaps it: net +1
+# colourless per iteration. The mana is COLOURLESS, which is why the outlet
+# below is Thrasios ({4} generic) and not Kinnan's own {5}{G}{U} (section 2.6).
+[engine.requires]
+in_play = ["Kinnan, Bonder Prodigy", "Basalt Monolith"]
+# NOT `untapped = ["Basalt Monolith"]`, which was a proxy and the wrong one.
+# The loop is unbounded if its ENTRY COST is payable now: {3} to untap Basalt.
+# That one check covers both cases without a special case - an untapped Basalt
+# is itself a 4-mana source and pays its own entry, while a tapped one requires
+# the {3} from elsewhere. Presence alone would fire with two mana and a tapped
+# Basalt, which is a loop you cannot enter.
+loop_entry_cost = 3
+# ONE activation is unbounded here, and that is the whole difference from the
+# dig below: {3} untaps Basalt, which then taps for 4 again, so entering the
+# loop once is entering it forever. Declared rather than defaulted so that the
+# contrast with `activations = 2` is visible in the file.
+activations     = 1
+
+[[engine]]
+name = "kinnan_enduring_vitality"
+cards = ["Kinnan, Bonder Prodigy", "Enduring Vitality"]
+sets = ["WIDE_COLOUR"]
+# Vitality grants every creature "{T}: add one mana of any color"; Kinnan makes
+# each of them produce two. Wide coloured mana, NOT unbounded - which is why it
+# sets a different flag.
+[engine.requires]
+in_play            = ["Kinnan, Bonder Prodigy", "Enduring Vitality"]
+creature_count_gte = 2
+
+[[win]]
+name = "infinite_C_into_thrasios"
+cards = ["Kinnan, Bonder Prodigy", "Basalt Monolith", "Thrasios, Triton Hero"]
+terminal_state = "assembly_proxy"
+# Thrasios costs {4} to activate, all generic, so unbounded colourless converts
+# straight into drawing the library. The deck's primary line.
+[win.requires]
+flag    = "INFINITE:C"
+in_play = ["Thrasios, Triton Hero"]
+
+[[win]]
+name = "infinite_C_outlet_in_hand"
+cards = ["Kinnan, Bonder Prodigy", "Basalt Monolith", "Thrasios, Triton Hero"]
+terminal_state = "assembly_proxy"
+# Engine assembled with the outlet still in hand. A weaker state than the one
+# above and deliberately a separate pattern rather than an OR, so the mix
+# reports how often the deck arrives here instead.
+#
+# THE ENTRY COST HERE IS A COLOUR, NOT A QUANTITY, and that is the whole reason
+# it took a four-pattern audit to find. Thrasios in HAND must first be CAST, and
+# he costs {G}{U}. INFINITE:C is COLOURLESS. The engine that makes this pattern
+# interesting cannot pay for the card the pattern is about.
+#
+# This is section 2.6's typed-flag argument applied one level further than 2.6
+# applied it. 2.6 established that a boolean INFINITE_MANA would wrongly let the
+# colourless engine pay Kinnan's {5}{G}{U}, and the typed flag prevents exactly
+# that - for the ACTIVATION. Nobody then checked the CAST, which is where this
+# pattern differs from infinite_C_into_thrasios: that one has Thrasios already
+# on the battlefield and its {4} activation is generic, so unbounded {C} really
+# does pay for it forever and it correctly needs no entry cost at all.
+#
+# entry_pips rather than a bigger loop_entry_cost, because no amount of generic
+# mana expresses "and two of it must be green and blue". Section 16.7 called
+# this R2 and rejected it for Kinnan's dig, where the constraint genuinely is a
+# quantity; here it genuinely is not.
+[win.requires]
+flag        = "INFINITE:C"
+in_hand     = ["Thrasios, Triton Hero"]
+entry_pips  = ["G", "U"]
+activations = 1
+
+# RETIRED BY R3, and this is the right kind of loss.
+#
+# This pattern detected "Kinnan is in play with WIDE_COLOUR and could activate
+# his dig twice". The dig is now EXECUTED (SIM_PLAN.md 16.7b) - the deck pays
+# {5}{G}{U}, looks at five cards, keeps a non-Human creature if there is one and
+# bottoms the rest - so there is nothing left to detect. A board that could
+# activate twice HAS activated twice, and what it got is on the battlefield where
+# the other patterns can see it.
+#
+# WHAT WENT WITH IT: `activations = 2`, and the whole R1 decision of 16.7. That
+# judgement was measured, argued, given its own line in the honesty header and a
+# required key in the loader - and it existed ONLY because the ability was
+# detected rather than resolved. Correct mechanism, parameter unnecessary.
+#
+# THAT IS THE SECOND TIME. `loop_entry_cost` replaced the `untapped` proxy on
+# kinnan_basalt the same way: a parameter we agonised over disappeared once the
+# model could do the thing properly, rather than becoming better-chosen. Worth
+# recognising on sight - when a judgement call is hard to pin down, it is worth
+# asking whether the thing it parameterises should be modelled instead.
+#
+# `activations` stays in the vocabulary because kinnan_basalt still declares it,
+# and its declaration there now carries the whole weight of the distinction: that
+# loop untaps itself so one activation is all of them.
+
+[[win]]
+name = "wide_colour_into_thrasios"
+cards = ["Kinnan, Bonder Prodigy", "Enduring Vitality", "Thrasios, Triton Hero"]
+terminal_state = "assembly_proxy"
+# "{4}: Scry 1, then reveal the top card of your library. If it's a land card,
+# put it onto the battlefield tapped. Otherwise, draw a card."
+#
+# WIDE_COLOUR is FINITE coloured mana, so N activations cost 4N - unlike
+# infinite_C_into_thrasios, where unbounded {C} pays {4} forever and no count is
+# needed. This pattern had no cost model at all until the four-pattern audit,
+# and it was firing on a board averaging 3.74 mana: 0.65 activations of an
+# ability costing 4.
+#
+# THREE ACTIVATIONS, and the reasoning so it can be disagreed with: one
+# activation is a cantrip, two is a good turn, three is where a finite-mana
+# board has seen enough library that "assembled" is honest.
+#
+# Below the dig's effective 14 because Thrasios digs deeper per mana than Kinnan
+# does. Below the four that would have been picked before the measurement below,
+# because the across-turn ramp is real even though it does not compound within a
+# chain.
+#
+# THE ZERO-PAYBACK RESULT IS STRUCTURAL, NOT EMPIRICAL. The revealed land enters
+# TAPPED, so it cannot fund the next activation in the same chain - regardless of
+# deck, land count or library state. A board with M mana gets floor(M/4)
+# activations and not one more. The measurement (25.6% of the undrawn library is
+# land, at 20,000 firings) only confirms a result that holds without it, which is
+# why a constant N is the right shape here for a stronger reason than it was for
+# the dig.
+#
+# STATED APPROXIMATION: the scry is not modelled. Scry 1 makes the reveal two
+# looks, so a pilot can push the land rate from 26% to about 45% if they want
+# ramp or down to about 7% if they want cards - and within a combo turn they want
+# cards, because the land is tapped and does nothing. SELECT is in the section
+# 4.2 kind set, has two users, and is unimplemented; the decision is also outside
+# the scorer's vocabulary, since valuing "a tapped land now versus an unknown
+# card" needs a notion of an unknown card that section 6.3 deliberately denies
+# it. Modelling neither branch UNDERSTATES Thrasios - the conservative direction,
+# and the one place in section 16 where missing machinery does not flatter the
+# deck.
+[win.requires]
+flag            = "WIDE_COLOUR"
+in_play         = ["Thrasios, Triton Hero"]
+loop_entry_cost = 4
+activations     = 3
+
+# ---------------------------------------------------------------------------
+# Policy (SIM_PLAN.md section 6.2).
+#
+# These numbers ARE the model's bias, and the point of authoring them is that
+# the bias becomes stateable: "these results assume this piloting" is a claim
+# you can read and disagree with. Read a trace before trusting any of it:
+#
+#     cs data/cards.json --trace 12345
+#
+# PROVISIONAL until effects are authored (Phase 7). Ranks below cover the
+# engine pieces, the outlets and the fast mana; everything else takes
+# default_rank. A rank is a relative preference, not a power level.
+# ---------------------------------------------------------------------------
+

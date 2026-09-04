@@ -1,0 +1,155 @@
+{
+  "schema_version": "cedh-simulation-result.v2",
+  "run_id": "run-fixture",
+  "timestamps": {
+    "started_at": "2026-09-03T00:00:00Z",
+    "completed_at": "2026-09-03T00:00:01Z"
+  },
+  "simulator": {
+    "version": "0.2.0",
+    "build_flavour": "debug"
+  },
+  "metric": {
+    "id": "goldfish_turns_to_assembly",
+    "measures": "turns until a declared pattern is assembled, unopposed",
+    "does_not_measure": "deck strength, win rate, or card quality"
+  },
+  "candidate": {
+    "candidate_id": "fixture",
+    "candidate_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "strategy_pack": {
+    "id": "kinnan-midrange-goldfish",
+    "version": "1.0.0",
+    "play_policy": "authored-kinnan-policy.v1",
+    "assembly_objectives": [
+      "infinite_C_into_thrasios"
+    ],
+    "declared_table_assumptions": [
+      "goldfish"
+    ],
+    "known_blind_spots": [
+      "no opponents"
+    ],
+    "derived": false,
+    "patterns": [
+      {
+        "name": "infinite_C_into_thrasios",
+        "source": "library",
+        "terminal_state": "assembly_proxy"
+      }
+    ],
+    "inherited_patterns": [
+      "infinite_C_into_thrasios"
+    ],
+    "rank_overrides": []
+  },
+  "card_data": {
+    "manifest_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "cards_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "source_view": "mtg_v1.card_any_medium",
+    "max_content_updated_at": "2026-09-01T00:00:00Z",
+    "corpus_row_count": 34566
+  },
+  "simulation": {
+    "games": 100,
+    "seed": 12345,
+    "objective_turn": 3,
+    "requested_scenario": {
+      "id": "goldfish_assembly",
+      "version": "1.0.0"
+    }
+  },
+  "coverage": {
+    "total_cards": 100,
+    "library_cards": 99,
+    "commander_cards": 1,
+    "modeled_cards": 65,
+    "inert_cards": 31,
+    "unauthored_cards": 4,
+    "inert_by_reason": {
+      "interaction": 16,
+      "opponent_trigger": 6
+    }
+  },
+  "assembly_cdf": [
+    {
+      "turn": 3,
+      "assembled_games": 2,
+      "probability": 0.02,
+      "wilson_95": {
+        "low": 0.0055,
+        "high": 0.07
+      }
+    }
+  ],
+  "censored": {
+    "games": 75,
+    "rate": 0.75,
+    "wilson_95": {
+      "low": 0.657,
+      "high": 0.824
+    }
+  },
+  "percentiles": [
+    {
+      "percentile": 0.1,
+      "status": "observed",
+      "turn": 8,
+      "interval_95": {
+        "low_turn": 7,
+        "high_turn": 9
+      }
+    },
+    {
+      "percentile": 0.25,
+      "status": "observed",
+      "turn": 12,
+      "interval_95": {
+        "low_turn": 10,
+        "high_turn": null
+      }
+    },
+    {
+      "percentile": 0.5,
+      "status": "censored",
+      "turn": null,
+      "interval_95": {
+        "low_turn": null,
+        "high_turn": null
+      }
+    },
+    {
+      "percentile": 0.75,
+      "status": "censored",
+      "turn": null,
+      "interval_95": {
+        "low_turn": null,
+        "high_turn": null
+      }
+    },
+    {
+      "percentile": 0.9,
+      "status": "censored",
+      "turn": null,
+      "interval_95": {
+        "low_turn": null,
+        "high_turn": null
+      }
+    }
+  ],
+  "ablation_results": [],
+  "warnings": [
+    "Assembly probability is not win rate."
+  ],
+  "unsupported_assumptions": [
+    {
+      "code": "no_opponents",
+      "detail": "No opponents are simulated."
+    }
+  ],
+  "determinism": {
+    "seed_scheme": "splitmix64(base_seed ^ splitmix64(game_index)) + xoshiro256++",
+    "result_digest": "0123456789abcdef"
+  }
+}

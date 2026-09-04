@@ -1,0 +1,18 @@
+# Thassa's Oracle consultation states. These are in-model wins because the
+# Oracle trigger and the devotion-versus-library comparison are represented.
+
+[[win]]
+name = "oracle_consultation_empty_library"
+cards = ["Thassa's Oracle", "Demonic Consultation"]
+terminal_state = "in_model_win"
+[win.requires]
+resolved = ["Thassa's Oracle", "Demonic Consultation"]
+devotion_gte_library = true
+
+[[win]]
+name = "oracle_tainted_pact_empty_library"
+cards = ["Thassa's Oracle", "Tainted Pact"]
+terminal_state = "in_model_win"
+[win.requires]
+resolved = ["Thassa's Oracle", "Tainted Pact"]
+devotion_gte_library = true

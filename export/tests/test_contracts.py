@@ -25,6 +25,7 @@ def _load(path: Path) -> dict[str, object]:
         ("cedh-deck-candidate.v1.schema.json", "kinnan-candidate.v1.json"),
         ("cedh-deck-candidate.v1.schema.json", "unsupported-pack-candidate.v1.json"),
         ("cedh-simulation-result.v1.schema.json", "simulation-result.v1.json"),
+        ("cedh-simulation-result.v2.schema.json", "simulation-result.v2.json"),
     ],
 )
 def test_contract_fixture_validates(schema_name: str, fixture_name: str) -> None:
@@ -44,8 +45,8 @@ def test_candidate_schema_refuses_an_extra_semantic_field() -> None:
 
 
 def test_result_schema_cannot_call_assembly_probability_win_rate() -> None:
-    schema = _load(CONTRACTS / "cedh-simulation-result.v1.schema.json")
-    result = _load(FIXTURES / "simulation-result.v1.json")
+    schema = _load(CONTRACTS / "cedh-simulation-result.v2.schema.json")
+    result = _load(FIXTURES / "simulation-result.v2.json")
     result["metric"]["id"] = "win_rate"  # type: ignore[index]
     errors = list(Draft202012Validator(schema).iter_errors(result))
     assert errors
