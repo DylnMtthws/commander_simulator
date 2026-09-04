@@ -15,9 +15,13 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+import sys
 import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "export" / "src"))
+
+from mtgsim_export.hashes import deck_sha256  # noqa: E402
 NAMESPACE = uuid.UUID("86b6bd22-e564-44d0-a374-c52a021d6a84")
 
 
@@ -70,20 +74,13 @@ def build_documents() -> tuple[dict[str, Any], dict[str, Any]]:
         for card in cards
         if not card["is_commander"]
     ]
-    semantic = {
+    candidate = {
+        "schema_version": "cedh-deck-candidate.v2",
+        "candidate_id": "ci-repro-fixture",
         "commander_oracle_ids": [commander["oracle_id"]],
-        "library": sorted(library, key=lambda card: card["oracle_id"]),
-        "schema_version": "cedh-deck-candidate.v1",
+        "library": library,
         "strategy_pack_id": "kinnan-midrange-goldfish",
         "strategy_pack_version": "1.0.0",
-    }
-    candidate = {
-        "schema_version": semantic["schema_version"],
-        "candidate_id": "ci-repro-fixture",
-        "commander_oracle_ids": semantic["commander_oracle_ids"],
-        "library": library,
-        "strategy_pack_id": semantic["strategy_pack_id"],
-        "strategy_pack_version": semantic["strategy_pack_version"],
         "provenance": {
             "producer": {"name": "make_repro_fixture.py", "version": "1"},
             "card_data": {
@@ -97,7 +94,9 @@ def build_documents() -> tuple[dict[str, Any], dict[str, Any]]:
                 "hash": f"sha256:{manifest['cards_sha256']}",
             },
         },
-        "candidate_hash": f"sha256:{_compact_sha256(semantic)}",
+        # The deck list only. The strategy pack above is deliberately absent
+        # from this hash; see contracts/hash-golden-vectors.json.
+        "deck_sha256": deck_sha256([commander["oracle_id"]], library),
         "user_constraints": {},
     }
     return snapshot, candidate

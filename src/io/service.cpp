@@ -23,7 +23,13 @@ namespace {
 
 using json = nlohmann::json;
 
-[[noreturn]] void fail(const std::string& message) { throw LoadError(message); }
+[[noreturn]] void fail(const std::string& message) {
+    throw ContractError(kContractViolation, message);
+}
+
+[[noreturn]] void fail(const char* code, const std::string& message) {
+    throw ContractError(code, message);
+}
 
 const json& require(const json& node, std::string_view key, std::string_view context) {
     const auto found = node.find(key);
@@ -40,27 +46,6 @@ std::string require_string(const json& node, std::string_view key, std::string_v
              "' must be a non-empty string");
     }
     return value.get<std::string>();
-}
-
-json semantic_document(const CandidateRequest& request) {
-    std::vector<std::string> commanders = request.commander_oracle_ids;
-    std::sort(commanders.begin(), commanders.end());
-    std::vector<CandidateCard> library = request.library;
-    std::sort(library.begin(), library.end(), [](const CandidateCard& left,
-                                                  const CandidateCard& right) {
-        return left.oracle_id < right.oracle_id;
-    });
-    json cards = json::array();
-    for (const CandidateCard& card : library) {
-        cards.push_back({{"oracle_id", card.oracle_id}, {"quantity", card.quantity}});
-    }
-    // nlohmann::json uses std::map by default, so dump() emits object keys in
-    // lexical order. Arrays are explicitly sorted above.
-    return {{"commander_oracle_ids", commanders},
-            {"library", cards},
-            {"schema_version", request.schema_version},
-            {"strategy_pack_id", request.strategy_pack_id},
-            {"strategy_pack_version", request.strategy_pack_version}};
 }
 
 json interval_json(const Interval& interval) {
@@ -83,6 +68,55 @@ std::string manifest_hash(const Manifest& manifest) {
 
 }  // namespace
 
+std::string deck_sha256(const CandidateRequest& request) {
+    std::vector<std::string> commanders = request.commander_oracle_ids;
+    std::sort(commanders.begin(), commanders.end());
+    std::vector<CandidateCard> library = request.library;
+    std::sort(library.begin(), library.end(),
+              [](const CandidateCard& left, const CandidateCard& right) {
+                  return left.oracle_id < right.oracle_id;
+              });
+
+    // A line-oriented preimage rather than canonical JSON. It is the
+    // producer's existing algorithm and is adopted unchanged: re-deriving an
+    // equivalent-looking one in JSON would be a second definition of the same
+    // thing, which is the class of bug this whole contract exists to close.
+    std::string preimage;
+    for (const std::string& oracle_id : commanders) {
+        preimage += "C:" + oracle_id + "\n";
+    }
+    for (const CandidateCard& card : library) {
+        preimage += card.oracle_id + ":" + std::to_string(card.quantity) + "\n";
+    }
+    return "sha256:" + sha256_hex(preimage);
+}
+
+std::string simulation_input_sha256(const SimulationInput& input) {
+    std::vector<std::string> ablations = input.ablations;
+    std::sort(ablations.begin(), ablations.end());
+
+    // nlohmann::json orders object keys lexically on dump(), which is the
+    // canonicalisation this preimage requires. The array is sorted above.
+    const json canonical{
+        {"ablations", ablations},
+        {"card_data_manifest_hash", input.card_data_manifest_hash},
+        {"cards_sha256", input.cards_sha256},
+        {"deck_sha256", input.deck_sha256},
+        {"games", input.games},
+        {"objective_turn", input.objective_turn},
+        {"scenario_id", input.scenario_id},
+        {"scenario_version", input.scenario_version},
+        {"schema_version", std::string(kSimulationInputSchemaVersion)},
+        {"seed", input.seed},
+        {"simulator_version", input.simulator_version},
+        {"strategy_pack_content_sha256", input.strategy_pack_content_sha256},
+        {"strategy_pack_derived", input.strategy_pack_derived},
+        {"strategy_pack_id", input.strategy_pack_id},
+        {"strategy_pack_version", input.strategy_pack_version},
+        {"sweep", input.sweep}};
+    return "sha256:" + sha256_hex(canonical.dump());
+}
+
 CandidateRequest load_candidate_request(const std::filesystem::path& path) {
     std::ifstream stream(path);
     if (!stream) {
@@ -104,11 +138,19 @@ CandidateRequest load_candidate_request(const std::filesystem::path& path) {
         fail("candidate: unsupported schema_version '" + request.schema_version +
              "'; supported: " + kCandidateSchemaVersion);
     }
+    if (document.contains("candidate_hash")) {
+        fail("candidate: field 'candidate_hash' was removed in " +
+             std::string(kCandidateSchemaVersion) +
+             ". It mixed the strategy pack into what its name called a deck identity, so a "
+             "producer computing an honest deck hash could never match it. Send "
+             "'deck_sha256' (the deck list only); the pack-inclusive fingerprint is the "
+             "result's simulation_input_sha256.");
+    }
     request.candidate_id = require_string(document, "candidate_id", "candidate");
     request.strategy_pack_id = require_string(document, "strategy_pack_id", "candidate");
     request.strategy_pack_version =
         require_string(document, "strategy_pack_version", "candidate");
-    request.candidate_hash = require_string(document, "candidate_hash", "candidate");
+    request.deck_sha256 = require_string(document, "deck_sha256", "candidate");
 
     const json& commanders = require(document, "commander_oracle_ids", "candidate");
     if (!commanders.is_array() || commanders.empty() || commanders.size() > 2) {
@@ -155,9 +197,14 @@ CandidateRequest load_candidate_request(const std::filesystem::path& path) {
              ", expected exactly 99");
     }
 
-    const std::string expected = "sha256:" + sha256_hex(semantic_document(request).dump());
-    if (request.candidate_hash != expected) {
-        fail("candidate: candidate_hash does not match semantic content; expected " + expected);
+    // Recomputed from the submitted list alone, never from the submitted
+    // hash. This is the whole point of shipping the algorithm on both sides:
+    // the producer's claim about which deck this is has to be checkable here.
+    const std::string expected = deck_sha256(request);
+    if (request.deck_sha256 != expected) {
+        fail(kDeckHashMismatch,
+             "candidate: deck_sha256 does not describe the submitted list; recomputed " +
+                 expected + ", received " + request.deck_sha256);
     }
     // Provenance does not affect simulation semantics, but it is required
     // audit data. Check its contract shape here so the service cannot accept a
@@ -204,7 +251,8 @@ StrategyPackSelection select_strategy_pack(const CandidateRequest& request,
         }
         std::sort(candidates.begin(), candidates.end());
     } else {
-        fail("strategy-pack registry does not exist: " + registry.string());
+        fail(kExecutionContextUnsupported,
+             "strategy-pack registry does not exist: " + registry.string());
     }
 
     std::filesystem::path selected;
@@ -224,13 +272,15 @@ StrategyPackSelection select_strategy_pack(const CandidateRequest& request,
         const std::string version = (*pack)["version"].value_or<std::string>("");
         if (id == request.strategy_pack_id && version == request.strategy_pack_version) {
             if (!selected.empty()) {
-                fail("strategy-pack registry contains duplicate '" + id + "@" + version + "'");
+                fail(kExecutionContextUnsupported,
+                     "strategy-pack registry contains duplicate '" + id + "@" + version + "'");
             }
             selected = path;
         }
     }
     if (selected.empty()) {
-        fail("candidate requests strategy pack '" + request.strategy_pack_id + "@" +
+        fail(kExecutionContextUnsupported,
+             "candidate requests strategy pack '" + request.strategy_pack_id + "@" +
              request.strategy_pack_version +
              "', but that exact pack is not installed. Unknown named packs are rejected; "
              "use derived-generic@1.0.0 to request explicit derived execution.");
@@ -253,7 +303,11 @@ void validate_candidate_snapshot(const CandidateRequest& request, const CardDb& 
         candidate_library[card.oracle_id] = card.quantity;
     }
     if (candidate_commanders != snapshot_commanders || candidate_library != snapshot_library) {
-        fail("candidate oracle IDs/quantities do not match the enriched --cards snapshot. "
+        // Not a deck mismatch: the deck is whatever the producer sent and its
+        // hash already verified. This is a stale or mismatched card export on
+        // THIS side, an execution-context fault.
+        fail(kExecutionContextUnsupported,
+             "candidate oracle IDs/quantities do not match the enriched --cards snapshot. "
              "Export that candidate with mtgsim-export --candidate before simulating it.");
     }
 }
@@ -262,7 +316,8 @@ void validate_candidate_for_pack(const CandidateRequest& request, const CardDb& 
                                  const DeckFile& pack) {
     if (request.strategy_pack_id != pack.strategy_pack.id ||
         request.strategy_pack_version != pack.strategy_pack.version) {
-        fail("candidate requests strategy pack '" + request.strategy_pack_id + "@" +
+        fail(kExecutionContextUnsupported,
+             "candidate requests strategy pack '" + request.strategy_pack_id + "@" +
              request.strategy_pack_version + "', but this simulator loaded '" +
              pack.strategy_pack.id + "@" + pack.strategy_pack.version +
              "'. Unsupported packs are rejected; generic Kinnan fallback is forbidden.");
@@ -274,7 +329,8 @@ void validate_candidate_for_pack(const CandidateRequest& request, const CardDb& 
     std::sort(requested_commanders.begin(), requested_commanders.end());
     std::sort(supported_commanders.begin(), supported_commanders.end());
     if (requested_commanders != supported_commanders) {
-        fail("candidate commander oracle IDs are not supported by strategy pack '" +
+        fail(kExecutionContextUnsupported,
+             "candidate commander oracle IDs are not supported by strategy pack '" +
              pack.strategy_pack.id + "'; refusing to run commander-specific logic");
     }
 
@@ -388,25 +444,47 @@ std::string build_simulation_result_json(const CandidateRequest& request, const 
 
     std::ostringstream digest;
     digest << std::hex << std::setfill('0') << std::setw(16) << run.digest_xor;
-    const std::string run_material = std::string(version()) + ":" +
-                                     request.candidate_hash + ":" +
-                                     manifest_hash(db.manifest) + ":" +
-                                     std::to_string(metadata.games) + ":" +
-                                     std::to_string(metadata.seed) + ":" +
-                                     std::to_string(metadata.objective_turn) + ":" +
-                                     metadata.scenario_id + "@" + metadata.scenario_version;
+
+    // Recomputed here rather than echoed: the result must report the hash of
+    // the list this process actually simulated. If the two ever disagree the
+    // request would already have been refused at load, so this is also the
+    // assertion that they did not silently drift apart in between.
+    const std::string deck_hash = deck_sha256(request);
+
+    // The pack fields describe the pack that was RESOLVED and run. A request
+    // naming an uninstalled pack never reaches this function.
+    const SimulationInput input{.deck_sha256 = deck_hash,
+                                .strategy_pack_id = pack.strategy_pack.id,
+                                .strategy_pack_version = pack.strategy_pack.version,
+                                .strategy_pack_content_sha256 = pack.strategy_pack.content_sha256,
+                                .strategy_pack_derived = pack.derived,
+                                .simulator_version = std::string(version()),
+                                .card_data_manifest_hash = manifest_hash(db.manifest),
+                                .cards_sha256 = db.manifest.cards_sha256,
+                                .scenario_id = metadata.scenario_id,
+                                .scenario_version = metadata.scenario_version,
+                                .seed = metadata.seed,
+                                .games = metadata.games,
+                                .objective_turn = metadata.objective_turn,
+                                .sweep = metadata.sweep,
+                                .ablations = metadata.ablations};
+    const std::string input_hash = simulation_input_sha256(input);
 
     json document{
         {"schema_version", kResultSchemaVersion},
-        {"run_id", "run-" + sha256_hex(run_material).substr(0, 24)},
+        // Derived from the input fingerprint, so two runs share a run_id
+        // exactly when they were the same measurement.
+        {"run_id", "run-" + input_hash.substr(7, 24)},
+        {"simulation_input_sha256", input_hash},
         {"timestamps", {{"started_at", metadata.started_at}, {"completed_at", metadata.completed_at}}},
         {"simulator", {{"version", std::string(version())}, {"build_flavour", std::string(build_flavour())}}},
         {"metric", {{"id", "goldfish_turns_to_assembly"},
                     {"measures", "turns until a declared pattern is assembled, unopposed"},
                     {"does_not_measure", "deck strength, win rate, or card quality"}}},
-        {"candidate", {{"candidate_id", request.candidate_id}, {"candidate_hash", request.candidate_hash}}},
+        {"candidate", {{"candidate_id", request.candidate_id}, {"deck_sha256", deck_hash}}},
         {"strategy_pack", {{"id", pack.strategy_pack.id},
                            {"version", pack.strategy_pack.version},
+                           {"content_sha256", pack.strategy_pack.content_sha256},
                            {"derived", pack.derived},
                            {"play_policy", pack.strategy_pack.play_policy_implementation},
                            {"assembly_objectives", pack.strategy_pack.assembly_objectives},

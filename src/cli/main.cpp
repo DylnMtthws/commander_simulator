@@ -766,6 +766,10 @@ int simulate_request(const std::filesystem::path& request_path,
             .objective_turn = objective_turn,
             .scenario_id = cs::io::kGoldfishScenarioId,
             .scenario_version = cs::io::kGoldfishScenarioVersion,
+            // --sweep is a full leave-one-out; --ablate names its targets. Both
+            // set do_ablation, so the empty name list is what tells them apart.
+            .sweep = do_ablation && ablation_names.empty(),
+            .ablations = ablation_names,
             .started_at = cs::io::utc_timestamp_now(),
             .completed_at = {}};
         const cs::CardDb db = cs::io::load_card_db(cards_path);
@@ -855,6 +859,13 @@ int simulate_request(const std::filesystem::path& request_path,
             std::fprintf(stderr, "wrote %s\n", output_path.c_str());
         }
         return 0;
+    } catch (const cs::io::ContractError& error) {
+        // The machine code goes on the wire ahead of the prose so the HTTP
+        // service can classify the refusal without matching English. Getting
+        // this wrong is how a pack that is not installed gets reported to a
+        // user as "your deck changed".
+        std::fprintf(stderr, "error: [%s] %s\n", error.code().c_str(), error.what());
+        return 1;
     } catch (const std::runtime_error& error) {
         std::fprintf(stderr, "error: %s\n", error.what());
         return 1;

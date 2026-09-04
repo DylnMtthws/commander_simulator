@@ -49,16 +49,24 @@ target_sources(cs_tests PRIVATE
     unit/test_life_draw.cpp
     unit/test_untap_target.cpp
     unit/test_imprint.cpp)
-target_sources(cs_tests PRIVATE unit/test_rank.cpp)
+target_sources(cs_tests PRIVATE unit/test_rank.cpp unit/test_hash_contract.cpp)
 
 # Catch2WithMain supplies main(), so no test file writes one.
 # cs_core arrives transitively via cs_io's PUBLIC link.
-target_link_libraries(cs_tests PRIVATE cs_io cs_warnings Catch2::Catch2WithMain)
+#
+# nlohmann_json is named explicitly, which is what cs_io's PRIVATE link is for:
+# a consumer that wants JSON asks for it. test_hash_contract.cpp needs it to
+# READ contracts/hash-golden-vectors.json -- the shared file the Python and C++
+# implementations are both checked against. No nlohmann type crosses a cs::io
+# API here; the seal on cs_core is untouched.
+target_link_libraries(cs_tests
+    PRIVATE cs_io cs_warnings Catch2::Catch2WithMain nlohmann_json::nlohmann_json)
 
 # The fixture path is compiled in rather than resolved relative to the working
 # directory, so `ctest` behaves the same wherever it is invoked from.
 target_compile_definitions(cs_tests PRIVATE
-    CS_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/fixtures")
+    CS_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/fixtures"
+    CS_CONTRACTS_DIR="${PROJECT_SOURCE_DIR}/contracts")
 
 # catch_discover_tests asks the built binary for its test list and registers
 # each one with CTest individually, so `ctest` reports per-test results and can

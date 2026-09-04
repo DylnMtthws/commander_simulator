@@ -136,7 +136,7 @@ def test_candidate_export_passes_a_query_string_dsn_unmodified() -> None:
         library=(),
         strategy_pack_id="fixture",
         strategy_pack_version="1.0.0",
-        candidate_hash="sha256:fixture",
+        deck_sha256="sha256:fixture",
     )
     connection = MagicMock()
     connection.__enter__.return_value = connection

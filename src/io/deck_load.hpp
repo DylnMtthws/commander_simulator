@@ -57,6 +57,10 @@ struct StrategyPack {
     std::string play_policy_implementation;
     std::vector<std::string> declared_table_assumptions;
     std::vector<std::string> known_blind_spots;
+    // SHA-256 of this pack file's bytes, as "sha256:<hex>". Pack id/version
+    // say WHICH pack; this says which *revision* of it. An edited pack that
+    // kept its version would otherwise be invisible in the run fingerprint.
+    std::string content_sha256;
 };
 
 struct DeckFile {

@@ -8,7 +8,7 @@
       "quantity": 99
     }
   ],
-  "schema_version": "cedh-deck-candidate.v1",
+  "schema_version": "cedh-deck-candidate.v2",
   "strategy_pack_id": "unsupported-fixture-pack",
   "strategy_pack_version": "1.0.0",
   "candidate_id": "unsupported-pack-fixture",
@@ -28,5 +28,5 @@
       "hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
     }
   },
-  "candidate_hash": "sha256:fb545417e059de3a1d89d5d948697db1e5df4f8161ac1f4cfd1aa523691da42f"
+  "deck_sha256": "sha256:83068934600cfba399c4ac5432f1751a8d2d2649615943fbae046dd10058e2bc"
 }

@@ -306,7 +306,10 @@ def build_candidate_export(
     manifest.pop("table", None)
     manifest.pop("ablation_replacement", None)
     manifest["candidate_id"] = candidate.candidate_id
-    manifest["candidate_hash"] = candidate.candidate_hash
+    # The deck list's hash. Names the LIST this snapshot was exported for, so a
+    # snapshot cannot silently be paired with a different deck. The strategy
+    # pack travels beside it, deliberately outside the hash.
+    manifest["deck_sha256"] = candidate.deck_sha256
     manifest["strategy_pack_id"] = candidate.strategy_pack_id
     manifest["strategy_pack_version"] = candidate.strategy_pack_version
     return document

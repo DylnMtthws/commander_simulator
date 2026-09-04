@@ -400,10 +400,10 @@
       "quantity": 1
     }
   ],
-  "schema_version": "cedh-deck-candidate.v1",
-  "strategy_pack_id": "derived-generic",
+  "schema_version": "cedh-deck-candidate.v2",
+  "strategy_pack_id": "kinnan-midrange-goldfish",
   "strategy_pack_version": "1.0.0",
-  "candidate_id": "kinnan-derived-fixture",
+  "candidate_id": "kinnan-snapshot-a",
   "provenance": {
     "producer": {
       "name": "commander-generator-fixture",
@@ -420,8 +420,8 @@
       "hash": "sha256:0ca3ccc3de4f063d601e0587afc98ae34953a5a0b596a08e73c9f700374471b6"
     }
   },
-  "candidate_hash": "sha256:e2c16cd33e921d681a3ac2478cad8491962666e6c49c2050fba6cdb0a998bdf6",
   "user_constraints": {
-    "fixture_note": "Explicit derived-mode service fixture."
-  }
+    "fixture_note": "opaque; ignored by simulator semantics"
+  },
+  "deck_sha256": "sha256:6265e748f42f3ad70eb2265f0c24a2a996970493f54a8f4e6c1228b2d3af92d0"
 }
