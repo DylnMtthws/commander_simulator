@@ -7,6 +7,7 @@ dependencies = ["mtgsim-export"]
 
 [project.scripts]
 mtgsim-serve = "mtgsim_service.server:main"
+mtgsim-sweep = "mtgsim_service.sweep:main"
 
 [dependency-groups]
 dev = ["jsonschema>=4.23", "pytest>=8", "ruff>=0.6", "mypy>=1.11"]

@@ -169,7 +169,11 @@ jobs:
           from pathlib import Path
 
           candidate = json.loads(Path(sys.argv[1]).read_text())
-          Path(sys.argv[2]).write_text(json.dumps({"candidate": candidate, "games": 20}))
+          Path(sys.argv[2]).write_text(json.dumps({
+              "schema_version": "cedh-simulation-request.v1",
+              "candidate": candidate,
+              "games": 20,
+          }))
           PY
 
       - name: Smoke-test health and simulation
@@ -204,12 +208,39 @@ jobs:
             --header 'Content-Type: application/json' \
             --data-binary "@${RUNNER_TEMP}/request.json" \
             http://127.0.0.1:18080/simulate > "${RUNNER_TEMP}/result.json"
-          python3 - "${RUNNER_TEMP}/result.json" <<'PY'
+          # The image must refuse batch work by default. A sweep is ~600 CPU-s;
+          # nothing should be able to buy it with an unauthenticated request.
+          python3 - "${RUNNER_TEMP}/request.json" "${RUNNER_TEMP}/sweep-request.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          request = json.loads(Path(sys.argv[1]).read_text())
+          request["sweep"] = True
+          Path(sys.argv[2]).write_text(json.dumps(request))
+          PY
+          sweep_status=$(curl --silent --output "${RUNNER_TEMP}/sweep.json" \
+            --write-out '%{http_code}' \
+            --header 'Content-Type: application/json' \
+            --header 'Authorization: Bearer guessed' \
+            --data-binary "@${RUNNER_TEMP}/sweep-request.json" \
+            http://127.0.0.1:18080/simulate)
+          test "${sweep_status}" = 403 || {
+            echo "sweep was not refused: HTTP ${sweep_status}"; cat "${RUNNER_TEMP}/sweep.json"; exit 1;
+          }
+          echo "sweep refused with 403 as expected"
+          python3 - "${RUNNER_TEMP}/result.json" "${RUNNER_TEMP}/candidate.json" <<'PY'
           import json
           import sys
           from pathlib import Path
 
           result = json.loads(Path(sys.argv[1]).read_text())
-          assert result["schema_version"] == "cedh-simulation-result.v2"
+          candidate = json.loads(Path(sys.argv[2]).read_text())
+          assert result["schema_version"] == "cedh-simulation-result.v3"
           assert result["simulation"]["games"] == 20
+          # The deck hash the simulator recomputed must be the one we sent, and
+          # the input fingerprint must be a genuinely different value.
+          assert result["candidate"]["deck_sha256"] == candidate["deck_sha256"]
+          assert result["simulation_input_sha256"] != result["candidate"]["deck_sha256"]
+          assert result["run_id"] == "run-" + result["simulation_input_sha256"][7:31]
           PY

@@ -1,0 +1,61 @@
+# Batch tier. Draft deployment shape only; do not deploy from this repository
+# session.
+#
+#   fly deploy --config deploy/fly.sweep.toml
+#
+# A separate app from sim-worker on purpose. The leave-one-out sweep is ~600
+# CPU-seconds of work that a person asks for a few times a day; the interactive
+# service answers sub-second requests continuously. Sharing one machine would
+# mean paying for the sweep's cores around the clock and letting a five-minute
+# job sit in front of an interactive request. Splitting them is what lets
+# deploy/fly.toml be small.
+#
+# This app is never continuously provisioned: min_machines_running = 0 plus
+# auto_start_machines is Fly's scale-to-zero, so a stopped machine costs only
+# rootfs storage. It is a job that happens to be reached over HTTP, not a
+# service. No queue, no database and no third vendor are introduced for it; if
+# HTTP is more than is needed, scripts/run_sweep.sh runs the same image as a
+# one-off `fly machine run` instead.
+#
+# Secrets, never in this file:
+#   fly secrets set --app sim-sweep MTGSIM_DATABASE_URL=... SIM_SWEEP_TOKEN=...
+#
+# SIM_SWEEP_TOKEN is required: the service refuses to start with
+# SIM_ALLOW_SWEEP=1 and no token, and refuses any sweep request that does not
+# present it as `Authorization: Bearer <token>`.
+#
+# SIZING. The sweep is a work queue over 2 tasks per ablation target
+# (src/cli/main.cpp `measure_ablations`), so ~196 independent tasks for the 98
+# targets; wall time tracks core count until the queue runs dry. From the
+# measured 297.61 s on 2 threads, at ~600 CPU-seconds of total work:
+#
+#   vCPUs   projected wall   note
+#   2       ~300 s           measured; equals SIM_TIMEOUT_SECONDS, no margin
+#   4       ~150 s           default below
+#   8       ~75 s
+#   16      ~37 s            the old draft; no requirement in this repo asks for it
+#
+# There is no stated completion-time requirement, so the default is the
+# smallest size that finishes with real margin. Raise `size` alone to buy wall
+# time - CS_THREADS is deliberately unset so it follows the machine's vCPU
+# count, and SIM_TIMEOUT_SECONDS below has headroom for a smaller size.
+
+app = "sim-sweep"
+primary_region = "ord"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  SIM_ALLOW_SWEEP = "1"
+  SIM_MAX_CONCURRENT = "1"
+  SIM_TIMEOUT_SECONDS = "900"
+
+[http_service]
+  internal_port = 8080
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "performance-4x"
