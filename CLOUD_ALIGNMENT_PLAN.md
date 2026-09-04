@@ -139,6 +139,15 @@ Multi-stage:
 Add a CI job that builds the image for `linux/amd64` with `push: false`, then runs the container with `SIM_TESTING=1 SIM_CARDS_FILE=...` and curls `/healthz` and one `/simulate`. Image publishing is **not** part of this plan.
 
 ### W8. `fly.toml` draft (do not deploy)
+
+> **Superseded 2026-09-04.** The `performance-16x` size below was drafted before
+> the interactive path was measured at 0.68 s for 20,000 games. The deployment
+> is now split into a small always-on `sim-worker` (`deploy/fly.toml`,
+> `shared-cpu-2x`) and an ephemeral `sim-sweep` batch worker
+> (`deploy/fly.sweep.toml`, `performance-4x`, scaled to zero). See
+> `docs/hosting-cost-model.md` and the STATE.md section of the same date. The
+> snippet below is kept as the record of what W8 landed.
+
 Commit a `deploy/fly.toml` documenting the intended shape so the deployment phase does not guess:
 
 ```toml
