@@ -45,7 +45,8 @@ TEST_CASE("UNTAP_TARGET offers only tapped legal permanents", "[effects][untap_t
     cs::CardDb db;
     db.cards.resize(2);
     db.cards[0].export_index = 0;
-    db.cards[0].faces.push_back(cs::Face{.is_land = true});
+    db.cards[0].faces.emplace_back();
+    db.cards[0].faces.back().is_land = true;
     db.cards[1].export_index = 1;
     cs::GameState state;
     state.battlefield.set(0);

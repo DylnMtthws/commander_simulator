@@ -48,7 +48,8 @@ TEST_CASE("an active ESCAPE effect grants nonland graveyard casting with an expl
     db.cards[0].export_index = 0;  // Underworld Breach stand-in
     db.cards[1].export_index = 1;  // spell
     db.cards[2].export_index = 2;  // land
-    db.cards[2].faces.push_back(cs::Face{.is_land = true});
+    db.cards[2].faces.emplace_back();
+    db.cards[2].faces.back().is_land = true;
 
     cs::EffectDb effects;
     effects.by_slot.resize(3);
