@@ -36,7 +36,7 @@ void TraceWriter::mana(std::span<const Source> sources) {
             }
         }
         if (colours.empty()) {
-            colours = "C";
+            colours.push_back('C');
         }
         std::fprintf(out_, "%dx{%s} ", source.amount, colours.c_str());
     }

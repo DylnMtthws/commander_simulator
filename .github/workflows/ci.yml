@@ -124,3 +124,68 @@ jobs:
 
       - name: Require identical macOS and Linux digests
         run: diff -u digests/macos/cs-digest.txt digests/linux/cs-digest.txt
+
+  image-smoke:
+    needs: [build-and-test, reproducibility]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build linux/amd64 image without publishing
+        run: docker build --platform linux/amd64 --tag mtgsim:ci .
+
+      - name: Generate disposable offline fixture
+        run: |
+          python3 scripts/make_repro_fixture.py \
+            --cards "${RUNNER_TEMP}/cards.json" \
+            --candidate "${RUNNER_TEMP}/candidate.json"
+          python3 - "${RUNNER_TEMP}/candidate.json" "${RUNNER_TEMP}/request.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          candidate = json.loads(Path(sys.argv[1]).read_text())
+          Path(sys.argv[2]).write_text(json.dumps({"candidate": candidate, "games": 20}))
+          PY
+
+      - name: Smoke-test health and simulation
+        run: |
+          container_id=$(docker run --rm --detach \
+            --publish 127.0.0.1:18080:8080 \
+            --env SIM_TESTING=1 \
+            --env SIM_CARDS_FILE=/tmp/cards.json \
+            --mount "type=bind,source=${RUNNER_TEMP}/cards.json,target=/tmp/cards.json,readonly" \
+            mtgsim:ci)
+          trap 'docker stop "${container_id}"' EXIT
+          start_ns=$(date +%s%N)
+          for attempt in $(seq 1 40); do
+            if curl --fail --silent --show-error \
+              http://127.0.0.1:18080/healthz > "${RUNNER_TEMP}/health.json"; then
+              break
+            fi
+            sleep 0.05
+          done
+          end_ns=$(date +%s%N)
+          python3 - "${start_ns}" "${end_ns}" "${RUNNER_TEMP}/health.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          elapsed = (int(sys.argv[2]) - int(sys.argv[1])) / 1_000_000_000
+          assert elapsed < 2, f"health startup took {elapsed:.3f}s"
+          assert json.loads(Path(sys.argv[3]).read_text())["status"] == "ok"
+          print(f"health startup: {elapsed:.3f}s")
+          PY
+          curl --fail --silent --show-error \
+            --header 'Content-Type: application/json' \
+            --data-binary "@${RUNNER_TEMP}/request.json" \
+            http://127.0.0.1:18080/simulate > "${RUNNER_TEMP}/result.json"
+          python3 - "${RUNNER_TEMP}/result.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          result = json.loads(Path(sys.argv[1]).read_text())
+          assert result["schema_version"] == "cedh-simulation-result.v2"
+          assert result["simulation"]["games"] == 20
+          PY

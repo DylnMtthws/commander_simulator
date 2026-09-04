@@ -103,7 +103,9 @@ int summarise(const std::filesystem::path& path) {
         lands += has_land ? 1 : 0;
         castable += has_castable ? 1 : 0;
         variable += has_variable ? 1 : 0;
-        multi_faced += card.faces.size() > 1 ? 1 : 0;
+        if (card.faces.size() > 1) {
+            ++multi_faced;
+        }
     }
 
     std::printf("  %zu with a land face, %zu castable, %zu X spells, %zu multi-faced\n",
