@@ -757,13 +757,13 @@ status = "modeled"
 authored_from = "b2ae0d724427351b0e14bb0bee94161ae4f2e69db7a3498e100dfa4652c615f5"
 # Imprint: exile a nonartifact, nonland card from hand. Colours are those of the
 # exiled card; approximated as GU, which is the deck's identity.
-effects = [ { kind = "MANA_SOURCE", colors = ["G","U"], amount = 1 }, { kind = "CARD_COST", cards = 1, filter = "nonland" } ]
+effects = [ { kind = "MANA_SOURCE", colors = ["G","U"], amount = 1 }, { kind = "CARD_COST", cards = 1, filter = "nonland", destination = "exile", remember_imprint = true } ]
 
 [cards."Mox Diamond"]
 status = "modeled"
 authored_from = "301afb391b47d64d23e28f128e9567da04cbf4588eb5daa025f9916cafcdd5ba"
 # Discard a LAND, which is a different and usually worse cost than Chrome Mox's.
-effects = [ { kind = "MANA_SOURCE", colors = ["W","U","B","R","G"], amount = 1 }, { kind = "CARD_COST", cards = 1, filter = "land" } ]
+effects = [ { kind = "MANA_SOURCE", colors = ["W","U","B","R","G"], amount = 1 }, { kind = "CARD_COST", cards = 1, filter = "land", destination = "graveyard", remember_imprint = false } ]
 
 # ===========================================================================
 # RITUAL - one-shot mana that does not come from tapping a battlefield permanent
@@ -890,6 +890,16 @@ effects = [
   { kind = "UNTAP_TARGET", targets = 1, nonland_only = true },
   { kind = "DRAW", cards = 1 },
 ]
+
+[cards."Isochron Scepter"]
+status = "modeled"
+authored_from = "b587800ae01be74ae3467da529f7cb731d53ae57b3ab259c38879be6a596a003"
+# "When Isochron Scepter enters, you may exile an instant card with mana value
+# 2 or less from your hand. ... You may copy the exiled card. If you do, you may
+# cast the copy without paying its mana cost." Imprint selection and memory are
+# represented. Repeatedly casting the copy is detected by an engine pattern;
+# the loop does not create stack copies.
+effects = [ { kind = "CARD_COST", cards = 1, filter = "instant", mana_value_lte = 2, destination = "exile", remember_imprint = true } ]
 
 [cards."Thassa's Oracle"]
 status = "unauthored"

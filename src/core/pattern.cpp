@@ -72,6 +72,14 @@ bool requirement_holds(const Requirement& requirement, const PatternSet& set,
             return false;
         }
     }
+    if (requirement.has_available_mana && !can_pay(requirement.available_mana, sources, 0)) {
+        return false;
+    }
+    if (requirement.imprinted_permanent >= 0 &&
+        state.imprinted[static_cast<std::size_t>(requirement.imprinted_permanent)] !=
+            requirement.imprinted_card) {
+        return false;
+    }
     if (requirement.loop_entry_cost >= 0) {
         Cost entry;
         entry.generic = static_cast<std::uint8_t>(requirement.loop_entry_cost *

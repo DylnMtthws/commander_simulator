@@ -117,11 +117,15 @@ struct TutorEffect {
 };
 
 // CARD_COST: paid in cards from hand, not mana.
-enum class CardFilter : std::uint8_t { Any = 0, Land, Nonland };
+enum class CardFilter : std::uint8_t { Any = 0, Land, Nonland, Instant };
+enum class CardCostDestination : std::uint8_t { Graveyard = 0, Exile };
 
 struct CardCostEffect {
     int cards = 1;
     CardFilter filter = CardFilter::Any;
+    int mana_value_lte = -1;
+    CardCostDestination destination = CardCostDestination::Graveyard;
+    bool remember_imprint = false;
 };
 
 // RITUAL: one-shot mana from somewhere other than tapping a permanent.

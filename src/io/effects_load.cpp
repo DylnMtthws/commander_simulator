@@ -41,6 +41,7 @@ CardFilter filter_from(const std::string& text, const std::string& context) {
     if (text.empty() || text == "any") return CardFilter::Any;
     if (text == "land") return CardFilter::Land;
     if (text == "nonland") return CardFilter::Nonland;
+    if (text == "instant") return CardFilter::Instant;
     fail(context + ": unknown card filter '" + text + "'");
 }
 
@@ -226,6 +227,26 @@ EffectDb load_effects(const std::filesystem::path& path, const CardDb& db,
                 cost.cards = static_cast<int>((*effect)["cards"].value_or<int64_t>(1));
                 cost.filter =
                     filter_from((*effect)["filter"].value_or<std::string>(""), context);
+                cost.mana_value_lte =
+                    static_cast<int>((*effect)["mana_value_lte"].value_or<int64_t>(-1));
+                const auto destination = (*effect)["destination"].value<std::string>();
+                const auto remember = (*effect)["remember_imprint"].value<bool>();
+                if (!destination || !remember.has_value()) {
+                    fail(context +
+                         ": CARD_COST requires explicit destination and remember_imprint; "
+                         "imprint state has no silent default.");
+                }
+                if (*destination == "graveyard") {
+                    cost.destination = CardCostDestination::Graveyard;
+                } else if (*destination == "exile") {
+                    cost.destination = CardCostDestination::Exile;
+                } else {
+                    fail(context + ": CARD_COST destination must be 'graveyard' or 'exile'");
+                }
+                cost.remember_imprint = *remember;
+                if (cost.remember_imprint && cost.destination != CardCostDestination::Exile) {
+                    fail(context + ": remember_imprint requires destination='exile'");
+                }
                 target.has_card_cost = true;
                 target.card_cost = cost;
             } else if (kind == "RITUAL") {

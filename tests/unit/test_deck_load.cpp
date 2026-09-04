@@ -155,7 +155,7 @@ TEST_CASE("refuses a term that is planned but not implemented", "[deck]") {
 [[win]]
 name = "state_needing_mana"
 [win.requires]
-available_mana = 4
+attached = ["Sol Ring", "Forest"]
 )"),
                            cs::io::DeckError,
                            MessageMatches(ContainsSubstring("NOT IMPLEMENTED")));

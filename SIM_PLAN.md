@@ -719,6 +719,19 @@ unchanged and documented. *Cerulean Wisps* is the first modeled user and also
 uses the pre-existing `DRAW` kind. Dramatic Reversal correctly remains
 `MASS_UNTAP`; its text chooses no target.
 
+#### 2026-09-03 re-audit — imprint state (no new kind)
+
+Imprint is remembered state attached to a permanent, not a loop verb. The
+existing `CARD_COST` verb already chooses and gives up a card from hand, so its
+destination, mana-value cap, and `remember_imprint` are flags under §4.2. The
+`imprinted = [permanent, card]` term reads the stored edge conjunctively;
+`available_mana` uses ordinary exact payment. The re-audit updates *Chrome Mox*
+to send its cost to exile and remember it, while deliberately preserving its
+existing broad `nonland` approximation so Kinnan 1.0.0's selection behavior does
+not change. *Mox Diamond* explicitly keeps graveyard/false. *Isochron Scepter*
+is the first card whose stored imprint is consumed by a pattern. Dramatic
+Reversal remains the existing `MASS_UNTAP` effect.
+
 #### SCOPE NOTE — the scorer is thinly validated by this deck
 
 **This deck has no cantrips.** No *Brainstorm*, no *Ponder*, no *Preordain*.

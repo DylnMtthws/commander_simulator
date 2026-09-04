@@ -53,6 +53,11 @@ struct Requirement {
     int storm_count_gte = 0;
     bool devotion_gte_library = false;  // blue devotion, for Thassa's Oracle
 
+    bool has_available_mana = false;
+    Cost available_mana;
+    int imprinted_permanent = -1;
+    int imprinted_card = -1;
+
     // The cost, in generic mana, of ENTERING a self-untap loop.
     //
     // This is the term that makes an engine a claim about the board rather than

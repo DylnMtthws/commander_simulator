@@ -326,6 +326,15 @@ void card_cost_candidates(const CardCostEffect& cost, const CardDb& db, const Ga
             case CardFilter::Nonland:
                 if (land) return;
                 break;
+            case CardFilter::Instant: {
+                const std::string& line =
+                    card.faces.empty() ? card.name : card.faces.front().type_line;
+                if (line.find("Instant") == std::string::npos) return;
+                break;
+            }
+        }
+        if (cost.mana_value_lte >= 0 && card.mana_value > cost.mana_value_lte) {
+            return;
         }
         out.push_back(slot);
     });

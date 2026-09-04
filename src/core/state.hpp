@@ -104,7 +104,10 @@ struct GameState {
     // The sentinel being an in-range value is the hazard. -1 is outside the
     // slot range and cannot be produced by value-initialisation, which is
     // exactly why it has to be set explicitly.
-    GameState() { copy_of.fill(-1); }
+    GameState() {
+        copy_of.fill(-1);
+        imprinted.fill(-1);
+    }
 
     // The library, as slot indices. Cards at [0, drawn) have already been
     // drawn; [drawn, library_count) are still in it.
@@ -138,6 +141,9 @@ struct GameState {
     // kind needed new STATE rather than a new term - and that is a fact about
     // the game, not a thinness in the policy.
     std::array<std::int8_t, kMaxDeckSlots> copy_of{};
+    // Card remembered by each imprint permanent, or -1. The remembered card
+    // itself lives in exile; this edge is the state a plain zone cannot carry.
+    std::array<std::int8_t, kMaxDeckSlots> imprinted{};
 
     Zone hand;
     Zone delayed_hand;  // cards set aside to enter hand at the next turn

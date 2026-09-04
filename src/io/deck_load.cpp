@@ -30,9 +30,7 @@ constexpr std::string_view kBoolTerms[] = {"devotion_gte_library"};
 // Declared in section 5.2 but not implemented yet. Named separately so the
 // error says "not implemented" rather than "unknown", which is the difference
 // between a typo and a missing feature.
-constexpr std::string_view kNotYetImplemented[] = {"available_mana",
-                                                   "devotion_blue_gte_library", "attached",
-                                                   "imprinted"};
+constexpr std::string_view kNotYetImplemented[] = {"devotion_blue_gte_library", "attached"};
 
 bool contains(auto&& list, std::string_view key) {
     return std::find(std::begin(list), std::end(list), key) != std::end(list);
@@ -126,6 +124,46 @@ Requirement parse_requirement(const toml::table& table, const CardDb& db, Patter
                      "' must be true when present; false is a negated/no-op term");
             }
             requirement.devotion_gte_library = true;
+        } else if (name == "available_mana") {
+            const auto* mana = value.as_table();
+            if (mana == nullptr || mana->empty()) {
+                fail(context + ": available_mana must be a non-empty inline table");
+            }
+            for (const auto& [mana_key, mana_value] : *mana) {
+                const std::string_view component{mana_key.str()};
+                const auto amount = mana_value.value<int64_t>();
+                if (!amount || *amount < 0) {
+                    fail(context + ": available_mana values must be non-negative integers");
+                }
+                if (component == "generic") {
+                    requirement.available_mana.generic = static_cast<std::uint8_t>(*amount);
+                } else {
+                    static constexpr std::string_view kOrder = "WUBRG";
+                    const auto at = kOrder.find(component);
+                    if (component.size() != 1 || at == std::string_view::npos) {
+                        fail(context +
+                             ": available_mana keys are 'generic' or WUBRG colour letters");
+                    }
+                    requirement.available_mana.pips[at] =
+                        static_cast<std::uint8_t>(*amount);
+                }
+            }
+            requirement.has_available_mana = true;
+        } else if (name == "imprinted") {
+            const auto* pair = value.as_array();
+            if (pair == nullptr || pair->size() != 2) {
+                fail(context +
+                     ": imprinted must be [permanent, card], exactly two card names");
+            }
+            const auto permanent = (*pair)[0].value<std::string>();
+            const auto card = (*pair)[1].value<std::string>();
+            if (!permanent || !card) {
+                fail(context + ": imprinted entries must be card names");
+            }
+            requirement.imprinted_permanent = slot_for(db, *permanent, context + " imprinted");
+            requirement.imprinted_card = slot_for(db, *card, context + " imprinted");
+            set.named_slots.set(requirement.imprinted_permanent);
+            set.named_slots.set(requirement.imprinted_card);
         } else if (name == "entry_pips") {
             // The coloured half of an entry cost (R2, section 16.7). Written as
             // colour letters rather than a mana string, because the pattern

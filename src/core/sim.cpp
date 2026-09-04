@@ -36,6 +36,7 @@ std::uint64_t digest_state(const GameState& state) noexcept {
     };
     for (std::size_t i = 0; i < kMaxDeckSlots; ++i) {
         mix(static_cast<std::uint64_t>(state.copy_of[i] + 1));
+        mix(static_cast<std::uint64_t>(state.imprinted[i] + 1));
     }
     mix_zone(state.hand);
     mix_zone(state.delayed_hand);
@@ -368,7 +369,15 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
                         break;  // nothing legal left; the scorer should have caught this
                     }
                     state.hand.clear(given_up);
-                    state.graveyard.set(given_up);
+                    if (cast_entry.card_cost.destination == CardCostDestination::Exile) {
+                        state.exile.set(given_up);
+                    } else {
+                        state.graveyard.set(given_up);
+                    }
+                    if (cast_entry.card_cost.remember_imprint) {
+                        state.imprinted[static_cast<std::size_t>(spell)] =
+                            static_cast<std::int8_t>(given_up);
+                    }
                     ++result.stats.cards_given_up;
                 }
             }
