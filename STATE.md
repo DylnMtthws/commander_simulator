@@ -71,6 +71,9 @@ Runtime configuration:
 | `SIM_MAX_GAMES` | `60000` | Requests above this are rejected with 400 |
 | `SIM_TIMEOUT_SECONDS` | `300` | Simulator subprocess timeout |
 | `SIM_MAX_CONCURRENT` | `1` | Simulations in flight; excess receives 429 |
+| `SIM_ALLOW_SWEEP` | `0` | `1` makes this process the batch sweep worker; refuses to start without a token |
+| `SIM_SWEEP_TOKEN` | unset | Bearer token a sweep request must present |
+| `SIM_MAX_ABLATIONS` | `8` | Most cards one request may name in `ablate` |
 | `SIM_CARDS_FILE` | unset | Test/offline card snapshot; cannot coexist with a DSN outside `SIM_TESTING=1` |
 
 Measured Release timings on the native GitHub Actions `ubuntu-latest` x64
@@ -95,6 +98,45 @@ W5 is landed. A full human sweep report was byte-for-byte identical before and
 after; a v2 request sweep was identical after removing only timestamps. The
 queue runs the paired-CRN and independently seeded arms as separate serial tasks
 and reconstructs results in target order.
+
+## Interactive and batch are separate machines (2026-09-04)
+
+The 16-vCPU always-on machine in the deployment draft is gone. It was the
+largest line item in the hosting estimate, and the only workload that ever
+wanted 16 cores — the 98-ablation sweep — no longer runs on the interactive
+service at all.
+
+| | Config | Size | Provisioning |
+|---|---|---|---|
+| `sim-worker`, interactive | `deploy/fly.toml` | `shared-cpu-2x`, 1 GB, `CS_THREADS=2` | one warm machine |
+| `sim-sweep`, batch | `deploy/fly.sweep.toml` | `performance-4x`, threads follow the vCPUs | `min_machines_running = 0`; started per sweep, stopped after |
+
+Two vCPUs is sized from the 0.68 s / 20,000-game interactive measurement above
+and from resident memory in the tens of MB. Four is sized from the sweep's ~600
+CPU-seconds: it is the smallest size that finishes with margin, since 2 vCPUs
+projects to ~300 s, exactly `SIM_TIMEOUT_SECONDS`. **Neither number is a
+concurrency measurement.** 0.68 s is one run on an idle machine; the load test
+that would decide between 2 and 4 vCPUs for the web tier is specified in
+`docs/hosting-cost-model.md` and has not been run.
+
+Sweeps are gated server-side, not by what the client sends:
+
+- `sweep: true` on the interactive service returns **403 `sweep_not_allowed`**
+  before `cs` is started. It needs `SIM_ALLOW_SWEEP=1` *and* a valid
+  `Authorization: Bearer` token, or **401 `unauthorized`**.
+- `ablate` is capped at `SIM_MAX_ABLATIONS` (8), so nobody buys a sweep's worth
+  of compute by naming 98 cards one at a time. The Deck Lab hardcoding an empty
+  ablation list was never a boundary and is not treated as one.
+- Startup fails if `SIM_ALLOW_SWEEP=1` with no token; the batch tier fails
+  closed.
+- `mtgsim-sweep` (`scripts/run_sweep.sh`) runs the same sweep as a one-off
+  command, for an ephemeral machine, a CI job or a shell. No queue, database or
+  new vendor was added.
+
+Cost is now two line items — baseline always-on, and per-sweep usage — worked
+through with named, unfilled price variables in `docs/hosting-cost-model.md`.
+Per-sweep cost is roughly invariant to worker size, because ~600 CPU-seconds is
+a property of the work; size buys wall time, not money.
 
 ## In flight
 
