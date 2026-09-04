@@ -201,6 +201,13 @@ struct DrawEffect {
     int cards = 1;
 };
 
+// EXILE_LIBRARY is a verb rather than a DRAW flag: cards leave the library for
+// exile and never become available to cast. `leave` is explicit authoring data
+// because "empty the library" and "leave one" produce different Oracle states.
+struct ExileLibraryEffect {
+    int leave = 0;
+};
+
 enum class ModifierMode : std::uint8_t { Multiply, GrantCreatureMana };
 
 struct ModifierEffect {
@@ -233,6 +240,8 @@ struct CardEffects {
     DrawEffect draw;
     bool has_select = false;
     SelectEffect select;
+    bool has_exile_library = false;
+    ExileLibraryEffect exile_library;
 
     // CONVOKE is a property of the COST, not an effect, which is why it is a
     // card-level flag and not a member of the closed kind set. Section 4.2's

@@ -150,6 +150,11 @@ struct GameState {
     Zone command_zone;
     Zone battlefield;
     Zone graveyard;
+    Zone exile;
+    // Cards whose cast or triggered resolution completed this game. This is
+    // historical state, distinct from their current zone (an instant may have
+    // resolved and then gone to the graveyard).
+    Zone resolved;
     Zone tapped;
 
     // Commander starts at 40. Life is a PAYABLE COST WITH A FLOOR and nothing
@@ -209,6 +214,11 @@ void take_peeked(GameState& state, int slot) noexcept;
 // Puts a peeked card on the BOTTOM: swapped to the end of the array and excluded
 // from every later draw.
 void bottom_peeked(GameState& state, int slot) noexcept;
+
+// Exiles cards from the library until exactly `leave` remain. The first users
+// are Demonic Consultation and Tainted Pact under a policy that names/keeps no
+// card, so both explicitly author leave=0.
+void exile_library_until(GameState& state, int leave) noexcept;
 
 // Sets up a game: library from the deck's non-commander slots, opening hand of
 // `hand_size`, commander in the command zone.

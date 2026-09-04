@@ -20,16 +20,17 @@ namespace {
 // too, or the pattern quietly never fires - the same failure class as a
 // mechanism not running.
 constexpr std::string_view kZoneTerms[] = {"in_play", "in_hand", "in_play_or_hand", "untapped",
-                                           "any_of"};
+                                           "any_of", "resolved"};
 constexpr std::string_view kScalarTerms[] = {"turn_gte", "creature_count_gte",
                                             "library_size_lte", "loop_entry_cost",
                                             "activations"};
 constexpr std::string_view kOtherTerms[] = {"flag", "flags", "entry_pips"};
+constexpr std::string_view kBoolTerms[] = {"devotion_gte_library"};
 
 // Declared in section 5.2 but not implemented yet. Named separately so the
 // error says "not implemented" rather than "unknown", which is the difference
 // between a typo and a missing feature.
-constexpr std::string_view kNotYetImplemented[] = {"available_mana", "resolved",
+constexpr std::string_view kNotYetImplemented[] = {"available_mana",
                                                    "devotion_blue_gte_library", "attached",
                                                    "imprinted"};
 
@@ -98,6 +99,7 @@ Requirement parse_requirement(const toml::table& table, const CardDb& db, Patter
             else if (name == "in_hand") requirement.in_hand = zone;
             else if (name == "in_play_or_hand") requirement.in_play_or_hand = zone;
             else if (name == "untapped") requirement.untapped = zone;
+            else if (name == "resolved") requirement.resolved = zone;
             else { requirement.any_of = zone; requirement.has_any_of = true; }
         } else if (contains(kScalarTerms, name)) {
             const auto number = value.value<int64_t>();
@@ -114,6 +116,13 @@ Requirement parse_requirement(const toml::table& table, const CardDb& db, Patter
                 saw_activations = true;
             }
             else requirement.library_size_lte = static_cast<int>(*number);
+        } else if (contains(kBoolTerms, name)) {
+            const auto enabled = value.value<bool>();
+            if (!enabled || !*enabled) {
+                fail(context + ": '" + std::string(name) +
+                     "' must be true when present; false is a negated/no-op term");
+            }
+            requirement.devotion_gte_library = true;
         } else if (name == "entry_pips") {
             // The coloured half of an entry cost (R2, section 16.7). Written as
             // colour letters rather than a mana string, because the pattern
@@ -345,6 +354,11 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db) {
         if (card.is_creature()) {
             set.creature_slots.set(card.export_index);
         }
+        const Face* face = card.castable_face();
+        if (face != nullptr) {
+            set.blue_devotion[static_cast<std::size_t>(card.export_index)] =
+                face->cost->pips[static_cast<std::size_t>(Colour::Blue)];
+        }
     }
 
     if (const auto* engines = root["engine"].as_array()) {
@@ -369,7 +383,8 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db) {
             engine.requires_ = parse_requirement(*requires_table, db, set, context, false);
             set.named_slots = set.named_slots | engine.requires_.in_play |
                               engine.requires_.in_hand | engine.requires_.in_play_or_hand |
-                              engine.requires_.untapped | engine.requires_.any_of;
+                              engine.requires_.untapped | engine.requires_.any_of |
+                              engine.requires_.resolved;
             set.engines.push_back(std::move(engine));
         }
     }
@@ -390,7 +405,8 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db) {
                 parse_requirement(*requires_table, db, set, "pattern '" + pattern.name + "'", true);
             set.named_slots = set.named_slots | pattern.requires_.in_play |
                               pattern.requires_.in_hand | pattern.requires_.in_play_or_hand |
-                              pattern.requires_.untapped | pattern.requires_.any_of;
+                              pattern.requires_.untapped | pattern.requires_.any_of |
+                              pattern.requires_.resolved;
             set.patterns.push_back(std::move(pattern));
         }
     }

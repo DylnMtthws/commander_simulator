@@ -336,6 +336,15 @@ EffectDb load_effects(const std::filesystem::path& path, const CardDb& db,
                 }
                 target.has_draw = true;
                 target.draw = draw;
+            } else if (kind == "EXILE_LIBRARY") {
+                const auto leave = (*effect)["leave"].value<int64_t>();
+                if (!leave || *leave < 0) {
+                    fail(context +
+                         ": EXILE_LIBRARY requires non-negative integer 'leave'; it has "
+                         "no default because leaving zero and leaving one are different states.");
+                }
+                target.has_exile_library = true;
+                target.exile_library.leave = static_cast<int>(*leave);
             } else if (kind == "MASS_UNTAP") {
                 MassUntapEffect untap;
                 untap.nonland_only = (*effect)["nonland_only"].value_or<bool>(true);

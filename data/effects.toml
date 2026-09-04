@@ -814,6 +814,34 @@ authored_from = "7e4f470294e075e97c76ccf15c1a415a17a3bff1994a8c1697c641b5ae0863c
 # card, one line of text - is where a re-read starts.
 effects = [ { kind = "DRAW", cards = 1 } ]
 
+# ===========================================================================
+# EXILE_LIBRARY - consultation effects used with Thassa's Oracle
+# ===========================================================================
+
+[cards."Demonic Consultation"]
+status = "modeled"
+authored_from = "eaa30f5853ef6ff63a6ceac588e637ab308994cf93026b60d4b296827b2ab89a"
+# "Choose a card name. Exile the top six cards of your library, then reveal
+# cards from the top of your library until you reveal a card with the chosen
+# name. Put that card into your hand and exile all other cards revealed this
+# way." The goldfish policy names a card absent from the deck, explicitly
+# making the terminal library state empty.
+effects = [ { kind = "EXILE_LIBRARY", leave = 0 } ]
+
+[cards."Tainted Pact"]
+status = "modeled"
+authored_from = "3f32f4fa185edb6907f666b933483b02d8b1b85ef8b00c54e88c4023e7476373"
+# "Exile the top card of your library. You may put that card into your hand ...
+# Repeat this process until you put a card into your hand or you exile two cards
+# with the same name." A singleton cEDH list may decline every card, leaving an
+# empty library; that policy choice is the authored line this effect represents.
+effects = [ { kind = "EXILE_LIBRARY", leave = 0 } ]
+
+[cards."Thassa's Oracle"]
+status = "unauthored"
+authored_from = "6a2a0571a5c0efc1745ba0a2a20cc047afbf1b0d34616c959168ee9f35e4135f"
+reason = "the selection portion of its ETB is not executed; resolved plus devotion_gte_library models only its terminal condition"
+
 # Explicitly unauthored entries are different from omissions. They make the
 # known gap reviewable while still allowing a pattern to name the card.
 [cards."Sylvan Library"]

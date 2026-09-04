@@ -39,6 +39,8 @@ std::uint64_t digest_state(const GameState& state) noexcept {
     mix_zone(state.command_zone);
     mix_zone(state.battlefield);
     mix_zone(state.graveyard);
+    mix_zone(state.exile);
+    mix_zone(state.resolved);
     mix_zone(state.tapped);
     return hash;
 }
@@ -273,6 +275,10 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
                 }
             }
 
+            if (cast_entry.has_exile_library) {
+                exile_library_until(state, cast_entry.exile_library.leave);
+            }
+
             // CARD_COST, paid in cards from hand rather than in mana. Chrome
             // Mox exiles a nonland card; Mox Diamond discards a land. Authored
             // since Phase 7 and charged since never - `has_card_cost` had zero
@@ -314,6 +320,11 @@ GameResult run_game(const CardDb& db, const EffectDb& effects, const PatternSet&
                 state.tapped = keep_tapped;
                 ++result.stats.mass_untaps;
             }
+
+            // Historical resolution state is recorded independently of the
+            // destination. Instants and sorceries move to the graveyard below;
+            // ETB permanents remain on the battlefield, but both resolved.
+            state.resolved.set(spell);
 
             // PAYING SPENDS THE PLAN THE MANA SYSTEM MADE.
             //

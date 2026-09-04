@@ -661,6 +661,18 @@ opening hand → mana available on turns 1–3 → pattern-completion terms →
 everything else.** `CARD_COST` is in the first tier with two users. Anything
 landing in the first tier gets a kind almost regardless of count.
 
+#### 2026-09-03 re-audit — `EXILE_LIBRARY`
+
+The loop gained `EXILE_LIBRARY` because moving the remaining library to exile
+is a verb none of the twelve existing kinds performs; it is not a timing,
+quantity, or precondition on `DRAW`. The entire previously authored card table
+was re-read against that distinction. **No existing entry changes kind:** none
+of Kinnan list A exiles its own library. *Demonic Consultation* and *Tainted
+Pact* are the first users, each with explicit `leave = 0`; *Thassa's Oracle* is
+explicitly unauthored for its selection text while its terminal condition is
+represented by the `resolved` and `devotion_gte_library` pattern terms. This
+does not change any objective in `kinnan-midrange-goldfish@1.0.0`.
+
 #### SCOPE NOTE — the scorer is thinly validated by this deck
 
 **This deck has no cantrips.** No *Brainstorm*, no *Ponder*, no *Preordain*.

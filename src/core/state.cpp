@@ -134,4 +134,19 @@ void bottom_peeked(GameState& state, int slot) noexcept {
     }
 }
 
+void exile_library_until(GameState& state, int leave) noexcept {
+    if (leave < 0) {
+        return;
+    }
+    while (state.library_size() > leave) {
+        const int slot = state.library[state.drawn];
+        state.exile.set(slot);
+        ++state.drawn;
+        if (state.bottomed > 0 && state.drawable() < 0) {
+            --state.bottomed;
+        }
+    }
+    state.bottomed = 0;
+}
+
 }  // namespace cs

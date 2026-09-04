@@ -43,11 +43,13 @@ struct Requirement {
     Zone in_play_or_hand;   // each of these in either zone
     Zone untapped;          // all of these present AND untapped
     Zone any_of;            // at least one of these on the battlefield
+    Zone resolved;          // all of these resolved at least once this game
     bool has_any_of = false;
     FlagMask flags = 0;     // all of these flags set by some engine this turn
     int turn_gte = 0;
     int creature_count_gte = 0;
     int library_size_lte = -1;  // -1 == not required
+    bool devotion_gte_library = false;  // blue devotion, for Thassa's Oracle
 
     // The cost, in generic mana, of ENTERING a self-untap loop.
     //
@@ -126,6 +128,7 @@ struct PatternSet {
     // Slots that are creatures, precomputed at load so creature_count_gte is a
     // mask-and-popcount rather than a type-string scan per turn.
     Zone creature_slots;
+    std::array<std::uint8_t, kMaxDeckSlots> blue_devotion{};
 
     // Union of every card slot named by a requirement. The effects loader uses
     // it to distinguish a harmless unlisted card from an unlisted combo piece.

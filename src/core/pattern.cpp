@@ -33,6 +33,9 @@ bool requirement_holds(const Requirement& requirement, const PatternSet& set,
     if (requirement.has_any_of && !board.intersects(requirement.any_of)) {
         return false;
     }
+    if (!state.resolved.contains(requirement.resolved)) {
+        return false;
+    }
     if (!requirement.untapped.empty()) {
         if (!board.contains(requirement.untapped)) {
             return false;
@@ -52,6 +55,16 @@ bool requirement_holds(const Requirement& requirement, const PatternSet& set,
     if (requirement.library_size_lte >= 0 &&
         state.library_size() > requirement.library_size_lte) {
         return false;
+    }
+    if (requirement.devotion_gte_library) {
+        int devotion_blue = 0;
+        state.battlefield.for_each([&](int slot) {
+            devotion_blue += set.blue_devotion[
+                static_cast<std::size_t>(state.effective(slot))];
+        });
+        if (devotion_blue < state.library_size()) {
+            return false;
+        }
     }
     if (requirement.loop_entry_cost >= 0) {
         Cost entry;
