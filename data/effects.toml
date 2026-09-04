@@ -813,3 +813,25 @@ authored_from = "7e4f470294e075e97c76ccf15c1a415a17a3bff1994a8c1697c641b5ae0863c
 # So the 31 deserve a re-read rather than a re-count, and `timing_only` - one
 # card, one line of text - is where a re-read starts.
 effects = [ { kind = "DRAW", cards = 1 } ]
+
+# Explicitly unauthored entries are different from omissions. They make the
+# known gap reviewable while still allowing a pattern to name the card.
+[cards."Sylvan Library"]
+status = "unauthored"
+authored_from = "unrecorded"
+reason = "its draw replacement and delayed life payment need a richer DRAW model"
+
+[cards."The One Ring"]
+status = "unauthored"
+authored_from = "unrecorded"
+reason = "its counter-scaled activated draw is not represented"
+
+[cards."Thrasios, Triton Hero"]
+status = "unauthored"
+authored_from = "unrecorded"
+reason = "its scry/reveal activated ability is not represented; the card remains a pattern term"
+
+[cards."Valley Floodcaller"]
+status = "unauthored"
+authored_from = "unrecorded"
+reason = "its creature-type conditional untap trigger is not represented"

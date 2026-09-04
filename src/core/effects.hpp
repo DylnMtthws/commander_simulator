@@ -263,6 +263,10 @@ struct EffectDb {
     // because "31 cards the model cannot see" and "1 of those 31 is filed wrong"
     // are different claims and a reader needs both.
     int disputed = 0;
+    // Card names whose text is not represented. Kept explicitly so both the
+    // human header and the service result can emit one warning per card; a
+    // count alone does not identify the approximation a consumer inherited.
+    std::vector<std::string> unauthored_names;
     std::vector<std::string> inert_categories;   // parallel arrays, sorted
     std::vector<int> inert_counts;
 };

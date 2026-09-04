@@ -17,6 +17,8 @@ inline constexpr const char* kCandidateSchemaVersion = "cedh-deck-candidate.v1";
 inline constexpr const char* kResultSchemaVersion = "cedh-simulation-result.v1";
 inline constexpr const char* kGoldfishScenarioId = "goldfish_assembly";
 inline constexpr const char* kGoldfishScenarioVersion = "1.0.0";
+inline constexpr const char* kDerivedStrategyPackId = "derived-generic";
+inline constexpr const char* kDerivedStrategyPackVersion = "1.0.0";
 
 struct CandidateCard {
     std::string oracle_id;
@@ -37,10 +39,25 @@ struct CandidateRequest {
 // cards, unique/coalesced oracle IDs, and the semantic-content SHA-256.
 [[nodiscard]] CandidateRequest load_candidate_request(const std::filesystem::path& path);
 
+struct StrategyPackSelection {
+    std::filesystem::path path;
+    bool derived = false;
+};
+
+// Selects an installed *.deck.toml by the candidate's exact id and version.
+// A file path is accepted for compatibility; a directory is the normal
+// registry boundary. The reserved derived id selects generic execution rather
+// than falling through from an unknown named pack.
+[[nodiscard]] StrategyPackSelection select_strategy_pack(
+    const CandidateRequest& request, const std::filesystem::path& registry);
+
 // Refuses a pack/commander/snapshot mismatch. There is intentionally no
 // generic fallback: Kinnan logic must never run for an unsupported candidate.
 void validate_candidate_for_pack(const CandidateRequest& request, const CardDb& db,
                                  const DeckFile& pack);
+
+// The snapshot check is shared by installed and derived execution.
+void validate_candidate_snapshot(const CandidateRequest& request, const CardDb& db);
 
 struct ServiceRunMetadata {
     int games = 0;

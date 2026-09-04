@@ -367,6 +367,9 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db) {
             const auto* requires_table = (*entry)["requires"].as_table();
             if (requires_table == nullptr) fail(context + ": missing 'requires'");
             engine.requires_ = parse_requirement(*requires_table, db, set, context, false);
+            set.named_slots = set.named_slots | engine.requires_.in_play |
+                              engine.requires_.in_hand | engine.requires_.in_play_or_hand |
+                              engine.requires_.untapped | engine.requires_.any_of;
             set.engines.push_back(std::move(engine));
         }
     }
@@ -385,6 +388,9 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db) {
             }
             pattern.requires_ =
                 parse_requirement(*requires_table, db, set, "pattern '" + pattern.name + "'", true);
+            set.named_slots = set.named_slots | pattern.requires_.in_play |
+                              pattern.requires_.in_hand | pattern.requires_.in_play_or_hand |
+                              pattern.requires_.untapped | pattern.requires_.any_of;
             set.patterns.push_back(std::move(pattern));
         }
     }

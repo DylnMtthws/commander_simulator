@@ -126,6 +126,10 @@ struct PatternSet {
     // Slots that are creatures, precomputed at load so creature_count_gte is a
     // mask-and-popcount rather than a type-string scan per turn.
     Zone creature_slots;
+
+    // Union of every card slot named by a requirement. The effects loader uses
+    // it to distinguish a harmless unlisted card from an unlisted combo piece.
+    Zone named_slots;
 };
 
 [[nodiscard]] bool requirement_holds(const Requirement& requirement, const PatternSet& set,

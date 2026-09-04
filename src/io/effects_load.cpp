@@ -65,7 +65,8 @@ EntersTappedUnless shape_from(const std::string& text, const std::string& contex
 
 }  // namespace
 
-EffectDb load_effects(const std::filesystem::path& path, const CardDb& db) {
+EffectDb load_effects(const std::filesystem::path& path, const CardDb& db,
+                      const PatternSet* patterns) {
     toml::table root;
     try {
         root = toml::parse_file(path.string());
@@ -75,6 +76,7 @@ EffectDb load_effects(const std::filesystem::path& path, const CardDb& db) {
 
     EffectDb effects;
     effects.by_slot.assign(db.cards.size(), CardEffects{});
+    std::vector<bool> listed(db.cards.size(), false);
 
     std::map<std::string, int> slots;
     for (const Card& card : db.cards) {
@@ -100,7 +102,16 @@ EffectDb load_effects(const std::filesystem::path& path, const CardDb& db) {
             fail(name + ": each card entry must be a table");
         }
         CardEffects& target = effects.by_slot[static_cast<std::size_t>(found->second)];
+        listed[static_cast<std::size_t>(found->second)] = true;
         const auto status = (*entry)["status"].value_or<std::string>("");
+
+        if (status == "unauthored") {
+            target.status = AuthorStatus::Unauthored;
+            if ((*entry)["reason"].value_or<std::string>("").empty()) {
+                fail(name + ": an explicit unauthored card requires a free-text 'reason'.");
+            }
+            continue;
+        }
 
         if (status == "inert") {
             target.status = AuthorStatus::Inert;
@@ -360,8 +371,20 @@ EffectDb load_effects(const std::filesystem::path& path, const CardDb& db) {
         }
     }
 
-    for (const CardEffects& entry : effects.by_slot) {
-        effects.unauthored += entry.status == AuthorStatus::Unauthored ? 1 : 0;
+    for (const Card& card : db.cards) {
+        const std::size_t slot = static_cast<std::size_t>(card.export_index);
+        const CardEffects& entry = effects.by_slot[slot];
+        if (entry.status != AuthorStatus::Unauthored) {
+            continue;
+        }
+        if (!listed[slot] && patterns != nullptr && patterns->named_slots.test(card.export_index)) {
+            fail(card.listed_name +
+                 ": no entry exists in the effect definitions, but an inherited pattern "
+                 "names this card. Pattern cards must be explicitly modeled, inert, or "
+                 "declared unauthored; refusing a silent approximation.");
+        }
+        ++effects.unauthored;
+        effects.unauthored_names.push_back(card.listed_name);
     }
     for (const auto& [category, count] : categories) {
         effects.inert_categories.push_back(category);

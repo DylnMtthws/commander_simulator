@@ -121,7 +121,7 @@ int trace_one(const std::filesystem::path& path, const std::filesystem::path& de
     try {
         db = cs::io::load_card_db(path);
         deck = cs::io::load_deck(deck_path, db);
-        effects = cs::io::load_effects(effects_path, db);
+        effects = cs::io::load_effects(effects_path, db, &deck.patterns);
     } catch (const std::runtime_error& error) {
         std::fflush(stdout);
         std::fprintf(stderr, "error: %s\n", error.what());
@@ -585,7 +585,7 @@ int simulate(const std::filesystem::path& path, const std::filesystem::path& dec
     try {
         db = cs::io::load_card_db(path);
         deck = cs::io::load_deck(deck_path, db);
-        effects = cs::io::load_effects(effects_path, db);
+        effects = cs::io::load_effects(effects_path, db, &deck.patterns);
     } catch (const std::runtime_error& error) {
         std::fflush(stdout);
         std::fprintf(stderr, "error: %s\n", error.what());
@@ -639,9 +639,20 @@ int simulate_request(const std::filesystem::path& request_path,
             .started_at = cs::io::utc_timestamp_now(),
             .completed_at = {}};
         const cs::CardDb db = cs::io::load_card_db(cards_path);
-        const cs::io::DeckFile pack = cs::io::load_deck(pack_path, db);
-        const cs::EffectDb effects = cs::io::load_effects(effects_path, db);
         const cs::io::CandidateRequest request = cs::io::load_candidate_request(request_path);
+        const std::filesystem::path registry = std::filesystem::is_directory(pack_path)
+                                                   ? pack_path
+                                                   : pack_path.parent_path();
+        const cs::io::StrategyPackSelection selected =
+            cs::io::select_strategy_pack(request, registry);
+        if (selected.derived) {
+            throw std::runtime_error(
+                "derived-generic execution is explicit but not available yet: missing "
+                "pattern-library inheritance (Phase C) and derived ranks (Phase D)");
+        }
+        const cs::io::DeckFile pack = cs::io::load_deck(selected.path, db);
+        const cs::EffectDb effects =
+            cs::io::load_effects(effects_path, db, &pack.patterns);
         cs::io::validate_candidate_for_pack(request, db, pack);
 
         const cs::AuthoredPolicy policy(pack.weights);
@@ -714,7 +725,7 @@ int sweep(const std::filesystem::path& path, const std::filesystem::path& deck_p
     try {
         db = cs::io::load_card_db(path);
         deck = cs::io::load_deck(deck_path, db);
-        effects = cs::io::load_effects(effects_path, db);
+        effects = cs::io::load_effects(effects_path, db, &deck.patterns);
     } catch (const std::runtime_error& error) {
         std::fflush(stdout);
         std::fprintf(stderr, "error: %s\n", error.what());
@@ -916,7 +927,7 @@ int hands(const std::filesystem::path& path, const std::filesystem::path& deck_p
     try {
         db = cs::io::load_card_db(path);
         deck = cs::io::load_deck(deck_path, db);
-        effects = cs::io::load_effects(effects_path, db);
+        effects = cs::io::load_effects(effects_path, db, &deck.patterns);
     } catch (const std::runtime_error& error) {
         std::fflush(stdout);
         std::fprintf(stderr, "error: %s\n", error.what());
@@ -1152,7 +1163,7 @@ int grid(const std::filesystem::path& path, const std::filesystem::path& deck_pa
     try {
         db = cs::io::load_card_db(path);
         deck = cs::io::load_deck(deck_path, db);
-        effects = cs::io::load_effects(effects_path, db);
+        effects = cs::io::load_effects(effects_path, db, &deck.patterns);
     } catch (const std::runtime_error& error) {
         std::fflush(stdout);
         std::fprintf(stderr, "error: %s\n", error.what());

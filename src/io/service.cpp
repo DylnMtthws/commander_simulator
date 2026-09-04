@@ -9,8 +9,10 @@
 #include <set>
 #include <sstream>
 #include <string_view>
+#include <vector>
 
 #include <nlohmann/json.hpp>
+#include <toml++/toml.hpp>
 
 #include "core/version.hpp"
 #include "io/card_db_load.hpp"
@@ -182,6 +184,80 @@ CandidateRequest load_candidate_request(const std::filesystem::path& path) {
     return request;
 }
 
+StrategyPackSelection select_strategy_pack(const CandidateRequest& request,
+                                           const std::filesystem::path& registry) {
+    if (request.strategy_pack_id == kDerivedStrategyPackId &&
+        request.strategy_pack_version == kDerivedStrategyPackVersion) {
+        return {.path = {}, .derived = true};
+    }
+
+    std::vector<std::filesystem::path> candidates;
+    if (std::filesystem::is_regular_file(registry)) {
+        candidates.push_back(registry);
+    } else if (std::filesystem::is_directory(registry)) {
+        for (const std::filesystem::directory_entry& entry :
+             std::filesystem::directory_iterator(registry)) {
+            const std::string filename = entry.path().filename().string();
+            if (entry.is_regular_file() && filename.ends_with(".deck.toml")) {
+                candidates.push_back(entry.path());
+            }
+        }
+        std::sort(candidates.begin(), candidates.end());
+    } else {
+        fail("strategy-pack registry does not exist: " + registry.string());
+    }
+
+    std::filesystem::path selected;
+    for (const std::filesystem::path& path : candidates) {
+        toml::table root;
+        try {
+            root = toml::parse_file(path.string());
+        } catch (const toml::parse_error& error) {
+            fail("cannot parse installed strategy pack " + path.string() + ": " +
+                 std::string(error.description()));
+        }
+        const auto* pack = root["strategy_pack"].as_table();
+        if (pack == nullptr) {
+            fail(path.string() + ": installed *.deck.toml is missing [strategy_pack]");
+        }
+        const std::string id = (*pack)["id"].value_or<std::string>("");
+        const std::string version = (*pack)["version"].value_or<std::string>("");
+        if (id == request.strategy_pack_id && version == request.strategy_pack_version) {
+            if (!selected.empty()) {
+                fail("strategy-pack registry contains duplicate '" + id + "@" + version + "'");
+            }
+            selected = path;
+        }
+    }
+    if (selected.empty()) {
+        fail("candidate requests strategy pack '" + request.strategy_pack_id + "@" +
+             request.strategy_pack_version +
+             "', but that exact pack is not installed. Unknown named packs are rejected; "
+             "use derived-generic@1.0.0 to request explicit derived execution.");
+    }
+    return {.path = selected, .derived = false};
+}
+
+void validate_candidate_snapshot(const CandidateRequest& request, const CardDb& db) {
+    std::map<std::string, int> snapshot_commanders;
+    std::map<std::string, int> snapshot_library;
+    for (const Card& card : db.cards) {
+        ++(card.is_commander ? snapshot_commanders : snapshot_library)[card.oracle_id];
+    }
+    std::map<std::string, int> candidate_commanders;
+    for (const std::string& id : request.commander_oracle_ids) {
+        ++candidate_commanders[id];
+    }
+    std::map<std::string, int> candidate_library;
+    for (const CandidateCard& card : request.library) {
+        candidate_library[card.oracle_id] = card.quantity;
+    }
+    if (candidate_commanders != snapshot_commanders || candidate_library != snapshot_library) {
+        fail("candidate oracle IDs/quantities do not match the enriched --cards snapshot. "
+             "Export that candidate with mtgsim-export --candidate before simulating it.");
+    }
+}
+
 void validate_candidate_for_pack(const CandidateRequest& request, const CardDb& db,
                                  const DeckFile& pack) {
     if (request.strategy_pack_id != pack.strategy_pack.id ||
@@ -202,23 +278,7 @@ void validate_candidate_for_pack(const CandidateRequest& request, const CardDb& 
              pack.strategy_pack.id + "'; refusing to run commander-specific logic");
     }
 
-    std::map<std::string, int> snapshot_commanders;
-    std::map<std::string, int> snapshot_library;
-    for (const Card& card : db.cards) {
-        ++(card.is_commander ? snapshot_commanders : snapshot_library)[card.oracle_id];
-    }
-    std::map<std::string, int> candidate_commanders;
-    for (const std::string& id : request.commander_oracle_ids) {
-        ++candidate_commanders[id];
-    }
-    std::map<std::string, int> candidate_library;
-    for (const CandidateCard& card : request.library) {
-        candidate_library[card.oracle_id] = card.quantity;
-    }
-    if (candidate_commanders != snapshot_commanders || candidate_library != snapshot_library) {
-        fail("candidate oracle IDs/quantities do not match the enriched --cards snapshot. "
-             "Export that candidate with mtgsim-export --candidate before simulating it.");
-    }
+    validate_candidate_snapshot(request, db);
 }
 
 std::string utc_timestamp_now() {
@@ -285,8 +345,10 @@ std::string build_simulation_result_json(const CandidateRequest& request, const 
                            " cards are explicitly inert under this scenario.");
     }
     if (effects.unauthored > 0) {
-        warnings.push_back(std::to_string(effects.unauthored) +
-                           " cards are unauthored and therefore dilute draws without executing text.");
+        for (const std::string& name : effects.unauthored_names) {
+            warnings.push_back(name +
+                               " is unauthored and therefore dilutes draws without executing text.");
+        }
     }
     if (effects.disputed > 0) {
         warnings.push_back(std::to_string(effects.disputed) +

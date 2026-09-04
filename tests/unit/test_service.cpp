@@ -104,3 +104,31 @@ TEST_CASE("an unsupported strategy pack never falls back to Kinnan", "[service][
                            cs::io::LoadError,
                            MessageMatches(ContainsSubstring("generic Kinnan fallback is forbidden")));
 }
+
+TEST_CASE("the registry selects an installed pack by exact id and version",
+          "[service][pack][registry]") {
+    const cs::io::CandidateRequest request = cs::io::load_candidate_request(
+        std::filesystem::path(CS_FIXTURE_DIR) / "kinnan-candidate.v1.json");
+    const std::filesystem::path data =
+        std::filesystem::path(CS_FIXTURE_DIR).parent_path().parent_path() / "data";
+    const cs::io::StrategyPackSelection selected =
+        cs::io::select_strategy_pack(request, data);
+    REQUIRE_FALSE(selected.derived);
+    REQUIRE(selected.path.filename() == "kinnan.deck.toml");
+
+    cs::io::CandidateRequest wrong = request;
+    wrong.strategy_pack_version = "9.9.9";
+    REQUIRE_THROWS_MATCHES(cs::io::select_strategy_pack(wrong, data), cs::io::LoadError,
+                           MessageMatches(ContainsSubstring("not installed")));
+}
+
+TEST_CASE("generic execution is an explicit reserved pack, never an unknown-pack fallback",
+          "[service][pack][derived]") {
+    cs::io::CandidateRequest request;
+    request.strategy_pack_id = cs::io::kDerivedStrategyPackId;
+    request.strategy_pack_version = cs::io::kDerivedStrategyPackVersion;
+    const cs::io::StrategyPackSelection selected =
+        cs::io::select_strategy_pack(request, std::filesystem::path(CS_FIXTURE_DIR));
+    REQUIRE(selected.derived);
+    REQUIRE(selected.path.empty());
+}
