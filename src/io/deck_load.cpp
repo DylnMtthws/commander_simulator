@@ -284,7 +284,8 @@ bool library_entry_applies(const toml::table& entry, const CardDb& db,
 
 }  // namespace
 
-DeckFile load_deck(const std::filesystem::path& path, const CardDb& db) {
+DeckFile load_deck(const std::filesystem::path& path, const CardDb& db,
+                   bool allow_no_patterns) {
     toml::table root;
     try {
         root = toml::parse_file(path.string());
@@ -523,15 +524,13 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db) {
     // index rather than a name comparison.
     deck.weights.rank.assign(db.cards.size(), 0);
     if (const auto* policy = root["policy"].as_table()) {
-        deck.weights.land_floor =
-            static_cast<int>((*policy)["land_floor"].value_or<int64_t>(3));
-        deck.weights.land_ceiling =
-            static_cast<int>((*policy)["land_ceiling"].value_or<int64_t>(6));
-        deck.life_floor = static_cast<int>((*policy)["life_floor"].value_or<int64_t>(10));
+        deck.weights.land_floor = static_cast<int>(
+            require_field(*policy, "policy", "land_floor").value_or<int64_t>(-1));
+        deck.weights.land_ceiling = static_cast<int>(
+            require_field(*policy, "policy", "land_ceiling").value_or<int64_t>(-1));
+        deck.life_floor = static_cast<int>(
+            require_field(*policy, "policy", "life_floor").value_or<int64_t>(-1));
         deck.weights.life_floor = deck.life_floor;
-        const auto default_rank =
-            static_cast<int>((*policy)["default_rank"].value_or<int64_t>(0));
-        std::fill(deck.weights.rank.begin(), deck.weights.rank.end(), default_rank);
 
         if (const auto* ranks = (*policy)["rank"].as_table()) {
             for (const auto& [key, value] : *ranks) {
@@ -539,13 +538,17 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db) {
                 // silently do nothing - the same shape as a pattern naming an
                 // absent card, and refused for the same reason.
                 const int slot = slot_for(db, std::string(key.str()), "[policy.rank]");
-                deck.weights.rank[static_cast<std::size_t>(slot)] =
-                    static_cast<int>(value.value_or<int64_t>(0));
+                const int rank = static_cast<int>(value.value_or<int64_t>(-1));
+                if (rank < 0 || rank > 100) fail("[policy.rank] values must be in 0..100");
+                deck.rank_overrides.push_back({slot, rank});
+                deck.rank_override_names.emplace_back(key.str());
             }
         }
+    } else {
+        fail(path.string() + ": missing required [policy] section");
     }
 
-    if (set.patterns.empty()) {
+    if (set.patterns.empty() && !allow_no_patterns) {
         fail(path.string() + ": no [[win]] patterns declared. Without one the simulator has "
                              "nothing to detect and every game is censored.");
     }

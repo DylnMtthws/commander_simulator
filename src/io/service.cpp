@@ -347,7 +347,7 @@ std::string build_simulation_result_json(const CandidateRequest& request, const 
     add_assumption("no_combat", "Combat, attacks, damage, and opponent-facing kills are unsupported.");
     add_assumption("assembly_proxy", "A declared assembly state ends a game; it is not a demonstrated win.");
     add_assumption("not_general_rules_engine",
-                   "Only effects authored by this versioned strategy pack execute.");
+                   "Only explicitly authored effects execute; unlisted cards are reported unauthored.");
 
     json warnings = json::array(
         {"Assembly probability is not win rate, deck strength, or card quality."});
@@ -364,6 +364,11 @@ std::string build_simulation_result_json(const CandidateRequest& request, const 
     if (effects.disputed > 0) {
         warnings.push_back(std::to_string(effects.disputed) +
                            " inert classification is explicitly disputed by the strategy-pack author.");
+    }
+    if (pack.patterns.patterns.empty()) {
+        warnings.push_back(
+            "No card-set pattern is known for this candidate; every game is censored and no "
+            "assembly claim is made.");
     }
     if (ablations.empty()) {
         warnings.push_back("No ablations were requested; ablation_results is empty.");

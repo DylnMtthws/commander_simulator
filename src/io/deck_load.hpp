@@ -15,6 +15,7 @@
 #include "core/effects.hpp"
 #include "core/pattern.hpp"
 #include "core/policy.hpp"
+#include "core/rank.hpp"
 
 namespace cs::io {
 
@@ -70,10 +71,12 @@ struct DeckFile {
     int life_floor = 10;
     bool derived = false;
     std::vector<std::string> rank_override_names;
+    std::vector<RankOverride> rank_overrides;
 };
 
 // Parses and validates against a loaded card database. The database is required
 // because half the validation is "does this name exist in the deck at all".
-[[nodiscard]] DeckFile load_deck(const std::filesystem::path& path, const CardDb& db);
+[[nodiscard]] DeckFile load_deck(const std::filesystem::path& path, const CardDb& db,
+                                 bool allow_no_patterns = false);
 
 }  // namespace cs::io

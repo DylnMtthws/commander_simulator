@@ -1,0 +1,48 @@
+# Explicit assumptions for the reserved generic execution mode. This is not a
+# registry pack (`*.deck.toml`) and therefore cannot be selected accidentally.
+[deck]
+name = "Derived generic cEDH candidate"
+commander = "derived from candidate oracle IDs"
+
+[strategy_pack]
+id = "derived-generic"
+version = "1.0.0"
+supported_commander_oracle_ids = ["derived-at-runtime"]
+supported_effect_definitions = [
+  "MANA_SOURCE", "DYNAMIC_MANA_SOURCE", "RITUAL", "MASS_UNTAP",
+  "DRAW", "SELECT", "TUTOR", "FETCH", "CLONE", "STATIC_MANA_MODIFIER",
+  "CARD_COST", "EXILE_LIBRARY", "MILL", "ESCAPE", "UNTAP_TARGET",
+]
+assembly_objectives = ["derived-at-load"]
+play_policy_implementation = "derived-role-policy.v1"
+declared_table_assumptions = [
+  "goldfish with no simulated opponents",
+  "three-opponent card-text context",
+  "opponents collectively expose WUBRG for conditional mana sources",
+  "on the play",
+]
+known_blind_spots = [
+  "only inherited card-set patterns can terminate a run",
+  "unlisted card text is unauthored and only dilutes draws",
+  "no stack, combat, opponent model, mulligans, commander tax, legend rule, or summoning sickness",
+]
+
+[provenance]
+source = "candidate request"
+source_url = ""
+snapshot_date = "derived-at-runtime"
+snapshot_note = "Deck identity and card-data hashes are replaced from the request at load."
+cards_sha256 = "derived-at-runtime"
+
+[table]
+opponents = 3
+opponent_colors = ["W", "U", "B", "R", "G"]
+on_the_play = true
+
+[ablation]
+replacement = ""
+
+[policy]
+land_floor = 3
+land_ceiling = 6
+life_floor = 10

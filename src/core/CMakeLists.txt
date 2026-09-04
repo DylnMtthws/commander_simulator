@@ -20,6 +20,7 @@ add_library(cs_core
     state.cpp
     pattern.cpp
     effects.cpp
+    rank.cpp
     policy.cpp
     sim.cpp
     stats.cpp

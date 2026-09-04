@@ -24,6 +24,7 @@ def _load(path: Path) -> dict[str, object]:
     [
         ("cedh-deck-candidate.v1.schema.json", "kinnan-candidate.v1.json"),
         ("cedh-deck-candidate.v1.schema.json", "unsupported-pack-candidate.v1.json"),
+        ("cedh-deck-candidate.v1.schema.json", "kinnan-derived-candidate.v1.json"),
         ("cedh-simulation-result.v1.schema.json", "simulation-result.v1.json"),
         ("cedh-simulation-result.v2.schema.json", "simulation-result.v2.json"),
     ],

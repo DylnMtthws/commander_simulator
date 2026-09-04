@@ -113,6 +113,13 @@ cs::GameConfig make_config(const cs::io::DeckFile& deck) {
     return config;
 }
 
+cs::EffectDb load_effects_for_deck(const std::filesystem::path& path, const cs::CardDb& db,
+                                   cs::io::DeckFile& deck) {
+    cs::EffectDb effects = cs::io::load_effects(path, db, &deck.patterns);
+    cs::derive_policy_ranks(db, effects, deck.patterns, deck.rank_overrides, deck.weights);
+    return effects;
+}
+
 int trace_one(const std::filesystem::path& path, const std::filesystem::path& deck_path,
               const std::filesystem::path& effects_path, std::uint64_t seed) {
     cs::CardDb db;
@@ -121,7 +128,7 @@ int trace_one(const std::filesystem::path& path, const std::filesystem::path& de
     try {
         db = cs::io::load_card_db(path);
         deck = cs::io::load_deck(deck_path, db);
-        effects = cs::io::load_effects(effects_path, db, &deck.patterns);
+        effects = load_effects_for_deck(effects_path, db, deck);
     } catch (const std::runtime_error& error) {
         std::fflush(stdout);
         std::fprintf(stderr, "error: %s\n", error.what());
@@ -178,6 +185,10 @@ void print_header(const cs::CardDb& db, const cs::io::DeckFile& deck, const cs::
         }
         std::printf("\n");
     }
+    std::printf("policy ranks: derived from roles; overrides: %zu",
+                deck.rank_override_names.size());
+    for (const std::string& name : deck.rank_override_names) std::printf(" %s", name.c_str());
+    std::printf("\n");
     std::printf("data: manifest %s (%s)\n", db.manifest.cards_sha256.substr(0, 8).c_str(),
                 db.manifest.max_content_updated_at.substr(0, 10).c_str());
     // The DECKLIST's provenance, separately from the card data's. They answer
@@ -592,7 +603,7 @@ int simulate(const std::filesystem::path& path, const std::filesystem::path& dec
     try {
         db = cs::io::load_card_db(path);
         deck = cs::io::load_deck(deck_path, db);
-        effects = cs::io::load_effects(effects_path, db, &deck.patterns);
+        effects = load_effects_for_deck(effects_path, db, deck);
     } catch (const std::runtime_error& error) {
         std::fflush(stdout);
         std::fprintf(stderr, "error: %s\n", error.what());
@@ -652,15 +663,22 @@ int simulate_request(const std::filesystem::path& request_path,
                                                    : pack_path.parent_path();
         const cs::io::StrategyPackSelection selected =
             cs::io::select_strategy_pack(request, registry);
+        cs::io::DeckFile pack;
         if (selected.derived) {
-            throw std::runtime_error(
-                "derived-generic execution is explicit but not available yet: missing "
-                "pattern-library inheritance (Phase C) and derived ranks (Phase D)");
+            pack = cs::io::load_deck(registry / "derived-generic.defaults.toml", db, true);
+            pack.derived = true;
+            pack.strategy_pack.supported_commander_oracle_ids = request.commander_oracle_ids;
+            pack.strategy_pack.assembly_objectives.clear();
+            for (const cs::WinPattern& pattern : pack.patterns.patterns) {
+                pack.strategy_pack.assembly_objectives.push_back(pattern.name);
+            }
+            pack.provenance.cards_sha256 = db.manifest.cards_sha256;
+            cs::io::validate_candidate_snapshot(request, db);
+        } else {
+            pack = cs::io::load_deck(selected.path, db);
+            cs::io::validate_candidate_for_pack(request, db, pack);
         }
-        const cs::io::DeckFile pack = cs::io::load_deck(selected.path, db);
-        const cs::EffectDb effects =
-            cs::io::load_effects(effects_path, db, &pack.patterns);
-        cs::io::validate_candidate_for_pack(request, db, pack);
+        cs::EffectDb effects = load_effects_for_deck(effects_path, db, pack);
 
         const cs::AuthoredPolicy policy(pack.weights);
         const cs::GameConfig config = make_config(pack);
@@ -732,7 +750,7 @@ int sweep(const std::filesystem::path& path, const std::filesystem::path& deck_p
     try {
         db = cs::io::load_card_db(path);
         deck = cs::io::load_deck(deck_path, db);
-        effects = cs::io::load_effects(effects_path, db, &deck.patterns);
+        effects = load_effects_for_deck(effects_path, db, deck);
     } catch (const std::runtime_error& error) {
         std::fflush(stdout);
         std::fprintf(stderr, "error: %s\n", error.what());
@@ -934,7 +952,7 @@ int hands(const std::filesystem::path& path, const std::filesystem::path& deck_p
     try {
         db = cs::io::load_card_db(path);
         deck = cs::io::load_deck(deck_path, db);
-        effects = cs::io::load_effects(effects_path, db, &deck.patterns);
+        effects = load_effects_for_deck(effects_path, db, deck);
     } catch (const std::runtime_error& error) {
         std::fflush(stdout);
         std::fprintf(stderr, "error: %s\n", error.what());
@@ -1170,7 +1188,7 @@ int grid(const std::filesystem::path& path, const std::filesystem::path& deck_pa
     try {
         db = cs::io::load_card_db(path);
         deck = cs::io::load_deck(deck_path, db);
-        effects = cs::io::load_effects(effects_path, db, &deck.patterns);
+        effects = load_effects_for_deck(effects_path, db, deck);
     } catch (const std::runtime_error& error) {
         std::fflush(stdout);
         std::fprintf(stderr, "error: %s\n", error.what());

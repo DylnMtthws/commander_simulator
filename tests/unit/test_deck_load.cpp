@@ -72,6 +72,10 @@ source = "test"
 source_url = ""
 snapshot_date = "1970-01-01"
 cards_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+[policy]
+land_floor = 3
+land_ceiling = 6
+life_floor = 10
 )";
 
 cs::io::DeckFile load(const std::string& body) {

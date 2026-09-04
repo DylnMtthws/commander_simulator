@@ -49,6 +49,7 @@ target_sources(cs_tests PRIVATE
     unit/test_life_draw.cpp
     unit/test_untap_target.cpp
     unit/test_imprint.cpp)
+target_sources(cs_tests PRIVATE unit/test_rank.cpp)
 
 # Catch2WithMain supplies main(), so no test file writes one.
 # cs_core arrives transitively via cs_io's PUBLIC link.
