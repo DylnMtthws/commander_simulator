@@ -1354,6 +1354,13 @@ int grid(const std::filesystem::path& path, const std::filesystem::path& deck_pa
 }
 
 int main(int argc, char** argv) {
+    if (argc == 2 && std::strcmp(argv[1], "--version") == 0) {
+        print_view("%.*s", cs::version());
+        std::printf(" %.*s\n", static_cast<int>(cs::build_flavour().size()),
+                    cs::build_flavour().data());
+        return 0;
+    }
+
     std::filesystem::path path{"data/cards.json"};
     std::filesystem::path deck_path{"data/kinnan.deck.toml"};
     std::filesystem::path effects_path{"data/effects.toml"};
