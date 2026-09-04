@@ -1,9 +1,7 @@
 # CI: configure, build, test, and check the core is sealed.
 #
-# macOS runner because that is the only platform this project targets - it runs
-# locally on an Apple Silicon Mac mini and nowhere else. Adding ubuntu here
-# would test a configuration nobody uses, and would eventually fail for reasons
-# that do not matter.
+# Linux amd64 is the deployment target. macOS remains a first-class CI leg
+# because local development happens on Apple Silicon Macs.
 #
 # The ci preset is asan plus -Werror. Warnings are errors in CI and NOT locally:
 # a warning should stop a merge without stopping someone mid-thought.
@@ -21,12 +19,21 @@ concurrency:
 
 jobs:
   build-and-test:
-    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Ninja
+      - name: Install Ninja on macOS
+        if: runner.os == 'macOS'
         run: brew install ninja
+
+      - name: Install Ninja on Ubuntu
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
 
       # Catch2 is fetched at configure time, so cache it or every run pays a
       # clone plus a full build of the framework.
@@ -34,7 +41,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: build/ci/_deps
-          key: deps-${{ runner.os }}-${{ hashFiles('tests/CMakeLists.txt') }}
+          key: deps-${{ runner.os }}-${{ hashFiles('tests/CMakeLists.txt', 'src/io/CMakeLists.txt') }}
 
       - name: Core is sealed
         run: ./scripts/check_core_is_sealed.sh
