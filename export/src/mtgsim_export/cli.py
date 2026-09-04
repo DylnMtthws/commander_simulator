@@ -15,7 +15,7 @@ from psycopg.rows import dict_row
 from mtgsim_export.candidate import CandidateError, load_candidate
 from mtgsim_export.deck import DeckError, load_deck
 from mtgsim_export.effects import check_effects
-from mtgsim_export.export import ExportError, build_export, deck_from_candidate
+from mtgsim_export.export import ExportError, build_export, export_candidate
 from mtgsim_export.mana import ManaCostError
 
 ENV_VAR = "MTGSIM_DATABASE_URL"
@@ -73,17 +73,12 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     try:
-        with psycopg.connect(args.database_url, row_factory=dict_row) as conn:
-            candidate = load_candidate(args.candidate) if args.candidate else None
-            deck = deck_from_candidate(conn, candidate) if candidate else load_deck(args.deck)
-            document = build_export(conn, deck)
-            if candidate:
-                document["manifest"].pop("table", None)
-                document["manifest"].pop("ablation_replacement", None)
-                document["manifest"]["candidate_id"] = candidate.candidate_id
-                document["manifest"]["candidate_hash"] = candidate.candidate_hash
-                document["manifest"]["strategy_pack_id"] = candidate.strategy_pack_id
-                document["manifest"]["strategy_pack_version"] = candidate.strategy_pack_version
+        candidate = load_candidate(args.candidate) if args.candidate else None
+        if candidate:
+            document = export_candidate(args.database_url, candidate)
+        else:
+            with psycopg.connect(args.database_url, row_factory=dict_row) as conn:
+                document = build_export(conn, load_deck(args.deck))
     except (CandidateError, DeckError, ExportError, ManaCostError) as exc:
         # These are the loud failures the design asks for. Print the reason and
         # write nothing: a partial cards.json is worse than none, because the

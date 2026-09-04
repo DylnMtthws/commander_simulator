@@ -660,7 +660,7 @@ int simulate_request(const std::filesystem::path& request_path,
                      const std::filesystem::path& output_path, int games,
                      std::uint64_t seed, int objective_turn,
                      const std::string& scenario, bool do_ablation,
-                     const std::string& only, int threads) {
+                     const std::vector<std::string>& ablation_names, int threads) {
     if (games <= 0) {
         std::fprintf(stderr, "error: --request requires --games greater than zero\n");
         return 2;
@@ -730,7 +730,9 @@ int simulate_request(const std::filesystem::path& request_path,
             }
             for (const cs::Card& card : db.cards) {
                 if (card.is_commander || card.export_index == replacement ||
-                    (!only.empty() && card.listed_name != only)) {
+                    (!ablation_names.empty() &&
+                     std::find(ablation_names.begin(), ablation_names.end(), card.listed_name) ==
+                         ablation_names.end())) {
                     continue;
                 }
                 const AblationResult measured = measure_ablation(
@@ -1407,6 +1409,7 @@ int main(int argc, char** argv) {
     int sampled_hands = 0;
     int grid_hands = 0;
     std::string only;
+    std::vector<std::string> request_ablations;
     // Section 4.1: the default objective is an early-turn CDF point, because the
     // tail cannot separate opening hands and this tool is a mulligan solver's
     // value function.
@@ -1440,6 +1443,7 @@ int main(int argc, char** argv) {
         } else if (std::strcmp(argv[i], "--ablate") == 0 && i + 1 < argc) {
             do_sweep = true;
             only = argv[++i];
+            request_ablations.push_back(only);
         } else if (std::strcmp(argv[i], "--threads") == 0 && i + 1 < argc) {
             threads = std::atoi(argv[++i]);
         } else if (std::strcmp(argv[i], "--turn") == 0 && i + 1 < argc) {
@@ -1451,7 +1455,8 @@ int main(int argc, char** argv) {
 
     if (!request_path.empty()) {
         return simulate_request(request_path, path, deck_path, effects_path, output_json,
-                                games, seed, objective_turn, scenario, do_sweep, only,
+                                games, seed, objective_turn, scenario, do_sweep,
+                                request_ablations,
                                 threads);
     }
 

@@ -295,3 +295,24 @@ def build_export(conn: psycopg.Connection[dict[str, Any]], deck: Deck) -> dict[s
     payload = json.dumps(document["cards"], sort_keys=True, separators=(",", ":"))
     document["manifest"]["cards_sha256"] = hashlib.sha256(payload.encode()).hexdigest()
     return document
+
+
+def build_candidate_export(
+    conn: psycopg.Connection[dict[str, Any]], candidate: Candidate
+) -> dict[str, Any]:
+    """Build the candidate-mode document used by both CLI and HTTP service."""
+    document = build_export(conn, deck_from_candidate(conn, candidate))
+    manifest: dict[str, Any] = document["manifest"]
+    manifest.pop("table", None)
+    manifest.pop("ablation_replacement", None)
+    manifest["candidate_id"] = candidate.candidate_id
+    manifest["candidate_hash"] = candidate.candidate_hash
+    manifest["strategy_pack_id"] = candidate.strategy_pack_id
+    manifest["strategy_pack_version"] = candidate.strategy_pack_version
+    return document
+
+
+def export_candidate(database_url: str, candidate: Candidate) -> dict[str, Any]:
+    """Connect with the caller's DSN unchanged and export one candidate."""
+    with psycopg.connect(database_url, row_factory=dict_row) as conn:
+        return build_candidate_export(conn, candidate)

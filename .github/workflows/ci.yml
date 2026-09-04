@@ -27,6 +27,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            export/uv.lock
+            service/uv.lock
+
       - name: Install Ninja on macOS
         if: runner.os == 'macOS'
         run: brew install ninja
@@ -60,3 +71,56 @@ jobs:
       # turns CI green while testing nothing.
       - name: Test
         run: ctest --preset ci
+
+      - name: Build release simulator for service tests
+        run: |
+          cmake -S . -B build/service -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+          cmake --build build/service --target cs
+
+      - name: Test service package
+        env:
+          CS_BIN: ${{ github.workspace }}/build/service/src/cli/cs
+          CS_PACKS_DIR: ${{ github.workspace }}/data
+          SIM_CARDS_FILE: ${{ runner.temp }}/mtgsim-repro/cards.json
+          SIM_TESTING: "1"
+        run: |
+          uv sync --project service --frozen --all-groups
+          uv run --python 3.13 --no-project python scripts/make_repro_fixture.py \
+            --cards "${SIM_CARDS_FILE}" --candidate "${RUNNER_TEMP}/candidate.json"
+          uv run --project service --frozen ruff check service scripts/make_repro_fixture.py export/src/mtgsim_export
+          uv run --project service --frozen mypy service/src export/src
+          uv run --project service --frozen pytest -q export/tests service/tests
+
+      - name: Record fixed-seed CLI digest
+        run: |
+          uv run --python 3.13 --no-project python scripts/make_repro_fixture.py \
+            --cards data/cards.json --candidate "${RUNNER_TEMP}/candidate.json"
+          ./build/service/src/cli/cs --games 2000 --seed 1 \
+            | awk '/digest xor/ {print $3}' > cs-digest.txt
+          test -s cs-digest.txt
+          cat cs-digest.txt
+
+      - name: Upload fixed-seed digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: cs-digest-${{ runner.os }}
+          path: cs-digest.txt
+
+  reproducibility:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download macOS digest
+        uses: actions/download-artifact@v4
+        with:
+          name: cs-digest-macOS
+          path: digests/macos
+
+      - name: Download Linux digest
+        uses: actions/download-artifact@v4
+        with:
+          name: cs-digest-Linux
+          path: digests/linux
+
+      - name: Require identical macOS and Linux digests
+        run: diff -u digests/macos/cs-digest.txt digests/linux/cs-digest.txt
