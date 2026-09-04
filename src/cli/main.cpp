@@ -5,8 +5,10 @@
 // statistics arrive in Phase 6 (SIM_PLAN.md section 9.5).
 
 #include <cstdio>
+#include <exception>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <string>
 
 #include <algorithm>
@@ -36,6 +38,31 @@ namespace {
 // happened to find a zero byte. Print one by passing its length.
 void print_view(const char* format, std::string_view value) {
     std::printf(format, static_cast<int>(value.size()), value.data());
+}
+
+int default_thread_count() {
+    const unsigned int hardware = std::thread::hardware_concurrency();
+    const int fallback = hardware > 0 ? static_cast<int>(hardware) : 1;
+
+    // cgroup v2 expresses a CPU quota as "quota period". "max" means the
+    // process is unconstrained, in which case the host's concurrency is the
+    // best available answer. Fractional quotas round up so a 1.5-CPU service
+    // can keep both available execution slots busy.
+    std::ifstream cpu_max("/sys/fs/cgroup/cpu.max");
+    std::string quota_text;
+    long long period = 0;
+    if (!(cpu_max >> quota_text >> period) || quota_text == "max" || period <= 0) {
+        return fallback;
+    }
+    try {
+        const long long quota = std::stoll(quota_text);
+        if (quota <= 0) return fallback;
+        const long long count = quota / period + (quota % period != 0 ? 1 : 0);
+        if (count > std::numeric_limits<int>::max()) return fallback;
+        return std::max(1, static_cast<int>(count));
+    } catch (const std::exception&) {
+        return fallback;
+    }
 }
 
 int summarise(const std::filesystem::path& path) {
@@ -596,7 +623,8 @@ AblationResult measure_ablation(const cs::CardDb& db, const cs::EffectDb& effect
 }
 
 int simulate(const std::filesystem::path& path, const std::filesystem::path& deck_path,
-             const std::filesystem::path& effects_path, int games, std::uint64_t base_seed) {
+             const std::filesystem::path& effects_path, int games, std::uint64_t base_seed,
+             int threads) {
     cs::CardDb db;
     cs::io::DeckFile deck;
     cs::EffectDb effects;
@@ -614,8 +642,10 @@ int simulate(const std::filesystem::path& path, const std::filesystem::path& dec
     const cs::GameConfig config = make_config(deck);
 
     print_header(db, deck, effects, deck_path, games, base_seed);
-    const cs::RunSummary run =
-        cs::simulate_batch(db, effects, deck.patterns, config, policy, base_seed, 0, games);
+    const cs::RunSummary run = drive<cs::RunSummary>(games, threads, [&](int first, int count) {
+        return cs::simulate_batch(db, effects, deck.patterns, config, policy, base_seed, first,
+                                  count);
+    });
     print_report(db, deck, run, config, policy);
     return 0;
 }
@@ -688,7 +718,10 @@ int simulate_request(const std::filesystem::path& request_path,
             return 2;
         }
         const cs::RunSummary run =
-            cs::simulate_batch(db, effects, pack.patterns, config, policy, seed, 0, games);
+            drive<cs::RunSummary>(games, threads, [&](int first, int count) {
+                return cs::simulate_batch(db, effects, pack.patterns, config, policy, seed,
+                                          first, count);
+            });
         std::vector<cs::io::ServiceAblationResult> ablations;
         if (do_ablation) {
             const int replacement = cs::slot_of_listed(db, pack.ablation_replacement);
@@ -1378,8 +1411,7 @@ int main(int argc, char** argv) {
     // tail cannot separate opening hands and this tool is a mulligan solver's
     // value function.
     int objective_turn = 3;
-    int threads = static_cast<int>(std::thread::hardware_concurrency());
-    threads = threads > 0 ? threads : 1;
+    int threads = default_thread_count();
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--games") == 0 && i + 1 < argc) {
             games = std::atoi(argv[++i]);
@@ -1451,7 +1483,7 @@ int main(int argc, char** argv) {
                      objective_turn, only);
     }
     if (games > 0) {
-        return simulate(path, deck_path, effects_path, games, seed);
+        return simulate(path, deck_path, effects_path, games, seed, threads);
     }
     return summarise(path);
 }
