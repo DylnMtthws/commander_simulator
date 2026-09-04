@@ -427,7 +427,7 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db,
     }
 
     const auto append_patterns = [&](const toml::table& document, bool inherited,
-                                     const std::string& source) {
+                                     const std::string& pattern_source) {
     if (const auto* engines = document["engine"].as_array()) {
         for (const toml::node& node : *engines) {
             const auto* entry = node.as_table();
@@ -436,7 +436,7 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db,
             engine.name = (*entry)["name"].value_or<std::string>("");
             if (engine.name.empty()) fail("every [[engine]] needs a name");
             const std::string context = "engine '" + engine.name + "'";
-            if (inherited && !library_entry_applies(*entry, db, source + ": " + context)) {
+            if (inherited && !library_entry_applies(*entry, db, pattern_source + ": " + context)) {
                 continue;
             }
 
@@ -468,7 +468,7 @@ DeckFile load_deck(const std::filesystem::path& path, const CardDb& db,
             if (pattern.name.empty()) fail("every [[win]] needs a name");
             reject_outcome_naming(pattern.name);
             const std::string context = "pattern '" + pattern.name + "'";
-            if (inherited && !library_entry_applies(*entry, db, source + ": " + context)) {
+            if (inherited && !library_entry_applies(*entry, db, pattern_source + ": " + context)) {
                 continue;
             }
             pattern.terminal_state =
