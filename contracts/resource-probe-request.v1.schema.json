@@ -1,0 +1,108 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "cards",
+    "commander_cost",
+    "extra_land_plays",
+    "landfall_draw",
+    "games",
+    "turns",
+    "seed",
+    "deck_identity"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "resource-probe-request.v1"
+    },
+    "cards": {
+      "type": "array",
+      "minItems": 99,
+      "maxItems": 99,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "land",
+          "colors",
+          "tapped"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "land": {
+            "type": "boolean"
+          },
+          "colors": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 31
+          },
+          "tapped": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "commander_cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generic",
+        "pips"
+      ],
+      "properties": {
+        "generic": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 30
+        },
+        "pips": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10
+          }
+        }
+      }
+    },
+    "extra_land_plays": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2
+    },
+    "landfall_draw": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2
+    },
+    "games": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20000
+    },
+    "turns": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 12
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2147483647
+    },
+    "deck_identity": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Controlled land/commander-only experiment, not general gameplay. Facts compiled by trusted caller. Ordered slot identity and behavior hash verified by C++."
+}

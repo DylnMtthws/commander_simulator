@@ -66,9 +66,13 @@ def settings(cards: Path | None, *, database_url: str | None = None) -> Settings
     )
 
 
-def sweep_worker_settings(cards: Path | None, *, token: str | None = SWEEP_TOKEN) -> Settings:
+def sweep_worker_settings(
+    cards: Path | None, *, token: str | None = SWEEP_TOKEN
+) -> Settings:
     """What deploy/fly.sweep.toml configures: sweeps allowed, token required."""
-    return replace(settings(cards), allow_sweep=True, sweep_token=token, timeout_seconds=120)
+    return replace(
+        settings(cards), allow_sweep=True, sweep_token=token, timeout_seconds=120
+    )
 
 
 @contextmanager
@@ -127,7 +131,9 @@ def rehash_candidate(document: dict[str, Any]) -> None:
     )
 
 
-def test_healthz_is_fast_and_reports_installed_pack(repro_files: tuple[Path, Path]) -> None:
+def test_healthz_is_fast_and_reports_installed_pack(
+    repro_files: tuple[Path, Path],
+) -> None:
     cards, _ = repro_files
     with running_server(settings(cards)) as (_, port):
         status, _, body = exchange(port, "GET", "/healthz")
@@ -154,7 +160,9 @@ def test_valid_request_round_trips_and_validates_v3_schema(
         status, headers, body = exchange(port, "POST", "/simulate", request)
 
     result = json.loads(body)
-    schema = json.loads((ROOT / "contracts/cedh-simulation-result.v3.schema.json").read_text())
+    schema = json.loads(
+        (ROOT / "contracts/cedh-simulation-result.v3.schema.json").read_text()
+    )
     Draft202012Validator(schema, format_checker=FormatChecker()).validate(result)
     assert status == 200
     assert result["simulation"]["games"] == 20
@@ -185,7 +193,12 @@ def test_multiple_named_ablations_are_forwarded(repro_files: tuple[Path, Path]) 
         {},
         {"schema_version": REQUEST_SCHEMA, "candidate": [], "games": 1},
         {"schema_version": REQUEST_SCHEMA, "candidate": {}, "games": "20"},
-        {"schema_version": REQUEST_SCHEMA, "candidate": {}, "sweep": True, "ablate": ["Sol Ring"]},
+        {
+            "schema_version": REQUEST_SCHEMA,
+            "candidate": {},
+            "sweep": True,
+            "ablate": ["Sol Ring"],
+        },
     ],
 )
 def test_invalid_requests_are_400(
@@ -330,7 +343,10 @@ def test_an_unversioned_request_envelope_is_refused(
     cards, candidate_path = repro_files
     with running_server(settings(cards)) as (_, port):
         status, _, body = exchange(
-            port, "POST", "/simulate", {"candidate": candidate(candidate_path), "games": 1}
+            port,
+            "POST",
+            "/simulate",
+            {"candidate": candidate(candidate_path), "games": 1},
         )
     assert status == 400
     assert json.loads(body)["error"] == "invalid_request"
@@ -347,7 +363,12 @@ def test_the_result_reports_both_hashes_and_they_mean_different_things(
             port,
             "POST",
             "/simulate",
-            {"schema_version": REQUEST_SCHEMA, "candidate": submitted, "games": 2, "seed": 7},
+            {
+                "schema_version": REQUEST_SCHEMA,
+                "candidate": submitted,
+                "games": 2,
+                "seed": 7,
+            },
         )
     assert status == 200
     result = json.loads(body)
@@ -378,8 +399,12 @@ def test_the_same_deck_under_two_seeds_keeps_one_deck_hash(
             )
             assert status == 200
             results.append(json.loads(body))
-    assert results[0]["candidate"]["deck_sha256"] == results[1]["candidate"]["deck_sha256"]
-    assert results[0]["simulation_input_sha256"] != results[1]["simulation_input_sha256"]
+    assert (
+        results[0]["candidate"]["deck_sha256"] == results[1]["candidate"]["deck_sha256"]
+    )
+    assert (
+        results[0]["simulation_input_sha256"] != results[1]["simulation_input_sha256"]
+    )
 
 
 def test_export_failure_is_503(repro_files: tuple[Path, Path]) -> None:
@@ -387,7 +412,10 @@ def test_export_failure_is_503(repro_files: tuple[Path, Path]) -> None:
     configuration = settings(None, database_url="postgresql://unreachable/example")
     with (
         running_server(configuration) as (_, port),
-        patch("mtgsim_service.server.export_candidate", side_effect=RuntimeError("offline")),
+        patch(
+            "mtgsim_service.server.export_candidate",
+            side_effect=RuntimeError("offline"),
+        ),
     ):
         status, _, body = exchange(
             port,
@@ -430,7 +458,9 @@ def test_simulator_timeout_is_504(repro_files: tuple[Path, Path]) -> None:
 
 def test_other_nonzero_exit_is_500(repro_files: tuple[Path, Path]) -> None:
     cards, candidate_path = repro_files
-    failed = subprocess.CompletedProcess(["cs"], 7, stdout=b"", stderr=b"engine failure")
+    failed = subprocess.CompletedProcess(
+        ["cs"], 7, stdout=b"", stderr=b"engine failure"
+    )
     with (
         running_server(settings(cards)) as (_, port),
         patch("mtgsim_service.server.subprocess.run", return_value=failed),
@@ -514,7 +544,9 @@ def test_offline_file_and_dsn_require_explicit_testing_mode(
 # much ablation work one request may name, and the batch tier demands a token.
 
 
-def test_sweep_is_refused_by_the_interactive_service(repro_files: tuple[Path, Path]) -> None:
+def test_sweep_is_refused_by_the_interactive_service(
+    repro_files: tuple[Path, Path],
+) -> None:
     cards, candidate_path = repro_files
     request = {
         "schema_version": REQUEST_SCHEMA,
@@ -528,7 +560,9 @@ def test_sweep_is_refused_by_the_interactive_service(repro_files: tuple[Path, Pa
     assert json.loads(body)["error"] == "sweep_not_allowed"
 
 
-def test_sweep_refusal_precedes_any_simulator_work(repro_files: tuple[Path, Path]) -> None:
+def test_sweep_refusal_precedes_any_simulator_work(
+    repro_files: tuple[Path, Path],
+) -> None:
     """The 403 must cost nothing; `cs` is never started."""
     cards, candidate_path = repro_files
     request = {
@@ -574,7 +608,9 @@ def test_sweep_worker_requires_a_bearer_token(repro_files: tuple[Path, Path]) ->
         wrong, _, wrong_body = exchange(
             port, "POST", "/simulate", request, authorization="Bearer wrong-token"
         )
-        malformed, _, _ = exchange(port, "POST", "/simulate", request, authorization=SWEEP_TOKEN)
+        malformed, _, _ = exchange(
+            port, "POST", "/simulate", request, authorization=SWEEP_TOKEN
+        )
     assert missing == wrong == malformed == 401
     assert json.loads(missing_body)["error"] == "unauthorized"
     assert json.loads(wrong_body)["error"] == "unauthorized"
@@ -591,7 +627,9 @@ def test_sweep_worker_without_a_token_configured_refuses_rather_than_admits(
         "sweep": True,
     }
     with running_server(sweep_worker_settings(cards, token=None)) as (_, port):
-        status, _, body = exchange(port, "POST", "/simulate", request, authorization="Bearer ")
+        status, _, body = exchange(
+            port, "POST", "/simulate", request, authorization="Bearer "
+        )
     assert status == 403
     assert json.loads(body)["error"] == "sweep_not_allowed"
 
@@ -675,7 +713,9 @@ def test_sweep_worker_environment_enables_sweeps(
 # --- The explicit batch entry point --------------------------------------
 
 
-def test_sweep_settings_allow_sweeps_and_size_independently(repro_files: tuple[Path, Path]) -> None:
+def test_sweep_settings_allow_sweeps_and_size_independently(
+    repro_files: tuple[Path, Path],
+) -> None:
     cards, _ = repro_files
     base = settings(cards)
     batch = sweep_settings(base, threads=8, timeout_seconds=900)
@@ -708,7 +748,10 @@ def test_sweep_settings_reject_nonsense_sizes(
 
 
 def test_sweep_cli_runs_a_sweep_the_web_tier_would_refuse(
-    clean_env: Path, tmp_path: Path, repro_files: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+    clean_env: Path,
+    tmp_path: Path,
+    repro_files: tuple[Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _, candidate_path = repro_files
     monkeypatch.setenv("CS_BIN", str(settings(None).cs_bin))
@@ -760,7 +803,9 @@ def test_interactive_deployment_is_small_and_refuses_sweeps() -> None:
     assert int(config["env"]["CS_THREADS"]) == 2
     assert int(config["env"]["SIM_MAX_ABLATIONS"]) == DEFAULT_MAX_ABLATIONS
     size = config["vm"][0]["size"]
-    assert size == "shared-cpu-2x", f"web tier is sized from interactive load, not {size}"
+    assert (
+        size == "shared-cpu-2x"
+    ), f"web tier is sized from interactive load, not {size}"
 
 
 def test_sweep_deployment_is_separate_and_never_idles() -> None:
@@ -782,3 +827,145 @@ def test_deploy_configs_carry_no_secrets(name: str) -> None:
     env = deploy_config(name).get("env", {})
     assert "MTGSIM_DATABASE_URL" not in env
     assert "SIM_SWEEP_TOKEN" not in env
+
+
+# Resource probes are additive and opt-in; their compiled input bypasses neither
+# authorization nor the shared capacity limit used by existing simulation.
+def resource_request() -> dict[str, Any]:
+    import hashlib
+
+    cards = [{"id": "Forest", "land": True, "colors": 16, "tapped": False}] * 99
+    ids = json.dumps([c["id"] for c in cards], separators=(",", ":"))
+    return {
+        "schema_version": "resource-probe-request.v1",
+        "cards": cards,
+        "commander_cost": {"generic": 0, "pips": [0, 0, 0, 0, 1]},
+        "extra_land_plays": 0,
+        "landfall_draw": 0,
+        "games": 20,
+        "turns": 6,
+        "seed": 1,
+        "deck_identity": "sha256:" + hashlib.sha256(ids.encode()).hexdigest(),
+    }
+
+
+def test_resource_probe_disabled_and_authorized(monkeypatch, repro_files):
+    cards, _ = repro_files
+    monkeypatch.delenv("SIM_RESOURCE_TOKEN", raising=False)
+    with running_server(settings(cards)) as (_, port):
+        assert not json.loads(exchange(port, "GET", "/capabilities")[2])[
+            "resource_probe"
+        ]["enabled"]
+        assert (
+            exchange(port, "POST", "/resource-simulate", resource_request())[0] == 503
+        )
+        monkeypatch.setenv("SIM_RESOURCE_TOKEN", "test-resource-token")
+        with patch("mtgsim_service.server.subprocess.run") as run:
+            for token in (None, "Bearer wrong", "test-resource-token"):
+                assert (
+                    exchange(
+                        port,
+                        "POST",
+                        "/resource-simulate",
+                        resource_request(),
+                        authorization=token,
+                    )[0]
+                    == 401
+                )
+            run.assert_not_called()
+        code, _, raw = exchange(
+            port,
+            "POST",
+            "/resource-simulate",
+            resource_request(),
+            authorization="Bearer test-resource-token",
+        )
+        assert code == 200
+        result = json.loads(raw)
+        Draft202012Validator(
+            json.loads(
+                (ROOT / "contracts/resource-probe-result.v1.schema.json").read_text()
+            )
+        ).validate(result)
+        assert result["commander_cast_count"] == 20
+        assert result["lands_mean"] == 6
+
+
+@pytest.mark.parametrize("fault", ["identity", "unknown", "boolean", "count"])
+def test_resource_probe_rejects_bad_compiled_inputs(monkeypatch, repro_files, fault):
+    monkeypatch.setenv("SIM_RESOURCE_TOKEN", "test-resource-token")
+    cards, _ = repro_files
+    request = resource_request()
+    if fault == "identity":
+        request["deck_identity"] = "sha256:" + "0" * 64
+    if fault == "unknown":
+        request["win_rate"] = 1
+    if fault == "boolean":
+        request["cards"][0]["land"] = 1
+    if fault == "count":
+        request["cards"].pop()
+    with running_server(settings(cards)) as (_, port):
+        assert (
+            exchange(
+                port,
+                "POST",
+                "/resource-simulate",
+                request,
+                authorization="Bearer test-resource-token",
+            )[0]
+            == 422
+        )
+        assert (
+            exchange(
+                port,
+                "POST",
+                "/resource-simulate",
+                resource_request(),
+                authorization="Bearer test-resource-token",
+            )[0]
+            == 200
+        )
+
+
+def test_resource_capacity_and_timeout_release(monkeypatch, repro_files):
+    monkeypatch.setenv("SIM_RESOURCE_TOKEN", "test-resource-token")
+    cards, _ = repro_files
+    with running_server(settings(cards)) as (server, port):
+        server.service.slots.acquire()
+        try:
+            assert (
+                exchange(
+                    port,
+                    "POST",
+                    "/resource-simulate",
+                    resource_request(),
+                    authorization="Bearer test-resource-token",
+                )[0]
+                == 429
+            )
+        finally:
+            server.service.slots.release()
+        with patch(
+            "mtgsim_service.server.subprocess.run",
+            side_effect=subprocess.TimeoutExpired("cs", 5),
+        ):
+            assert (
+                exchange(
+                    port,
+                    "POST",
+                    "/resource-simulate",
+                    resource_request(),
+                    authorization="Bearer test-resource-token",
+                )[0]
+                == 502
+            )
+        assert (
+            exchange(
+                port,
+                "POST",
+                "/resource-simulate",
+                resource_request(),
+                authorization="Bearer test-resource-token",
+            )[0]
+            == 200
+        )

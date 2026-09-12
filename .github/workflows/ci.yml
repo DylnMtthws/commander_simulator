@@ -244,3 +244,23 @@ jobs:
           assert result["simulation_input_sha256"] != result["candidate"]["deck_sha256"]
           assert result["run_id"] == "run-" + result["simulation_input_sha256"][7:31]
           PY
+
+      - name: Package tested resource probe for generator releases
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p release
+          container_id=$(docker create mtgsim:ci)
+          docker cp "${container_id}:/app/cs" release/cs
+          docker rm "${container_id}"
+          docker image inspect mtgsim:ci > release/image.json
+          cd release
+          sha256sum cs > SHA256SUMS
+
+      - name: Retain tested resource probe
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: resource-probe-${{ github.sha }}
+          path: release/
+          retention-days: 7
+          compression-level: 0
