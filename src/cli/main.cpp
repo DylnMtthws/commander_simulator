@@ -1,3 +1,4 @@
+#include "io/resource_probe_io.hpp"
 // Loads a card database and prints what it found.
 //
 // The first end-to-end path: exporter -> cards.json -> C++ -> a summary a human
@@ -1482,6 +1483,17 @@ int grid(const std::filesystem::path& path, const std::filesystem::path& deck_pa
 }
 
 int main(int argc, char** argv) {
+    if (argc == 3 && std::strcmp(argv[1], "--resource-request") == 0) {
+        try {
+            const auto result = cs::io::run_resource_request(argv[2]);
+            std::printf("%s\n", result.c_str());
+            return 0;
+        } catch (const std::exception& e) {
+            std::fprintf(stderr, "error: resource request rejected: %s\n", e.what());
+            return 2;
+        }
+    }
+
     if (argc == 2 && std::strcmp(argv[1], "--version") == 0) {
         print_view("%.*s", cs::version());
         std::printf(" %.*s\n", static_cast<int>(cs::build_flavour().size()),

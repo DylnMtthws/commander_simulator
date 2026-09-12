@@ -95,7 +95,9 @@ class Settings:
         cards_file = Path(cards_value) if cards_value else None
         testing = os.environ.get("SIM_TESTING") == "1"
         if database_url is None and cards_file is None:
-            raise ValueError("MTGSIM_DATABASE_URL is required unless SIM_CARDS_FILE is set")
+            raise ValueError(
+                "MTGSIM_DATABASE_URL is required unless SIM_CARDS_FILE is set"
+            )
         if database_url is not None and cards_file is not None and not testing:
             raise ValueError(
                 "MTGSIM_DATABASE_URL and SIM_CARDS_FILE may coexist only with SIM_TESTING=1"
@@ -177,12 +179,18 @@ class SimulatorService:
                 check=False,
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
-            raise RuntimeError(f"cannot execute CS_BIN {self.settings.cs_bin}: {exc}") from exc
+            raise RuntimeError(
+                f"cannot execute CS_BIN {self.settings.cs_bin}: {exc}"
+            ) from exc
         if completed.returncode != 0:
-            raise RuntimeError(f"CS_BIN --version failed: {_stderr_tail(completed.stderr).strip()}")
+            raise RuntimeError(
+                f"CS_BIN --version failed: {_stderr_tail(completed.stderr).strip()}"
+            )
         fields = completed.stdout.decode(errors="replace").strip().split()
         if len(fields) < 2:
-            raise RuntimeError("CS_BIN --version did not return '<semver> <build-type>'")
+            raise RuntimeError(
+                "CS_BIN --version did not return '<semver> <build-type>'"
+            )
         return fields[0]
 
     def _read_strategy_packs(self) -> list[str]:
@@ -209,7 +217,9 @@ class SimulatorService:
         with tempfile.TemporaryDirectory(prefix="mtgsim-") as directory:
             temporary = Path(directory)
             candidate_path = temporary / "candidate.json"
-            candidate_path.write_text(json.dumps(candidate_document, ensure_ascii=False) + "\n")
+            candidate_path.write_text(
+                json.dumps(candidate_document, ensure_ascii=False) + "\n"
+            )
             try:
                 candidate = load_candidate(candidate_path)
             except CandidateError as exc:
@@ -301,7 +311,9 @@ class SimulatorService:
                         detail or f"cs refused the request ({code})",
                         stderr,
                     )
-                detail = stderr.strip() or f"cs exited with status {completed.returncode}"
+                detail = (
+                    stderr.strip() or f"cs exited with status {completed.returncode}"
+                )
                 if detail.startswith("error: "):
                     detail = detail[7:]
                 raise RequestFailure(
@@ -348,7 +360,9 @@ class RequestHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: object) -> None:
         return
 
-    def _send_bytes(self, status: int, body: bytes, headers: dict[str, str] | None = None) -> None:
+    def _send_bytes(
+        self, status: int, body: bytes, headers: dict[str, str] | None = None
+    ) -> None:
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
@@ -357,7 +371,9 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _fail(self, failure: RequestFailure, headers: dict[str, str] | None = None) -> None:
+    def _fail(
+        self, failure: RequestFailure, headers: dict[str, str] | None = None
+    ) -> None:
         body = json.dumps(
             {"error": failure.code, "detail": failure.detail, "stderr": failure.stderr},
             separators=(",", ":"),
@@ -365,8 +381,34 @@ class RequestHandler(BaseHTTPRequestHandler):
         self._send_bytes(failure.status, body, headers)
 
     def do_GET(self) -> None:
+        if urlsplit(self.path).path == "/capabilities":
+            enabled = bool(os.environ.get("SIM_RESOURCE_TOKEN"))
+            self._send_bytes(
+                HTTPStatus.OK,
+                json.dumps(
+                    {
+                        "schema_version": "simulator-capabilities.v1",
+                        "resource_probe": {
+                            "enabled": enabled,
+                            "request_schema": "resource-probe-request.v1",
+                            "scenario": "commander-land-engine-only.v1",
+                            "max_games": min(
+                                20000, self.server.service.settings.max_games
+                            ),
+                            "limitations": [
+                                "no noncommander spells",
+                                "no opponents or combat",
+                                "only compiled simple lands",
+                            ],
+                        },
+                    }
+                ).encode(),
+            )
+            return
         if urlsplit(self.path).path != "/healthz":
-            self._fail(RequestFailure(HTTPStatus.NOT_FOUND, "not_found", "route not found"))
+            self._fail(
+                RequestFailure(HTTPStatus.NOT_FOUND, "not_found", "route not found")
+            )
             return
         service = self.server.service
         body = json.dumps(
@@ -381,20 +423,28 @@ class RequestHandler(BaseHTTPRequestHandler):
         self._send_bytes(HTTPStatus.OK, body)
 
     def _read_request(self) -> dict[str, Any]:
-        content_type = self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
+        content_type = (
+            self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
+        )
         if content_type != "application/json":
             raise RequestFailure(
-                HTTPStatus.BAD_REQUEST, "invalid_request", "Content-Type must be application/json"
+                HTTPStatus.BAD_REQUEST,
+                "invalid_request",
+                "Content-Type must be application/json",
             )
         try:
             length = int(self.headers.get("Content-Length", ""))
         except ValueError as exc:
             raise RequestFailure(
-                HTTPStatus.BAD_REQUEST, "invalid_request", "Content-Length must be an integer"
+                HTTPStatus.BAD_REQUEST,
+                "invalid_request",
+                "Content-Length must be an integer",
             ) from exc
         if length < 1 or length > MAX_REQUEST_BYTES:
             raise RequestFailure(
-                HTTPStatus.BAD_REQUEST, "invalid_request", "request body size is invalid"
+                HTTPStatus.BAD_REQUEST,
+                "invalid_request",
+                "request body size is invalid",
             )
         try:
             document = json.loads(self.rfile.read(length))
@@ -404,7 +454,9 @@ class RequestHandler(BaseHTTPRequestHandler):
             ) from exc
         if not isinstance(document, dict):
             raise RequestFailure(
-                HTTPStatus.BAD_REQUEST, "invalid_request", "request must be a JSON object"
+                HTTPStatus.BAD_REQUEST,
+                "invalid_request",
+                "request must be a JSON object",
             )
         return document
 
@@ -424,7 +476,9 @@ class RequestHandler(BaseHTTPRequestHandler):
                 "sweep worker is misconfigured: SIM_SWEEP_TOKEN is unset",
             )
         scheme, _, presented = self.headers.get("Authorization", "").partition(" ")
-        if scheme.lower() != "bearer" or not compare_digest(presented.strip(), expected):
+        if scheme.lower() != "bearer" or not compare_digest(
+            presented.strip(), expected
+        ):
             raise RequestFailure(
                 HTTPStatus.UNAUTHORIZED,
                 "unauthorized",
@@ -440,17 +494,98 @@ class RequestHandler(BaseHTTPRequestHandler):
             )
         return value
 
+    def _resource_simulate(self) -> None:
+        service = self.server.service
+        expected = os.environ.get("SIM_RESOURCE_TOKEN")
+        if not expected:
+            self._fail(
+                RequestFailure(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    "disabled",
+                    "resource probe is disabled",
+                )
+            )
+            return
+        scheme, _, token = self.headers.get("Authorization", "").partition(" ")
+        if scheme.lower() != "bearer" or not compare_digest(token, expected):
+            self._fail(
+                RequestFailure(
+                    HTTPStatus.UNAUTHORIZED,
+                    "unauthorized",
+                    "resource probe requires authentication",
+                )
+            )
+            return
+        acquired = False
+        try:
+            document = self._read_request()
+            games = self._integer(document, "games", 0)
+            if not 1 <= games <= min(20000, service.settings.max_games):
+                raise RequestFailure(
+                    HTTPStatus.BAD_REQUEST, "invalid_request", "invalid game budget"
+                )
+            acquired = service.slots.acquire(blocking=False)
+            if not acquired:
+                raise RequestFailure(
+                    HTTPStatus.TOO_MANY_REQUESTS, "busy", "simulator is busy"
+                )
+            with tempfile.TemporaryDirectory(prefix="resource-probe-") as folder:
+                path = Path(folder) / "request.json"
+                path.write_text(json.dumps(document))
+                completed = subprocess.run(
+                    [service.settings.cs_bin, "--resource-request", str(path)],
+                    capture_output=True,
+                    timeout=min(10, service.settings.timeout_seconds),
+                    check=False,
+                )
+                if completed.returncode or len(completed.stdout) > 1_000_000:
+                    raise RequestFailure(
+                        HTTPStatus.UNPROCESSABLE_ENTITY,
+                        "unsupported",
+                        "resource request rejected",
+                    )
+                result = json.loads(completed.stdout)
+                if result.get("schema_version") != "resource-probe-result.v1":
+                    raise RequestFailure(
+                        HTTPStatus.BAD_GATEWAY,
+                        "invalid_result",
+                        "resource result rejected",
+                    )
+                self._send_bytes(HTTPStatus.OK, completed.stdout)
+        except RequestFailure as failure:
+            self._fail(failure)
+        except (OSError, subprocess.SubprocessError, ValueError, TypeError):
+            self._fail(
+                RequestFailure(
+                    HTTPStatus.BAD_GATEWAY, "unavailable", "resource probe unavailable"
+                )
+            )
+        finally:
+            if acquired:
+                service.slots.release()
+
     def do_POST(self) -> None:
+        if urlsplit(self.path).path == "/resource-simulate":
+            self._resource_simulate()
+            return
         if urlsplit(self.path).path != "/simulate":
-            self._fail(RequestFailure(HTTPStatus.NOT_FOUND, "not_found", "route not found"))
+            self._fail(
+                RequestFailure(HTTPStatus.NOT_FOUND, "not_found", "route not found")
+            )
             return
         service = self.server.service
         settings = service.settings
         try:
             document = self._read_request()
             allowed = {
-                "schema_version", "candidate", "games", "turn", "seed",
-                "scenario", "sweep", "ablate",
+                "schema_version",
+                "candidate",
+                "games",
+                "turn",
+                "seed",
+                "scenario",
+                "sweep",
+                "ablate",
             }
             unknown = sorted(set(document) - allowed)
             if unknown:
@@ -482,7 +617,9 @@ class RequestHandler(BaseHTTPRequestHandler):
             seed = self._integer(document, "seed", 12345)
             if games < 1:
                 raise RequestFailure(
-                    HTTPStatus.BAD_REQUEST, "invalid_request", "games must be at least 1"
+                    HTTPStatus.BAD_REQUEST,
+                    "invalid_request",
+                    "games must be at least 1",
                 )
             if games > settings.max_games:
                 raise RequestFailure(
@@ -505,7 +642,9 @@ class RequestHandler(BaseHTTPRequestHandler):
             ablate = document.get("ablate", [])
             if not isinstance(scenario, str):
                 raise RequestFailure(
-                    HTTPStatus.BAD_REQUEST, "invalid_request", "scenario must be a string"
+                    HTTPStatus.BAD_REQUEST,
+                    "invalid_request",
+                    "scenario must be a string",
                 )
             if not isinstance(sweep, bool):
                 raise RequestFailure(
@@ -537,7 +676,9 @@ class RequestHandler(BaseHTTPRequestHandler):
 
             if not service.slots.acquire(blocking=False):
                 self._fail(
-                    RequestFailure(HTTPStatus.TOO_MANY_REQUESTS, "busy", "simulator is busy"),
+                    RequestFailure(
+                        HTTPStatus.TOO_MANY_REQUESTS, "busy", "simulator is busy"
+                    ),
                     {"Retry-After": "5"},
                 )
                 return
@@ -579,7 +720,9 @@ def make_server(
     settings: Settings, host: str = "0.0.0.0", port: int | None = None
 ) -> ServiceHTTPServer:
     return ServiceHTTPServer(
-        (host, settings.port if port is None else port), RequestHandler, SimulatorService(settings)
+        (host, settings.port if port is None else port),
+        RequestHandler,
+        SimulatorService(settings),
     )
 
 
@@ -607,7 +750,9 @@ def assert_startup_database_role(settings: Settings) -> None:
     if settings.cards_file is not None:
         return
     if not settings.database_url:
-        raise ValueError("MTGSIM_DATABASE_URL must be set for database-backed service startup")
+        raise ValueError(
+            "MTGSIM_DATABASE_URL must be set for database-backed service startup"
+        )
     try:
         with psycopg.connect(
             settings.database_url,

@@ -28,6 +28,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Catch2)
 
 add_executable(cs_tests
+    unit/test_resource_probe.cpp
     unit/test_smoke.cpp
     unit/test_card_db_load.cpp
     unit/test_mana.cpp

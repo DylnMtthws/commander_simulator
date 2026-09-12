@@ -15,6 +15,7 @@
 # subtler cases that still compile.
 
 add_library(cs_core
+    resource_probe.cpp
     version.cpp
     mana.cpp
     state.cpp
